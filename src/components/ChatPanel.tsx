@@ -6,7 +6,7 @@ import { MensagemAtiva, FilaAtendimento } from '@/types/atendimento';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -150,22 +150,20 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
         />
       )}
       
-      {/* Messages */}
-      <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
-        <div className="p-4">
-          {mensagensLoading ? (
-            <div className="flex items-center justify-center h-32">
-              <Loader2 className="w-6 h-6 animate-spin text-primary" />
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {mensagens?.map((msg) => (
-                <MessageBubble key={msg.id} mensagem={msg} />
-              ))}
-            </div>
-          )}
-        </div>
-      </ScrollArea>
+      {/* Messages - área de scroll */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-4" ref={scrollRef}>
+        {mensagensLoading ? (
+          <div className="flex items-center justify-center h-32">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {mensagens?.map((msg) => (
+              <MessageBubble key={msg.id} mensagem={msg} />
+            ))}
+          </div>
+        )}
+      </div>
       
       {/* Input */}
       {canRespond && (

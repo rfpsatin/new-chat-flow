@@ -28,7 +28,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               <div className="flex-1" />
               <DevToggle />
             </header>
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-hidden h-0">
               {children}
             </div>
           </main>

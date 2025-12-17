@@ -294,16 +294,16 @@ async function findOrCreateConversa(
   contatoId: string,
   requestId: string
 ) {
-  console.log(`[${requestId}] Finding active conversation for contact: ${contatoId}`)
+  console.log(`[${requestId}] Finding conversation for contact: ${contatoId}`)
   
-  // Find active conversation (not encerrado)
-  const { data: existingConversa, error: findError } = await supabase
+  // Find the most recent conversation for this contact (any status)
+  const { data: ultimaConversa, error: findError } = await supabase
     .from('conversas')
     .select('*')
     .eq('empresa_id', empresaId)
     .eq('contato_id', contatoId)
-    .neq('status', 'encerrado')
     .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   if (findError) {
@@ -311,12 +311,38 @@ async function findOrCreateConversa(
     throw findError
   }
 
-  if (existingConversa) {
-    console.log(`[${requestId}] Found existing conversation: ${existingConversa.id} (status: ${existingConversa.status})`)
-    return existingConversa
+  // If conversation exists and is closed, reopen it
+  if (ultimaConversa && ultimaConversa.status === 'encerrado') {
+    console.log(`[${requestId}] Found closed conversation: ${ultimaConversa.id}, reopening...`)
+    
+    const { error: updateError } = await supabase
+      .from('conversas')
+      .update({
+        status: 'fila_humano',
+        encerrado_em: null,
+        encerrado_por_id: null,
+        motivo_encerramento_id: null,
+        agente_responsavel_id: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', ultimaConversa.id)
+
+    if (updateError) {
+      console.error(`[${requestId}] ERROR reopening conversation:`, updateError)
+      throw updateError
+    }
+
+    console.log(`[${requestId}] Conversation reopened: ${ultimaConversa.id}`)
+    return { ...ultimaConversa, status: 'fila_humano' }
   }
 
-  // Create new conversation with status 'fila_humano' (ready for human agent)
+  // If conversation exists and is active, use it
+  if (ultimaConversa) {
+    console.log(`[${requestId}] Found active conversation: ${ultimaConversa.id} (status: ${ultimaConversa.status})`)
+    return ultimaConversa
+  }
+
+  // No conversation exists, create new one
   console.log(`[${requestId}] Creating new conversation`)
   const { data: newConversa, error: createError } = await supabase
     .from('conversas')
