@@ -18,12 +18,14 @@ import {
   Users, 
   Clock, 
   LogOut,
-  LayoutDashboard
+  LayoutDashboard,
+  Headphones
 } from 'lucide-react';
 
 const menuItems = [
   { title: 'Fila de Atendimento', url: '/', icon: LayoutDashboard },
   { title: 'Contatos', url: '/contatos', icon: Users },
+  { title: 'Atendentes', url: '/atendentes', icon: Headphones },
   { title: 'Histórico', url: '/historico', icon: Clock },
 ];
 

@@ -7,6 +7,7 @@ import { AppProvider } from "@/contexts/AppContext";
 import FilaPage from "./pages/FilaPage";
 import ContatosPage from "./pages/ContatosPage";
 import HistoricoPage from "./pages/HistoricoPage";
+import AtendentesPage from "./pages/AtendentesPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
             <Route path="/" element={<FilaPage />} />
             <Route path="/contatos" element={<ContatosPage />} />
             <Route path="/historico" element={<HistoricoPage />} />
+            <Route path="/atendentes" element={<AtendentesPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
