@@ -112,7 +112,7 @@ export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelPro
   }
 
   return (
-    <ScrollArea className="h-full">
+    <ScrollArea className="absolute inset-0">
       <div className="py-4 space-y-6">
         {renderSection('Com Bot', comBot, comBot.length, <Bot className="w-4 h-4 text-muted-foreground" />, true)}
         {renderSection('Aguardando Triagem', aguardandoTriagem, aguardandoTriagem.length)}
