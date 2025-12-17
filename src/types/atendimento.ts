@@ -114,6 +114,12 @@ export interface ContatoComHistorico {
   total_sessoes: number;
 }
 
+export interface AtendenteComHistorico {
+  agente_id: string;
+  agente_nome: string | null;
+  total_sessoes: number;
+}
+
 export interface FiltrosHistorico {
   busca: string;
   operadorId: string | null;

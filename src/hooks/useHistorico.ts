@@ -1,8 +1,77 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { HistoricoConversa, ContatoComHistorico, FiltrosHistorico } from '@/types/atendimento';
+import { HistoricoConversa, ContatoComHistorico, AtendenteComHistorico, FiltrosHistorico } from '@/types/atendimento';
 import { startOfDay, endOfDay } from 'date-fns';
 
+// Lista atendentes que têm sessões finalizadas
+export function useAtendentesComHistorico(empresaId: string) {
+  return useQuery({
+    queryKey: ['atendentes-historico', empresaId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('vw_historico_conversas')
+        .select('agente_responsavel_id, agente_nome')
+        .eq('empresa_id', empresaId)
+        .not('agente_responsavel_id', 'is', null);
+
+      if (error) throw error;
+
+      // Agrupar por agente e contar sessões
+      const atendentesMap = new Map<string, AtendenteComHistorico>();
+      
+      data?.forEach((item) => {
+        if (!item.agente_responsavel_id) return;
+        
+        const existing = atendentesMap.get(item.agente_responsavel_id);
+        if (existing) {
+          existing.total_sessoes += 1;
+        } else {
+          atendentesMap.set(item.agente_responsavel_id, {
+            agente_id: item.agente_responsavel_id,
+            agente_nome: item.agente_nome,
+            total_sessoes: 1,
+          });
+        }
+      });
+
+      return Array.from(atendentesMap.values()).sort((a, b) => b.total_sessoes - a.total_sessoes);
+    },
+    enabled: !!empresaId,
+  });
+}
+
+// Lista sessões atendidas por um atendente específico
+export function useSessoesAtendente(empresaId: string, agenteId: string | null, filtros: FiltrosHistorico) {
+  return useQuery({
+    queryKey: ['sessoes-atendente', empresaId, agenteId, filtros],
+    queryFn: async () => {
+      if (!agenteId) return [];
+
+      let query = supabase
+        .from('vw_historico_conversas')
+        .select('*')
+        .eq('empresa_id', empresaId)
+        .eq('agente_responsavel_id', agenteId)
+        .order('iniciado_em', { ascending: false });
+
+      // Filtro por período
+      if (filtros.dataInicio) {
+        query = query.gte('iniciado_em', startOfDay(filtros.dataInicio).toISOString());
+      }
+      if (filtros.dataFim) {
+        query = query.lte('iniciado_em', endOfDay(filtros.dataFim).toISOString());
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      return data as HistoricoConversa[];
+    },
+    enabled: !!empresaId && !!agenteId,
+  });
+}
+
+// Lista contatos com histórico (usado quando há filtro de busca)
 export function useContatosComHistorico(empresaId: string, filtros: FiltrosHistorico) {
   return useQuery({
     queryKey: ['contatos-historico', empresaId, filtros],
@@ -59,6 +128,7 @@ export function useContatosComHistorico(empresaId: string, filtros: FiltrosHisto
   });
 }
 
+// Lista sessões de um contato específico
 export function useSessoesContato(empresaId: string, contatoId: string | null, filtros: FiltrosHistorico) {
   return useQuery({
     queryKey: ['sessoes-contato', empresaId, contatoId, filtros],

@@ -13,9 +13,10 @@ interface Props {
   filtros: FiltrosType;
   onFiltrosChange: (filtros: FiltrosType) => void;
   operadores: { id: string; nome: string }[];
+  ocultarOperador?: boolean;
 }
 
-export function FiltrosHistorico({ filtros, onFiltrosChange, operadores }: Props) {
+export function FiltrosHistorico({ filtros, onFiltrosChange, operadores, ocultarOperador = false }: Props) {
   const handleClearFiltros = () => {
     onFiltrosChange({
       busca: '',
@@ -35,28 +36,30 @@ export function FiltrosHistorico({ filtros, onFiltrosChange, operadores }: Props
         <Input
           value={filtros.busca}
           onChange={(e) => onFiltrosChange({ ...filtros, busca: e.target.value })}
-          placeholder="Nome ou telefone..."
+          placeholder="Buscar cliente por nome ou telefone..."
           className="pl-8 h-9"
         />
       </div>
 
-      {/* Operador */}
-      <Select
-        value={filtros.operadorId || 'all'}
-        onValueChange={(value) => onFiltrosChange({ ...filtros, operadorId: value === 'all' ? null : value })}
-      >
-        <SelectTrigger className="h-9">
-          <SelectValue placeholder="Operador" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Todos operadores</SelectItem>
-          {operadores.map((op) => (
-            <SelectItem key={op.id} value={op.id}>
-              {op.nome}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {/* Operador - oculto em modo atendentes */}
+      {!ocultarOperador && (
+        <Select
+          value={filtros.operadorId || 'all'}
+          onValueChange={(value) => onFiltrosChange({ ...filtros, operadorId: value === 'all' ? null : value })}
+        >
+          <SelectTrigger className="h-9">
+            <SelectValue placeholder="Operador" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos operadores</SelectItem>
+            {operadores.map((op) => (
+              <SelectItem key={op.id} value={op.id}>
+                {op.nome}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
 
       {/* Período */}
       <div className="flex gap-2">

@@ -1,12 +1,14 @@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
-import { FolderOpen, Clock, User } from 'lucide-react';
+import { FolderOpen, Clock, User, Phone } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { HistoricoConversa, ContatoComHistorico } from '@/types/atendimento';
+import { HistoricoConversa, ContatoComHistorico, AtendenteComHistorico } from '@/types/atendimento';
 
 interface Props {
+  modo: 'atendentes' | 'contatos';
+  atendente: AtendenteComHistorico | null;
   contato: ContatoComHistorico | null;
   sessoes: HistoricoConversa[];
   isLoading: boolean;
@@ -15,17 +17,24 @@ interface Props {
 }
 
 export function SessoesDetailPanel({
+  modo,
+  atendente,
   contato,
   sessoes,
   isLoading,
   sessoesAbertas,
   onToggleSessao,
 }: Props) {
-  if (!contato) {
+  const isAtendentes = modo === 'atendentes';
+  const temSelecao = isAtendentes ? !!atendente : !!contato;
+
+  if (!temSelecao) {
     return (
       <div className="h-full flex flex-col items-center justify-center bg-muted/30 text-muted-foreground">
         <FolderOpen className="w-10 h-10 mb-2" />
-        <p className="text-sm">Selecione um contato</p>
+        <p className="text-sm">
+          {isAtendentes ? 'Selecione um atendente' : 'Selecione um contato'}
+        </p>
       </div>
     );
   }
@@ -37,9 +46,23 @@ export function SessoesDetailPanel({
           <FolderOpen className="w-4 h-4 text-muted-foreground" />
           <h2 className="font-semibold text-sm">Sessões</h2>
         </div>
-        <p className="text-xs text-muted-foreground mt-1 truncate">
-          {contato.contato_nome || contato.whatsapp_numero}
-        </p>
+        {isAtendentes && atendente ? (
+          <p className="text-xs text-muted-foreground mt-1 truncate">
+            Atendidas por: {atendente.agente_nome || 'Sem nome'}
+          </p>
+        ) : contato ? (
+          <div className="mt-1">
+            <p className="text-xs font-medium truncate">
+              {contato.contato_nome || 'Sem nome'}
+            </p>
+            {contato.whatsapp_numero && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Phone className="w-3 h-3" />
+                {contato.whatsapp_numero}
+              </p>
+            )}
+          </div>
+        ) : null}
       </div>
 
       <ScrollArea className="flex-1">
@@ -88,7 +111,16 @@ export function SessoesDetailPanel({
                         </div>
                       )}
 
-                      {sessao.agente_nome && (
+                      {/* Mostrar nome do cliente quando em modo atendentes */}
+                      {isAtendentes && sessao.contato_nome && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                          <User className="w-3 h-3" />
+                          <span>{sessao.contato_nome}</span>
+                        </div>
+                      )}
+
+                      {/* Mostrar nome do agente quando em modo contatos */}
+                      {!isAtendentes && sessao.agente_nome && (
                         <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                           <User className="w-3 h-3" />
                           <span>{sessao.agente_nome}</span>

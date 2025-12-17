@@ -5,8 +5,14 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/componen
 import { ContatosMasterPanel } from '@/components/historico/ContatosMasterPanel';
 import { SessoesDetailPanel } from '@/components/historico/SessoesDetailPanel';
 import { MensagensMultiplasPanel } from '@/components/historico/MensagensMultiplasPanel';
-import { useContatosComHistorico, useSessoesContato, useOperadoresHistorico } from '@/hooks/useHistorico';
-import { FiltrosHistorico, HistoricoConversa } from '@/types/atendimento';
+import { 
+  useAtendentesComHistorico, 
+  useContatosComHistorico, 
+  useSessoesAtendente,
+  useSessoesContato, 
+  useOperadoresHistorico 
+} from '@/hooks/useHistorico';
+import { FiltrosHistorico, HistoricoConversa, AtendenteComHistorico, ContatoComHistorico } from '@/types/atendimento';
 
 export default function HistoricoPage() {
   const { empresaId } = useApp();
@@ -18,18 +24,41 @@ export default function HistoricoPage() {
     dataFim: null,
   });
   
-  const [contatoSelecionadoId, setContatoSelecionadoId] = useState<string | null>(null);
+  const [itemSelecionadoId, setItemSelecionadoId] = useState<string | null>(null);
   const [sessoesAbertasIds, setSessoesAbertasIds] = useState<string[]>([]);
 
+  // Detectar modo baseado nos filtros
+  const modoAtendentes = !filtros.busca && !filtros.operadorId;
+
   // Queries
+  const { data: atendentes = [], isLoading: loadingAtendentes } = useAtendentesComHistorico(empresaId);
   const { data: contatos = [], isLoading: loadingContatos } = useContatosComHistorico(empresaId, filtros);
-  const { data: sessoes = [], isLoading: loadingSessoes } = useSessoesContato(empresaId, contatoSelecionadoId, filtros);
+  const { data: sessoesAtendente = [], isLoading: loadingSessoesAtendente } = useSessoesAtendente(
+    empresaId, 
+    modoAtendentes ? itemSelecionadoId : null, 
+    filtros
+  );
+  const { data: sessoesContato = [], isLoading: loadingSessoesContato } = useSessoesContato(
+    empresaId, 
+    !modoAtendentes ? itemSelecionadoId : null, 
+    filtros
+  );
   const { data: operadores = [] } = useOperadoresHistorico(empresaId);
 
-  // Contato selecionado
+  // Dados baseados no modo
+  const sessoes = modoAtendentes ? sessoesAtendente : sessoesContato;
+  const loadingSessoes = modoAtendentes ? loadingSessoesAtendente : loadingSessoesContato;
+
+  // Item selecionado (atendente ou contato)
+  const atendenteSelecionado = useMemo(() => {
+    if (!modoAtendentes) return null;
+    return atendentes.find((a) => a.agente_id === itemSelecionadoId) || null;
+  }, [atendentes, itemSelecionadoId, modoAtendentes]);
+
   const contatoSelecionado = useMemo(() => {
-    return contatos.find((c) => c.contato_id === contatoSelecionadoId) || null;
-  }, [contatos, contatoSelecionadoId]);
+    if (modoAtendentes) return null;
+    return contatos.find((c) => c.contato_id === itemSelecionadoId) || null;
+  }, [contatos, itemSelecionadoId, modoAtendentes]);
 
   // Sessões abertas (objetos completos)
   const sessoesAbertas = useMemo(() => {
@@ -38,9 +67,22 @@ export default function HistoricoPage() {
       .filter((s): s is HistoricoConversa => s !== undefined);
   }, [sessoes, sessoesAbertasIds]);
 
-  const handleSelectContato = (contatoId: string) => {
-    setContatoSelecionadoId(contatoId);
-    setSessoesAbertasIds([]); // Limpar sessões abertas ao trocar de contato
+  const handleSelectItem = (id: string) => {
+    setItemSelecionadoId(id);
+    setSessoesAbertasIds([]); // Limpar sessões abertas ao trocar de seleção
+  };
+
+  const handleFiltrosChange = (novosFiltros: FiltrosHistorico) => {
+    const modoAnterior = !filtros.busca && !filtros.operadorId;
+    const novoModo = !novosFiltros.busca && !novosFiltros.operadorId;
+    
+    // Se mudou de modo, limpar seleção
+    if (modoAnterior !== novoModo) {
+      setItemSelecionadoId(null);
+      setSessoesAbertasIds([]);
+    }
+    
+    setFiltros(novosFiltros);
   };
 
   const handleToggleSessao = (conversaId: string) => {
@@ -66,20 +108,24 @@ export default function HistoricoPage() {
         <div className="p-4 border-b border-border">
           <h1 className="text-xl font-bold">Histórico de Atendimentos</h1>
           <p className="text-sm text-muted-foreground">
-            Visualize e pesquise conversas encerradas
+            {modoAtendentes 
+              ? 'Selecione um atendente para ver suas sessões finalizadas' 
+              : 'Busque por contatos para ver histórico de conversas'}
           </p>
         </div>
 
         <ResizablePanelGroup direction="horizontal" className="flex-1">
-          {/* Painel Master - Contatos */}
+          {/* Painel Master - Atendentes ou Contatos */}
           <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
             <ContatosMasterPanel
+              modo={modoAtendentes ? 'atendentes' : 'contatos'}
+              atendentes={atendentes}
               contatos={contatos}
-              isLoading={loadingContatos}
-              contatoSelecionadoId={contatoSelecionadoId}
-              onSelectContato={handleSelectContato}
+              isLoading={modoAtendentes ? loadingAtendentes : loadingContatos}
+              itemSelecionadoId={itemSelecionadoId}
+              onSelectItem={handleSelectItem}
               filtros={filtros}
-              onFiltrosChange={setFiltros}
+              onFiltrosChange={handleFiltrosChange}
               operadores={operadores}
             />
           </ResizablePanel>
@@ -89,6 +135,8 @@ export default function HistoricoPage() {
           {/* Painel Detail - Sessões */}
           <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
             <SessoesDetailPanel
+              modo={modoAtendentes ? 'atendentes' : 'contatos'}
+              atendente={atendenteSelecionado}
               contato={contatoSelecionado}
               sessoes={sessoes}
               isLoading={loadingSessoes}
