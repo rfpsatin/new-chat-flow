@@ -95,9 +95,9 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
     ['adm', 'sup'].includes(currentUser?.tipo_usuario || '');
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-background">
+    <div className="absolute inset-0 flex flex-col bg-background">
       {/* Header */}
-      <div className="p-4 border-b bg-card">
+      <div className="flex-shrink-0 p-4 border-b bg-card">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Avatar className="h-11 w-11">
@@ -143,15 +143,17 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
 
       {/* Histórico do cliente (sessões anteriores) */}
       {conversa.contato_id && (
-        <HistoricoClienteCollapsible
-          empresaId={empresaId}
-          contatoId={conversa.contato_id}
-          conversaAtualId={conversa.conversa_id}
-        />
+        <div className="flex-shrink-0">
+          <HistoricoClienteCollapsible
+            empresaId={empresaId}
+            contatoId={conversa.contato_id}
+            conversaAtualId={conversa.conversa_id}
+          />
+        </div>
       )}
       
       {/* Messages - área de scroll */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-4" ref={scrollRef}>
+      <div className="flex-1 overflow-y-auto p-4" ref={scrollRef}>
         {mensagensLoading ? (
           <div className="flex items-center justify-center h-32">
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -165,9 +167,9 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
         )}
       </div>
       
-      {/* Input */}
+      {/* Input - FIXO NO BOTTOM */}
       {canRespond && (
-        <div className="p-4 border-t bg-card">
+        <div className="flex-shrink-0 p-4 border-t bg-card">
           <form 
             onSubmit={(e) => { e.preventDefault(); handleEnviar(); }}
             className="flex items-center gap-3"
