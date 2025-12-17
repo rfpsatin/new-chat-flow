@@ -535,6 +535,23 @@ export type Database = {
           },
         ]
       }
+      vw_mensagens_consolidado: {
+        Row: {
+          arquivado_em: string | null
+          contato_id: string | null
+          conteudo: string | null
+          conversa_id: string | null
+          criado_em: string | null
+          direcao: string | null
+          empresa_id: string | null
+          id: number | null
+          origem: string | null
+          payload: Json | null
+          remetente_id: string | null
+          tipo_remetente: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       atribuir_agente: {
@@ -548,6 +565,10 @@ export type Database = {
           p_resumo?: string
           p_usuario_id: string
         }
+        Returns: undefined
+      }
+      solicitar_atendimento_humano: {
+        Args: { p_conversa_id: string }
         Returns: undefined
       }
     }
