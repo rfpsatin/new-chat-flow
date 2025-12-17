@@ -578,7 +578,15 @@ export type Database = {
       }
     }
     Functions: {
+      assumir_conversa: {
+        Args: { p_agente_id: string; p_conversa_id: string }
+        Returns: undefined
+      }
       atribuir_agente: {
+        Args: { p_agente_id: string; p_conversa_id: string }
+        Returns: undefined
+      }
+      encaminhar_para_atendente: {
         Args: { p_agente_id: string; p_conversa_id: string }
         Returns: undefined
       }
