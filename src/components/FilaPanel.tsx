@@ -2,7 +2,7 @@ import { useApp } from '@/contexts/AppContext';
 import { useFila, useAtribuirAgente } from '@/hooks/useFila';
 import { ConversaItem } from '@/components/ConversaItem';
 import { FilaAtendimento } from '@/types/atendimento';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { Button } from '@/components/ui/button';
 import { Loader2, Inbox, Bot, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -112,13 +112,13 @@ export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelPro
   }
 
   return (
-    <ScrollArea className="absolute inset-0">
+    <div className="absolute inset-0 overflow-y-auto">
       <div className="py-4 space-y-6">
         {renderSection('Com Bot', comBot, comBot.length, <Bot className="w-4 h-4 text-muted-foreground" />, true)}
         {renderSection('Aguardando Triagem', aguardandoTriagem, aguardandoTriagem.length)}
         {renderSection('Na Fila', naFila, naFila.length)}
         {renderSection('Em Atendimento', emAtendimento, emAtendimento.length)}
       </div>
-    </ScrollArea>
+    </div>
   );
 }
