@@ -1,121 +1,113 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { MainLayout } from '@/components/MainLayout';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { HistoricoConversa } from '@/types/atendimento';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { Search, Calendar, MessageSquare, Clock } from 'lucide-react';
-import { HistoricoMensagensDialog } from '@/components/HistoricoMensagensDialog';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
+import { ContatosMasterPanel } from '@/components/historico/ContatosMasterPanel';
+import { SessoesDetailPanel } from '@/components/historico/SessoesDetailPanel';
+import { MensagensMultiplasPanel } from '@/components/historico/MensagensMultiplasPanel';
+import { useContatosComHistorico, useSessoesContato, useOperadoresHistorico } from '@/hooks/useHistorico';
+import { FiltrosHistorico, HistoricoConversa } from '@/types/atendimento';
 
 export default function HistoricoPage() {
   const { empresaId } = useApp();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedConversa, setSelectedConversa] = useState<HistoricoConversa | null>(null);
-
-  const { data: historico, isLoading } = useQuery({
-    queryKey: ['historico-geral', empresaId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('vw_historico_conversas')
-        .select('*')
-        .eq('empresa_id', empresaId)
-        .order('iniciado_em', { ascending: false })
-        .limit(100);
-      
-      if (error) throw error;
-      return data as HistoricoConversa[];
-    },
+  
+  const [filtros, setFiltros] = useState<FiltrosHistorico>({
+    busca: '',
+    operadorId: null,
+    dataInicio: null,
+    dataFim: null,
   });
+  
+  const [contatoSelecionadoId, setContatoSelecionadoId] = useState<string | null>(null);
+  const [sessoesAbertasIds, setSessoesAbertasIds] = useState<string[]>([]);
+
+  // Queries
+  const { data: contatos = [], isLoading: loadingContatos } = useContatosComHistorico(empresaId, filtros);
+  const { data: sessoes = [], isLoading: loadingSessoes } = useSessoesContato(empresaId, contatoSelecionadoId, filtros);
+  const { data: operadores = [] } = useOperadoresHistorico(empresaId);
+
+  // Contato selecionado
+  const contatoSelecionado = useMemo(() => {
+    return contatos.find((c) => c.contato_id === contatoSelecionadoId) || null;
+  }, [contatos, contatoSelecionadoId]);
+
+  // Sessões abertas (objetos completos)
+  const sessoesAbertas = useMemo(() => {
+    return sessoesAbertasIds
+      .map((id) => sessoes.find((s) => s.conversa_id === id))
+      .filter((s): s is HistoricoConversa => s !== undefined);
+  }, [sessoes, sessoesAbertasIds]);
+
+  const handleSelectContato = (contatoId: string) => {
+    setContatoSelecionadoId(contatoId);
+    setSessoesAbertasIds([]); // Limpar sessões abertas ao trocar de contato
+  };
+
+  const handleToggleSessao = (conversaId: string) => {
+    setSessoesAbertasIds((prev) => {
+      if (prev.includes(conversaId)) {
+        return prev.filter((id) => id !== conversaId);
+      }
+      // Limitar a 4 sessões abertas
+      if (prev.length >= 4) {
+        return [...prev.slice(1), conversaId];
+      }
+      return [...prev, conversaId];
+    });
+  };
+
+  const handleCloseSessao = (conversaId: string) => {
+    setSessoesAbertasIds((prev) => prev.filter((id) => id !== conversaId));
+  };
 
   return (
     <MainLayout>
-      <div className="p-6 h-full overflow-auto">
-        <div className="max-w-4xl mx-auto space-y-6">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Histórico de Atendimentos</h1>
-            <p className="text-muted-foreground">
-              Visualize todas as conversas encerradas
-            </p>
-          </div>
-          
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar no histórico..."
-              className="pl-9"
-            />
-          </div>
-          
-          {historico && historico.length > 0 ? (
-            <div className="grid gap-4">
-              {historico.map(item => (
-                <Card 
-                  key={item.conversa_id}
-                  className="cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => setSelectedConversa(item)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Calendar className="w-4 h-4" />
-                          <span>
-                            {format(new Date(item.iniciado_em), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
-                          </span>
-                        </div>
-                        {item.resumo && (
-                          <p className="text-sm text-foreground line-clamp-2 mt-2">
-                            {item.resumo}
-                          </p>
-                        )}
-                      </div>
-                      {item.motivo_encerramento && (
-                        <span className="text-xs bg-muted px-2.5 py-1 rounded-full text-muted-foreground shrink-0">
-                          {item.motivo_encerramento}
-                        </span>
-                      )}
-                    </div>
-                    {item.encerrado_em && (
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-3">
-                        <Clock className="w-3 h-3" />
-                        <span>
-                          Encerrado em {format(new Date(item.encerrado_em), 'HH:mm', { locale: ptBR })}
-                        </span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-16">
-              <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-                <MessageSquare className="w-10 h-10 text-muted-foreground" />
-              </div>
-              <h3 className="font-semibold text-foreground text-lg mb-1">
-                Nenhum histórico
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Os atendimentos encerrados aparecerão aqui
-              </p>
-            </div>
-          )}
+      <div className="h-full flex flex-col">
+        <div className="p-4 border-b border-border">
+          <h1 className="text-xl font-bold">Histórico de Atendimentos</h1>
+          <p className="text-sm text-muted-foreground">
+            Visualize e pesquise conversas encerradas
+          </p>
         </div>
+
+        <ResizablePanelGroup direction="horizontal" className="flex-1">
+          {/* Painel Master - Contatos */}
+          <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
+            <ContatosMasterPanel
+              contatos={contatos}
+              isLoading={loadingContatos}
+              contatoSelecionadoId={contatoSelecionadoId}
+              onSelectContato={handleSelectContato}
+              filtros={filtros}
+              onFiltrosChange={setFiltros}
+              operadores={operadores}
+            />
+          </ResizablePanel>
+
+          <ResizableHandle withHandle />
+
+          {/* Painel Detail - Sessões */}
+          <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
+            <SessoesDetailPanel
+              contato={contatoSelecionado}
+              sessoes={sessoes}
+              isLoading={loadingSessoes}
+              sessoesAbertas={sessoesAbertasIds}
+              onToggleSessao={handleToggleSessao}
+            />
+          </ResizablePanel>
+
+          <ResizableHandle withHandle />
+
+          {/* Painel de Mensagens Múltiplas */}
+          <ResizablePanel defaultSize={50} minSize={30}>
+            <MensagensMultiplasPanel
+              sessoes={sessoesAbertas}
+              onCloseSessao={handleCloseSessao}
+            />
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </div>
-      
-      {selectedConversa && (
-        <HistoricoMensagensDialog
-          conversa={selectedConversa}
-          onClose={() => setSelectedConversa(null)}
-        />
-      )}
     </MainLayout>
   );
 }

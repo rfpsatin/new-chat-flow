@@ -501,8 +501,11 @@ export type Database = {
       }
       vw_historico_conversas: {
         Row: {
+          agente_nome: string | null
+          agente_responsavel_id: string | null
           canal: string | null
           contato_id: string | null
+          contato_nome: string | null
           conversa_id: string | null
           empresa_id: string | null
           encerrado_em: string | null
@@ -510,8 +513,16 @@ export type Database = {
           motivo_encerramento: string | null
           resumo: string | null
           status: string | null
+          whatsapp_numero: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "conversas_agente_responsavel_id_fkey"
+            columns: ["agente_responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "conversas_contato_id_fkey"
             columns: ["contato_id"]

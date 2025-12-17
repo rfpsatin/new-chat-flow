@@ -101,4 +101,22 @@ export interface HistoricoConversa {
   encerrado_em: string | null;
   motivo_encerramento: string | null;
   resumo: string | null;
+  contato_nome: string | null;
+  whatsapp_numero: string | null;
+  agente_responsavel_id: string | null;
+  agente_nome: string | null;
+}
+
+export interface ContatoComHistorico {
+  contato_id: string;
+  contato_nome: string | null;
+  whatsapp_numero: string | null;
+  total_sessoes: number;
+}
+
+export interface FiltrosHistorico {
+  busca: string;
+  operadorId: string | null;
+  dataInicio: Date | null;
+  dataFim: Date | null;
 }

@@ -7,11 +7,60 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Search, Phone, Calendar, MessageSquare, User, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { HistoricoMensagensDialog } from '@/components/HistoricoMensagensDialog';
+import { useMensagensHistorico } from '@/hooks/useHistorico';
+
+function MensagensDialog({ conversa, onClose }: { conversa: HistoricoConversa; onClose: () => void }) {
+  const { data: mensagens, isLoading } = useMensagensHistorico(conversa.conversa_id);
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Clock className="w-4 h-4" />
+            {format(new Date(conversa.iniciado_em), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+          </DialogTitle>
+        </DialogHeader>
+        <ScrollArea className="flex-1 max-h-[60vh]">
+          <div className="p-2 space-y-2">
+            {isLoading ? (
+              <p className="text-center text-muted-foreground py-4">Carregando...</p>
+            ) : mensagens?.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">Nenhuma mensagem</p>
+            ) : (
+              mensagens?.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={cn(
+                    'max-w-[85%] p-2.5 rounded-lg text-sm',
+                    msg.direcao === 'in'
+                      ? 'bg-muted mr-auto'
+                      : 'bg-primary text-primary-foreground ml-auto'
+                  )}
+                >
+                  {msg.tipo_remetente !== 'cliente' && msg.direcao === 'out' && (
+                    <div className="text-xs opacity-70 mb-1">
+                      {msg.tipo_remetente === 'bot' ? '🤖 Bot' : '👤 Agente'}
+                    </div>
+                  )}
+                  <p className="whitespace-pre-wrap break-words">{msg.conteudo}</p>
+                  <div className="text-xs opacity-70 mt-1 text-right">
+                    {format(new Date(msg.criado_em), 'HH:mm', { locale: ptBR })}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function ContatosPage() {
   const { empresaId } = useApp();
@@ -187,7 +236,7 @@ export default function ContatosPage() {
       </div>
       
       {selectedHistorico && (
-        <HistoricoMensagensDialog
+        <MensagensDialog
           conversa={selectedHistorico}
           onClose={() => setSelectedHistorico(null)}
         />
