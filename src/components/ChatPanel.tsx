@@ -95,7 +95,7 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
     ['adm', 'sup'].includes(currentUser?.tipo_usuario || '');
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full min-h-0 bg-background">
       {/* Header */}
       <div className="p-4 border-b bg-card">
         <div className="flex items-center justify-between">
@@ -151,18 +151,20 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
       )}
       
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-        {mensagensLoading ? (
-          <div className="flex items-center justify-center h-full">
-            <Loader2 className="w-6 h-6 animate-spin text-primary" />
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {mensagens?.map((msg) => (
-              <MessageBubble key={msg.id} mensagem={msg} />
-            ))}
-          </div>
-        )}
+      <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
+        <div className="p-4">
+          {mensagensLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {mensagens?.map((msg) => (
+                <MessageBubble key={msg.id} mensagem={msg} />
+              ))}
+            </div>
+          )}
+        </div>
       </ScrollArea>
       
       {/* Input */}
