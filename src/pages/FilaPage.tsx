@@ -9,7 +9,7 @@ export default function FilaPage() {
 
   return (
     <MainLayout>
-      <div className="flex h-full">
+      <div className="flex h-full min-h-0">
         {/* Left panel - Queue list */}
         <div className="w-[380px] border-r bg-card flex flex-col">
           <div className="p-4 border-b">
@@ -27,7 +27,7 @@ export default function FilaPage() {
         </div>
         
         {/* Right panel - Chat */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-h-0">
           <ChatPanel conversa={selectedConversa} />
         </div>
       </div>
