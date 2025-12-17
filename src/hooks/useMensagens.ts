@@ -68,7 +68,44 @@ export function useEnviarMensagem() {
       conteudo: string;
       remetenteId: string;
     }) => {
-      // Insert message
+      // 1. Get contact to retrieve WhatsApp number
+      const { data: contato, error: contatoError } = await supabase
+        .from('contatos')
+        .select('whatsapp_numero')
+        .eq('id', contato_id)
+        .single();
+
+      if (contatoError || !contato) {
+        throw new Error('Contato não encontrado');
+      }
+
+      // 2. Send message via Whapi API
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      
+      const functionUrl = `${supabaseUrl}/functions/v1/whapi-send-message`;
+      
+      const whapiResponse = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          empresa_id: empresaId,
+          to: contato.whatsapp_numero,
+          message: conteudo,
+        }),
+      });
+
+      if (!whapiResponse.ok) {
+        const errorData = await whapiResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Erro ao enviar mensagem via Whapi');
+      }
+
+      const whapiData = await whapiResponse.json();
+
+      // 3. Insert message in database
       const { error: msgError } = await supabase
         .from('mensagens_ativas')
         .insert({
@@ -79,11 +116,12 @@ export function useEnviarMensagem() {
           tipo_remetente: 'agente',
           remetente_id: remetenteId,
           conteudo,
+          payload: whapiData.response || { message_id: whapiData.message_id },
         });
       
       if (msgError) throw msgError;
 
-      // Update conversation last_message_at
+      // 4. Update conversation last_message_at
       const { error: convError } = await supabase
         .from('conversas')
         .update({ last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })

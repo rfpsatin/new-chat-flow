@@ -2,3 +2,6 @@ project_id = "hyizldxjiwjeruxqrqbv"
 
 [functions.whapi-webhook]
 verify_jwt = false
+
+[functions.whapi-send-message]
+verify_jwt = false
