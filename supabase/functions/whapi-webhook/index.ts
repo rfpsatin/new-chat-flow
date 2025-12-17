@@ -316,14 +316,14 @@ async function findOrCreateConversa(
     return existingConversa
   }
 
-  // Create new conversation with status 'bot'
+  // Create new conversation with status 'fila_humano' (ready for human agent)
   console.log(`[${requestId}] Creating new conversation`)
   const { data: newConversa, error: createError } = await supabase
     .from('conversas')
     .insert({
       empresa_id: empresaId,
       contato_id: contatoId,
-      status: 'bot',
+      status: 'fila_humano',
       canal: 'whatsapp',
       iniciado_por: 'cliente',
     })
