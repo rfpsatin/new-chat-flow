@@ -6,6 +6,7 @@ import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { HistoricoConversa } from '@/types/atendimento';
 import { useMensagensHistorico } from '@/hooks/useHistorico';
+import { SatisfacaoStars } from './SatisfacaoStars';
 
 interface Props {
   sessao: HistoricoConversa;
@@ -19,12 +20,15 @@ export function SessaoCard({ sessao, onClose }: Props) {
     <div className="flex-1 min-h-0 border border-border rounded-lg bg-card flex flex-col">
       {/* Header */}
       <div className="p-3 border-b border-border flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-sm">
-            <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span className="font-medium">
-              {format(new Date(sessao.iniciado_em), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-            </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-sm">
+              <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+              <span className="font-medium">
+                {format(new Date(sessao.iniciado_em), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+              </span>
+            </div>
+            <SatisfacaoStars nota={sessao.nota_satisfacao} />
           </div>
           <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
             {sessao.agente_nome && (

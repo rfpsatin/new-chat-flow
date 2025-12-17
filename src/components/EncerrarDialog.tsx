@@ -39,6 +39,8 @@ export function EncerrarDialog({ conversa, onClose }: EncerrarDialogProps) {
         motivoId: selectedMotivo,
         usuarioId: currentUser.id,
         resumo: resumo.trim() || undefined,
+        empresaId: conversa.empresa_id,
+        contatoId: conversa.contato_id,
       });
       
       toast({

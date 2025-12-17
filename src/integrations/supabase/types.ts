@@ -107,6 +107,9 @@ export type Database = {
           iniciado_por: string
           last_message_at: string
           motivo_encerramento_id: string | null
+          nota_satisfacao: number | null
+          pesquisa_enviada_em: string | null
+          pesquisa_respondida_em: string | null
           resumo: string | null
           status: string
           updated_at: string
@@ -123,6 +126,9 @@ export type Database = {
           iniciado_por?: string
           last_message_at?: string
           motivo_encerramento_id?: string | null
+          nota_satisfacao?: number | null
+          pesquisa_enviada_em?: string | null
+          pesquisa_respondida_em?: string | null
           resumo?: string | null
           status: string
           updated_at?: string
@@ -139,6 +145,9 @@ export type Database = {
           iniciado_por?: string
           last_message_at?: string
           motivo_encerramento_id?: string | null
+          nota_satisfacao?: number | null
+          pesquisa_enviada_em?: string | null
+          pesquisa_respondida_em?: string | null
           resumo?: string | null
           status?: string
           updated_at?: string
@@ -511,6 +520,7 @@ export type Database = {
           encerrado_em: string | null
           iniciado_em: string | null
           motivo_encerramento: string | null
+          nota_satisfacao: number | null
           resumo: string | null
           status: string | null
           whatsapp_numero: string | null
