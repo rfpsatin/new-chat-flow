@@ -4,7 +4,6 @@ import { useUsuarios } from '@/hooks/useUsuarios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { LogIn, MessageSquare } from 'lucide-react';
 
 export function UserSelector() {
@@ -64,19 +63,10 @@ export function UserSelector() {
               <SelectContent>
                 {usuarios?.map(user => (
                   <SelectItem key={user.id} value={user.id}>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                          {getInitials(user.nome)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col items-start">
-                        <span className="font-medium">{user.nome}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {getRoleLabel(user.tipo_usuario)}
-                        </span>
-                      </div>
-                    </div>
+                    <span className="font-medium">{user.nome}</span>
+                    <span className="text-muted-foreground ml-2">
+                      — {getRoleLabel(user.tipo_usuario)}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
