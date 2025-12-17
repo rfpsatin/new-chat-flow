@@ -1,0 +1,197 @@
+import { useState } from 'react';
+import { useApp } from '@/contexts/AppContext';
+import { useContatos, useHistoricoContato } from '@/hooks/useContatos';
+import { MainLayout } from '@/components/MainLayout';
+import { Contato, HistoricoConversa } from '@/types/atendimento';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { Search, Phone, Calendar, MessageSquare, User, Clock } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { HistoricoMensagensDialog } from '@/components/HistoricoMensagensDialog';
+
+export default function ContatosPage() {
+  const { empresaId } = useApp();
+  const { data: contatos, isLoading } = useContatos(empresaId);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedContato, setSelectedContato] = useState<Contato | null>(null);
+  const { data: historico } = useHistoricoContato(selectedContato?.id || null);
+  const [selectedHistorico, setSelectedHistorico] = useState<HistoricoConversa | null>(null);
+
+  const filteredContatos = contatos?.filter(contato =>
+    contato.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    contato.whatsapp_numero.includes(searchTerm)
+  );
+
+  const getInitials = (name: string | null) => {
+    if (!name) return '?';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const formatPhone = (phone: string) => {
+    const cleaned = phone.replace(/\D/g, '');
+    if (cleaned.length === 13) {
+      return `+${cleaned.slice(0, 2)} (${cleaned.slice(2, 4)}) ${cleaned.slice(4, 9)}-${cleaned.slice(9)}`;
+    }
+    return phone;
+  };
+
+  return (
+    <MainLayout>
+      <div className="flex h-full">
+        {/* Left panel - Contact list */}
+        <div className="w-[380px] border-r bg-card flex flex-col">
+          <div className="p-4 border-b space-y-3">
+            <h2 className="font-semibold text-lg">Contatos</h2>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar por nome ou telefone..."
+                className="pl-9"
+              />
+            </div>
+          </div>
+          
+          <ScrollArea className="flex-1">
+            <div className="p-2 space-y-1">
+              {filteredContatos?.map(contato => (
+                <button
+                  key={contato.id}
+                  onClick={() => setSelectedContato(contato)}
+                  className={cn(
+                    'w-full p-3 text-left rounded-lg transition-colors',
+                    'hover:bg-accent/50',
+                    selectedContato?.id === contato.id && 'bg-accent'
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback className="bg-primary/10 text-primary font-medium text-sm">
+                        {getInitials(contato.nome)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground truncate">
+                        {contato.nome || 'Sem nome'}
+                      </p>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Phone className="w-3 h-3" />
+                        <span>{formatPhone(contato.whatsapp_numero)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+        
+        {/* Right panel - Contact details */}
+        <div className="flex-1 p-6 overflow-auto bg-muted/30">
+          {selectedContato ? (
+            <div className="max-w-2xl mx-auto space-y-6">
+              {/* Contact card */}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                    <Avatar className="h-16 w-16">
+                      <AvatarFallback className="bg-primary/10 text-primary font-semibold text-xl">
+                        {getInitials(selectedContato.nome)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h2 className="text-xl font-bold text-foreground">
+                        {selectedContato.nome || 'Sem nome'}
+                      </h2>
+                      <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Phone className="w-4 h-4" />
+                          {formatPhone(selectedContato.whatsapp_numero)}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-4 h-4" />
+                          Desde {format(new Date(selectedContato.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {/* History */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Clock className="w-5 h-5" />
+                    Histórico de Atendimentos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {historico && historico.length > 0 ? (
+                    <div className="space-y-3">
+                      {historico.map(item => (
+                        <button
+                          key={item.conversa_id}
+                          onClick={() => setSelectedHistorico(item)}
+                          className="w-full p-4 bg-muted/50 rounded-lg hover:bg-muted transition-colors text-left"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium">
+                              {format(new Date(item.iniciado_em), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                            </span>
+                            {item.motivo_encerramento && (
+                              <span className="text-xs bg-muted px-2 py-1 rounded-full text-muted-foreground">
+                                {item.motivo_encerramento}
+                              </span>
+                            )}
+                          </div>
+                          {item.resumo && (
+                            <p className="text-sm text-muted-foreground line-clamp-2">
+                              {item.resumo}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Encerrado em {item.encerrado_em && format(new Date(item.encerrado_em), 'HH:mm', { locale: ptBR })}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                      <p>Nenhum atendimento encerrado</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center mb-4">
+                <User className="w-10 h-10 text-muted-foreground" />
+              </div>
+              <h3 className="font-semibold text-foreground text-lg mb-1">
+                Selecione um contato
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Escolha um contato para ver seus detalhes e histórico
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {selectedHistorico && (
+        <HistoricoMensagensDialog
+          conversa={selectedHistorico}
+          onClose={() => setSelectedHistorico(null)}
+        />
+      )}
+    </MainLayout>
+  );
+}
