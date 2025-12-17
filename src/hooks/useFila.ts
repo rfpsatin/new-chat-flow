@@ -78,6 +78,47 @@ export function useFila(empresaId: string) {
   return query;
 }
 
+// Supervisora encaminha conversa para atendente (esperando_tria → fila_humano)
+export function useEncaminharAtendente() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ conversaId, agenteId }: { conversaId: string; agenteId: string }) => {
+      const { error } = await supabase.rpc('encaminhar_para_atendente', {
+        p_conversa_id: conversaId,
+        p_agente_id: agenteId,
+      });
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fila'] });
+      queryClient.invalidateQueries({ queryKey: ['conversa'] });
+    },
+  });
+}
+
+// Atendente assume conversa designada para ele (fila_humano → em_atendimento_humano)
+export function useAssumirConversa() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ conversaId, agenteId }: { conversaId: string; agenteId: string }) => {
+      const { error } = await supabase.rpc('assumir_conversa', {
+        p_conversa_id: conversaId,
+        p_agente_id: agenteId,
+      });
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fila'] });
+      queryClient.invalidateQueries({ queryKey: ['conversa'] });
+    },
+  });
+}
+
+// Mantido para transferências (quando já está em atendimento)
 export function useAtribuirAgente() {
   const queryClient = useQueryClient();
 

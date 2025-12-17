@@ -1,22 +1,25 @@
 import { useState } from 'react';
 import { useOperadores } from '@/hooks/useUsuarios';
-import { useAtendimentosAtivos, useAtribuirAgente } from '@/hooks/useFila';
+import { useAtendimentosAtivos, useEncaminharAtendente, useAtribuirAgente } from '@/hooks/useFila';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Users, Search, Loader2 } from 'lucide-react';
+import { Users, Search, Loader2, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { StatusConversa } from '@/types/atendimento';
 
 interface AtribuirAtendentePopoverProps {
   empresaId: string;
   conversaId: string;
+  conversaStatus: StatusConversa;
   onSuccess?: () => void;
 }
 
 export function AtribuirAtendentePopover({ 
   empresaId, 
   conversaId,
+  conversaStatus,
   onSuccess 
 }: AtribuirAtendentePopoverProps) {
   const [open, setOpen] = useState(false);
@@ -24,21 +27,35 @@ export function AtribuirAtendentePopover({
   
   const { data: operadores, isLoading } = useOperadores(empresaId);
   const contagemAtivos = useAtendimentosAtivos(empresaId);
+  const encaminharAtendente = useEncaminharAtendente();
   const atribuirAgente = useAtribuirAgente();
 
   const operadoresFiltrados = operadores?.filter(op => 
     op.nome.toLowerCase().includes(busca.toLowerCase())
   );
 
+  // Se está aguardando triagem, usa encaminhar. Se já está em atendimento, usa transferir.
+  const isEncaminhamento = conversaStatus === 'esperando_tria';
+  const isTransferencia = conversaStatus === 'em_atendimento_humano';
+
   const handleAtribuir = async (agenteId: string) => {
-    await atribuirAgente.mutateAsync({
-      conversaId,
-      agenteId,
-    });
+    if (isEncaminhamento) {
+      await encaminharAtendente.mutateAsync({
+        conversaId,
+        agenteId,
+      });
+    } else {
+      await atribuirAgente.mutateAsync({
+        conversaId,
+        agenteId,
+      });
+    }
     setOpen(false);
     setBusca('');
     onSuccess?.();
   };
+
+  const isPending = encaminharAtendente.isPending || atribuirAgente.isPending;
 
   const getStatusColor = (count: number) => {
     if (count === 0) return 'bg-emerald-500';
@@ -52,17 +69,24 @@ export function AtribuirAtendentePopover({
     return `${count} em atendimento`;
   };
 
+  const buttonLabel = isEncaminhamento ? 'Encaminhar para Atendente' : 'Transferir Atendente';
+  const headerLabel = isEncaminhamento ? 'Encaminhar para' : 'Transferir para';
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" className="gap-2">
-          <Users className="w-4 h-4" />
-          Atribuir Atendente
+          {isEncaminhamento ? (
+            <ArrowRight className="w-4 h-4" />
+          ) : (
+            <Users className="w-4 h-4" />
+          )}
+          {buttonLabel}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="start">
         <div className="p-3 border-b">
-          <h4 className="font-medium text-sm mb-2">Selecione o Atendente</h4>
+          <h4 className="font-medium text-sm mb-2">{headerLabel}</h4>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -91,7 +115,7 @@ export function AtribuirAtendentePopover({
                   <button
                     key={op.id}
                     onClick={() => handleAtribuir(op.id)}
-                    disabled={atribuirAgente.isPending}
+                    disabled={isPending}
                     className={cn(
                       "w-full px-3 py-2.5 flex items-center justify-between",
                       "hover:bg-accent transition-colors text-left",

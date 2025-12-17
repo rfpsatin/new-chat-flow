@@ -88,9 +88,11 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
   const canRespond = conversa.status === 'em_atendimento_humano' && 
     conversa.agente_responsavel_id === currentUser?.id;
   
-  const canAssign = ['esperando_tria', 'fila_humano'].includes(conversa.status) &&
+  // Supervisora pode encaminhar conversas que estão aguardando triagem
+  const canEncaminhar = conversa.status === 'esperando_tria' &&
     ['adm', 'sup'].includes(currentUser?.tipo_usuario || '');
 
+  // Supervisora pode transferir conversas já em atendimento
   const canTransfer = conversa.status === 'em_atendimento_humano' &&
     ['adm', 'sup'].includes(currentUser?.tipo_usuario || '');
 
@@ -130,12 +132,13 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
           </div>
         </div>
         
-        {/* Assign/Transfer agent button */}
-        {(canAssign || canTransfer) && (
+        {/* Encaminhar/Transferir agent button */}
+        {(canEncaminhar || canTransfer) && (
           <div className="mt-4">
             <AtribuirAtendentePopover
               empresaId={empresaId}
               conversaId={conversa.conversa_id}
+              conversaStatus={conversa.status}
             />
           </div>
         )}

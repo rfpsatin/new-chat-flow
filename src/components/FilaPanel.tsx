@@ -1,10 +1,10 @@
 import { useApp } from '@/contexts/AppContext';
-import { useFila, useAtribuirAgente } from '@/hooks/useFila';
+import { useFila, useAssumirConversa } from '@/hooks/useFila';
 import { ConversaItem } from '@/components/ConversaItem';
 import { FilaAtendimento } from '@/types/atendimento';
 
 import { Button } from '@/components/ui/button';
-import { Loader2, Inbox, Bot, UserPlus } from 'lucide-react';
+import { Loader2, Inbox, Bot, Clock, Users, Headphones } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface FilaPanelProps {
@@ -15,19 +15,20 @@ interface FilaPanelProps {
 export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelProps) {
   const { empresaId, currentUser } = useApp();
   const { data: fila, isLoading } = useFila(empresaId);
-  const atribuirAgente = useAtribuirAgente();
+  const assumirConversa = useAssumirConversa();
 
   const comBot = fila?.filter(c => c.status === 'bot') || [];
   const aguardandoTriagem = fila?.filter(c => c.status === 'esperando_tria') || [];
   const naFila = fila?.filter(c => c.status === 'fila_humano') || [];
   const emAtendimento = fila?.filter(c => c.status === 'em_atendimento_humano') || [];
 
+  // Atendente assume conversa que foi encaminhada para ele
   const handleAssumirConversa = async (conversa: FilaAtendimento, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!currentUser?.id || !conversa.conversa_id) return;
     
     try {
-      await atribuirAgente.mutateAsync({
+      await assumirConversa.mutateAsync({
         conversaId: conversa.conversa_id,
         agenteId: currentUser.id,
       });
@@ -51,7 +52,7 @@ export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelPro
     conversas: FilaAtendimento[], 
     count: number,
     icon?: React.ReactNode,
-    showAssumirButton?: boolean
+    sectionType?: 'bot' | 'triagem' | 'fila' | 'atendimento'
   ) => {
     if (count === 0) return null;
     
@@ -69,27 +70,33 @@ export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelPro
           </span>
         </div>
         <div className="space-y-1 px-2">
-          {conversas.map(conversa => (
-            <div key={conversa.conversa_id} className="relative group">
-              <ConversaItem
-                conversa={conversa}
-                isSelected={selectedConversaId === conversa.conversa_id}
-                onClick={() => onSelectConversa(conversa)}
-              />
-              {showAssumirButton && (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity h-7 text-xs"
-                  onClick={(e) => handleAssumirConversa(conversa, e)}
-                  disabled={atribuirAgente.isPending}
-                >
-                  <UserPlus className="w-3 h-3 mr-1" />
-                  Assumir
-                </Button>
-              )}
-            </div>
-          ))}
+          {conversas.map(conversa => {
+            // Mostrar botão "Assumir" apenas para conversas na fila designadas para o usuário atual
+            const isDesignadoParaMim = 
+              sectionType === 'fila' && 
+              conversa.agente_responsavel_id === currentUser?.id;
+            
+            return (
+              <div key={conversa.conversa_id} className="relative group">
+                <ConversaItem
+                  conversa={conversa}
+                  isSelected={selectedConversaId === conversa.conversa_id}
+                  onClick={() => onSelectConversa(conversa)}
+                />
+                {isDesignadoParaMim && (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity h-7 text-xs"
+                    onClick={(e) => handleAssumirConversa(conversa, e)}
+                    disabled={assumirConversa.isPending}
+                  >
+                    Assumir
+                  </Button>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -114,10 +121,10 @@ export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelPro
   return (
     <div className="absolute inset-0 overflow-y-auto">
       <div className="py-4 space-y-6">
-        {renderSection('Com Bot', comBot, comBot.length, <Bot className="w-4 h-4 text-muted-foreground" />, true)}
-        {renderSection('Aguardando Triagem', aguardandoTriagem, aguardandoTriagem.length)}
-        {renderSection('Na Fila', naFila, naFila.length)}
-        {renderSection('Em Atendimento', emAtendimento, emAtendimento.length)}
+        {renderSection('Com Bot', comBot, comBot.length, <Bot className="w-4 h-4 text-muted-foreground" />, 'bot')}
+        {renderSection('Aguardando Triagem', aguardandoTriagem, aguardandoTriagem.length, <Clock className="w-4 h-4 text-muted-foreground" />, 'triagem')}
+        {renderSection('Na Fila', naFila, naFila.length, <Users className="w-4 h-4 text-muted-foreground" />, 'fila')}
+        {renderSection('Em Atendimento', emAtendimento, emAtendimento.length, <Headphones className="w-4 h-4 text-muted-foreground" />, 'atendimento')}
       </div>
     </div>
   );
