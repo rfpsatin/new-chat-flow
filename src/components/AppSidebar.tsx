@@ -5,6 +5,7 @@ import {
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -13,13 +14,17 @@ import {
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import { 
   MessageSquare, 
   Users, 
   Clock, 
   LogOut,
   LayoutDashboard,
-  Headphones
+  Headphones,
+  Shield,
+  UserCog,
+  FileText,
 } from 'lucide-react';
 
 const menuItems = [
@@ -29,10 +34,17 @@ const menuItems = [
   { title: 'Histórico', url: '/historico', icon: Clock },
 ];
 
+const adminMenuItems = [
+  { title: 'Usuários', url: '/admin/usuarios', icon: UserCog },
+  { title: 'Motivos Encerramento', url: '/admin/motivos', icon: FileText },
+];
+
 export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser, setCurrentUser, setSelectedConversa } = useApp();
+
+  const isAdmin = currentUser?.tipo_usuario === 'adm';
 
   const handleLogout = () => {
     setCurrentUser(null);
@@ -52,6 +64,25 @@ export function AppSidebar() {
       default: return tipo;
     }
   };
+
+  const renderMenuItem = (item: typeof menuItems[0], isActive: boolean) => (
+    <SidebarMenuItem key={item.title}>
+      <SidebarMenuButton
+        asChild
+        isActive={isActive}
+        className={`h-11 px-3 rounded-lg transition-colors ${
+          isActive 
+            ? 'bg-sidebar-primary text-sidebar-primary-foreground' 
+            : 'text-sidebar-foreground hover:bg-sidebar-accent'
+        }`}
+      >
+        <button onClick={() => navigate(item.url)}>
+          <item.icon className="w-5 h-5" />
+          <span className="font-medium">{item.title}</span>
+        </button>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
 
   return (
     <Sidebar className="border-r-0">
@@ -73,28 +104,31 @@ export function AppSidebar() {
             <SidebarMenu>
               {menuItems.map((item) => {
                 const isActive = location.pathname === item.url;
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive}
-                      className={`h-11 px-3 rounded-lg transition-colors ${
-                        isActive 
-                          ? 'bg-sidebar-primary text-sidebar-primary-foreground' 
-                          : 'text-sidebar-foreground hover:bg-sidebar-accent'
-                      }`}
-                    >
-                      <button onClick={() => navigate(item.url)}>
-                        <item.icon className="w-5 h-5" />
-                        <span className="font-medium">{item.title}</span>
-                      </button>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
+                return renderMenuItem(item, isActive);
               })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {isAdmin && (
+          <>
+            <Separator className="my-2 bg-sidebar-border" />
+            <SidebarGroup>
+              <SidebarGroupLabel className="flex items-center gap-2 text-sidebar-foreground/60 px-3 py-2">
+                <Shield className="w-4 h-4" />
+                <span>Administração</span>
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {adminMenuItems.map((item) => {
+                    const isActive = location.pathname === item.url;
+                    return renderMenuItem(item, isActive);
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
       </SidebarContent>
       
       <SidebarFooter className="p-4 border-t border-sidebar-border">
