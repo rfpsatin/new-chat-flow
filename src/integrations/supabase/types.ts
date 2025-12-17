@@ -205,6 +205,7 @@ export type Database = {
           id: string
           nome_fantasia: string | null
           razao_social: string
+          whapi_token: string | null
         }
         Insert: {
           ativo?: boolean
@@ -213,6 +214,7 @@ export type Database = {
           id?: string
           nome_fantasia?: string | null
           razao_social: string
+          whapi_token?: string | null
         }
         Update: {
           ativo?: boolean
@@ -221,6 +223,7 @@ export type Database = {
           id?: string
           nome_fantasia?: string | null
           razao_social?: string
+          whapi_token?: string | null
         }
         Relationships: []
       }
