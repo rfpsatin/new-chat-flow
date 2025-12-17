@@ -318,7 +318,7 @@ async function findOrCreateConversa(
     const { error: updateError } = await supabase
       .from('conversas')
       .update({
-        status: 'fila_humano',
+        status: 'esperando_tria',
         encerrado_em: null,
         encerrado_por_id: null,
         motivo_encerramento_id: null,
@@ -333,7 +333,7 @@ async function findOrCreateConversa(
     }
 
     console.log(`[${requestId}] Conversation reopened: ${ultimaConversa.id}`)
-    return { ...ultimaConversa, status: 'fila_humano' }
+    return { ...ultimaConversa, status: 'esperando_tria' }
   }
 
   // If conversation exists and is active, use it
@@ -349,7 +349,7 @@ async function findOrCreateConversa(
     .insert({
       empresa_id: empresaId,
       contato_id: contatoId,
-      status: 'fila_humano',
+      status: 'esperando_tria',
       canal: 'whatsapp',
       iniciado_por: 'cliente',
     })
