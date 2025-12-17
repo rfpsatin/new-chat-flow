@@ -27,7 +27,7 @@ export default function FilaPage() {
         </div>
         
         {/* Right panel - Chat */}
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 relative">
           <ChatPanel conversa={selectedConversa} />
         </div>
       </div>
