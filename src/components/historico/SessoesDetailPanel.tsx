@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { HistoricoConversa, ContatoComHistorico, AtendenteComHistorico } from '@/types/atendimento';
+import { SatisfacaoStars } from './SatisfacaoStars';
 
 interface Props {
   modo: 'atendentes' | 'contatos';
@@ -127,11 +128,14 @@ export function SessoesDetailPanel({
                         </div>
                       )}
 
-                      {sessao.motivo_encerramento && (
-                        <span className="inline-block text-xs bg-muted px-2 py-0.5 rounded mt-2">
-                          {sessao.motivo_encerramento}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        {sessao.motivo_encerramento && (
+                          <span className="inline-block text-xs bg-muted px-2 py-0.5 rounded">
+                            {sessao.motivo_encerramento}
+                          </span>
+                        )}
+                        <SatisfacaoStars nota={sessao.nota_satisfacao} />
+                      </div>
 
                       {sessao.resumo && (
                         <p className="text-xs text-muted-foreground mt-2 line-clamp-2">

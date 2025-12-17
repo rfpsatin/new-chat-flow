@@ -101,6 +101,7 @@ export interface HistoricoConversa {
   encerrado_em: string | null;
   motivo_encerramento: string | null;
   resumo: string | null;
+  nota_satisfacao: number | null;
   contato_nome: string | null;
   whatsapp_numero: string | null;
   agente_responsavel_id: string | null;
