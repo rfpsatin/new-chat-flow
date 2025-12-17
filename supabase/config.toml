@@ -1,1 +1,4 @@
 project_id = "hyizldxjiwjeruxqrqbv"
+
+[functions.whapi-webhook]
+verify_jwt = false
