@@ -1,0 +1,132 @@
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { HistoricoConversa, ContatoComHistorico, FiltrosHistorico } from '@/types/atendimento';
+import { startOfDay, endOfDay } from 'date-fns';
+
+export function useContatosComHistorico(empresaId: string, filtros: FiltrosHistorico) {
+  return useQuery({
+    queryKey: ['contatos-historico', empresaId, filtros],
+    queryFn: async () => {
+      let query = supabase
+        .from('vw_historico_conversas')
+        .select('contato_id, contato_nome, whatsapp_numero, agente_responsavel_id')
+        .eq('empresa_id', empresaId);
+
+      // Filtro por busca (nome ou telefone)
+      if (filtros.busca) {
+        query = query.or(`contato_nome.ilike.%${filtros.busca}%,whatsapp_numero.ilike.%${filtros.busca}%`);
+      }
+
+      // Filtro por operador
+      if (filtros.operadorId) {
+        query = query.eq('agente_responsavel_id', filtros.operadorId);
+      }
+
+      // Filtro por período
+      if (filtros.dataInicio) {
+        query = query.gte('iniciado_em', startOfDay(filtros.dataInicio).toISOString());
+      }
+      if (filtros.dataFim) {
+        query = query.lte('iniciado_em', endOfDay(filtros.dataFim).toISOString());
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      // Agrupar por contato e contar sessões
+      const contatosMap = new Map<string, ContatoComHistorico>();
+      
+      data?.forEach((item) => {
+        if (!item.contato_id) return;
+        
+        const existing = contatosMap.get(item.contato_id);
+        if (existing) {
+          existing.total_sessoes += 1;
+        } else {
+          contatosMap.set(item.contato_id, {
+            contato_id: item.contato_id,
+            contato_nome: item.contato_nome,
+            whatsapp_numero: item.whatsapp_numero,
+            total_sessoes: 1,
+          });
+        }
+      });
+
+      return Array.from(contatosMap.values()).sort((a, b) => b.total_sessoes - a.total_sessoes);
+    },
+    enabled: !!empresaId,
+  });
+}
+
+export function useSessoesContato(empresaId: string, contatoId: string | null, filtros: FiltrosHistorico) {
+  return useQuery({
+    queryKey: ['sessoes-contato', empresaId, contatoId, filtros],
+    queryFn: async () => {
+      if (!contatoId) return [];
+
+      let query = supabase
+        .from('vw_historico_conversas')
+        .select('*')
+        .eq('empresa_id', empresaId)
+        .eq('contato_id', contatoId)
+        .order('iniciado_em', { ascending: false });
+
+      // Filtro por operador
+      if (filtros.operadorId) {
+        query = query.eq('agente_responsavel_id', filtros.operadorId);
+      }
+
+      // Filtro por período
+      if (filtros.dataInicio) {
+        query = query.gte('iniciado_em', startOfDay(filtros.dataInicio).toISOString());
+      }
+      if (filtros.dataFim) {
+        query = query.lte('iniciado_em', endOfDay(filtros.dataFim).toISOString());
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      return data as HistoricoConversa[];
+    },
+    enabled: !!empresaId && !!contatoId,
+  });
+}
+
+export function useMensagensHistorico(conversaId: string | null) {
+  return useQuery({
+    queryKey: ['mensagens-historico', conversaId],
+    queryFn: async () => {
+      if (!conversaId) return [];
+
+      const { data, error } = await supabase
+        .from('mensagens_historico')
+        .select('*')
+        .eq('conversa_id', conversaId)
+        .order('criado_em', { ascending: true });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!conversaId,
+  });
+}
+
+export function useOperadoresHistorico(empresaId: string) {
+  return useQuery({
+    queryKey: ['operadores-historico', empresaId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('id, nome')
+        .eq('empresa_id', empresaId)
+        .eq('ativo', true)
+        .order('nome');
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!empresaId,
+  });
+}
