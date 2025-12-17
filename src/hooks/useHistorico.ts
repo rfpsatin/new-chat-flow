@@ -200,3 +200,25 @@ export function useOperadoresHistorico(empresaId: string) {
     enabled: !!empresaId,
   });
 }
+
+// Histórico de sessões anteriores de um contato (para contexto no chat)
+export function useHistoricoCliente(empresaId: string, contatoId: string | null) {
+  return useQuery({
+    queryKey: ['historico-cliente', empresaId, contatoId],
+    queryFn: async () => {
+      if (!contatoId) return [];
+
+      const { data, error } = await supabase
+        .from('vw_historico_conversas')
+        .select('*')
+        .eq('empresa_id', empresaId)
+        .eq('contato_id', contatoId)
+        .order('encerrado_em', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      return data as HistoricoConversa[];
+    },
+    enabled: !!empresaId && !!contatoId,
+  });
+}
