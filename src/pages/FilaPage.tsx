@@ -18,8 +18,8 @@ export default function FilaPage() {
               Conversas aguardando ou em andamento
             </p>
           </div>
-          <div className="flex-1 overflow-hidden">
-            <FilaPanel
+        <div className="flex-1 relative">
+          <FilaPanel
               onSelectConversa={setSelectedConversa}
               selectedConversaId={selectedConversa?.conversa_id || null}
             />
