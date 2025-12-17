@@ -1,27 +1,26 @@
 import { useState, useRef, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { useMensagens, useEnviarMensagem } from '@/hooks/useMensagens';
-import { useConversa, useAtribuirAgente } from '@/hooks/useFila';
-import { useOperadores } from '@/hooks/useUsuarios';
+import { useConversa } from '@/hooks/useFila';
 import { MensagemAtiva, FilaAtendimento } from '@/types/atendimento';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { formatDistanceToNow, format } from 'date-fns';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   Send, 
   Phone, 
-  UserPlus, 
   XCircle,
   MessageSquare,
   Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EncerrarDialog } from '@/components/EncerrarDialog';
+import { AtribuirAtendentePopover } from '@/components/AtribuirAtendentePopover';
+import { HistoricoClienteCollapsible } from '@/components/HistoricoClienteCollapsible';
 
 interface ChatPanelProps {
   conversa: FilaAtendimento | null;
@@ -31,13 +30,10 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
   const { currentUser, empresaId } = useApp();
   const { data: mensagens, isLoading: mensagensLoading } = useMensagens(conversa?.conversa_id || null);
   const { data: conversaDetalhes } = useConversa(conversa?.conversa_id || null);
-  const { data: operadores } = useOperadores(empresaId);
   const enviarMensagem = useEnviarMensagem();
-  const atribuirAgente = useAtribuirAgente();
   
   const [mensagemInput, setMensagemInput] = useState('');
   const [showEncerrar, setShowEncerrar] = useState(false);
-  const [selectedAgente, setSelectedAgente] = useState<string>('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -58,17 +54,6 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
     });
     
     setMensagemInput('');
-  };
-
-  const handleAtribuir = async () => {
-    if (!selectedAgente || !conversa) return;
-    
-    await atribuirAgente.mutateAsync({
-      conversaId: conversa.conversa_id,
-      agenteId: selectedAgente,
-    });
-    
-    setSelectedAgente('');
   };
 
   const formatPhone = (phone: string) => {
@@ -104,6 +89,9 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
     conversa.agente_responsavel_id === currentUser?.id;
   
   const canAssign = ['esperando_tria', 'fila_humano'].includes(conversa.status) &&
+    ['adm', 'sup'].includes(currentUser?.tipo_usuario || '');
+
+  const canTransfer = conversa.status === 'em_atendimento_humano' &&
     ['adm', 'sup'].includes(currentUser?.tipo_usuario || '');
 
   return (
@@ -142,32 +130,25 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
           </div>
         </div>
         
-        {/* Assign agent section */}
-        {canAssign && (
-          <div className="mt-4 flex items-center gap-2 p-3 bg-accent/50 rounded-lg">
-            <UserPlus className="w-4 h-4 text-muted-foreground" />
-            <Select value={selectedAgente} onValueChange={setSelectedAgente}>
-              <SelectTrigger className="flex-1 h-9 bg-background">
-                <SelectValue placeholder="Selecione um atendente..." />
-              </SelectTrigger>
-              <SelectContent>
-                {operadores?.map(op => (
-                  <SelectItem key={op.id} value={op.id}>
-                    {op.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button 
-              size="sm" 
-              onClick={handleAtribuir}
-              disabled={!selectedAgente || atribuirAgente.isPending}
-            >
-              Atribuir
-            </Button>
+        {/* Assign/Transfer agent button */}
+        {(canAssign || canTransfer) && (
+          <div className="mt-4">
+            <AtribuirAtendentePopover
+              empresaId={empresaId}
+              conversaId={conversa.conversa_id}
+            />
           </div>
         )}
       </div>
+
+      {/* Histórico do cliente (sessões anteriores) */}
+      {conversa.contato_id && (
+        <HistoricoClienteCollapsible
+          empresaId={empresaId}
+          contatoId={conversa.contato_id}
+          conversaAtualId={conversa.conversa_id}
+        />
+      )}
       
       {/* Messages */}
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
