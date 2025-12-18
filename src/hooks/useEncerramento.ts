@@ -50,7 +50,40 @@ export function useEncerrarConversa() {
       empresaId: string;
       contatoId: string;
     }) => {
-      // 1. Inserir mensagem de pesquisa antes de encerrar
+      // 1. Buscar número do contato para enviar via WhatsApp
+      const { data: contato, error: contatoError } = await supabase
+        .from('contatos')
+        .select('whatsapp_numero')
+        .eq('id', contatoId)
+        .single();
+
+      if (contatoError || !contato) {
+        throw new Error('Não foi possível obter o número do contato');
+      }
+
+      // 2. Enviar mensagem de pesquisa via WhatsApp
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+      const whapiResponse = await fetch(`${supabaseUrl}/functions/v1/whapi-send-message`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          empresa_id: empresaId,
+          to: contato.whatsapp_numero,
+          message: MENSAGEM_PESQUISA,
+        }),
+      });
+
+      if (!whapiResponse.ok) {
+        console.error('Erro ao enviar pesquisa via WhatsApp:', await whapiResponse.text());
+        // Continuar mesmo se falhar o envio - não bloquear encerramento
+      }
+
+      // 3. Inserir mensagem de pesquisa no banco
       const { error: msgError } = await supabase
         .from('mensagens_ativas')
         .insert({
@@ -64,7 +97,7 @@ export function useEncerrarConversa() {
       
       if (msgError) throw msgError;
 
-      // 2. Atualizar timestamp de pesquisa enviada
+      // 4. Atualizar timestamp de pesquisa enviada
       const { error: updateError } = await supabase
         .from('conversas')
         .update({ pesquisa_enviada_em: new Date().toISOString() })
@@ -72,7 +105,7 @@ export function useEncerrarConversa() {
       
       if (updateError) throw updateError;
 
-      // 3. Encerrar conversa (isso arquiva as mensagens)
+      // 5. Encerrar conversa (isso arquiva as mensagens)
       const { error } = await supabase.rpc('encerrar_conversa', {
         p_conversa_id: conversaId,
         p_motivo_id: motivoId,
