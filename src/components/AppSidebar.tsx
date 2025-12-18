@@ -25,6 +25,7 @@ import {
   Shield,
   UserCog,
   FileText,
+  BarChart3,
 } from 'lucide-react';
 
 const menuItems = [
@@ -32,6 +33,7 @@ const menuItems = [
   { title: 'Contatos', url: '/contatos', icon: Users },
   { title: 'Atendentes', url: '/atendentes', icon: Headphones },
   { title: 'Histórico', url: '/historico', icon: Clock },
+  { title: 'Dashboard', url: '/dashboard', icon: BarChart3 },
 ];
 
 const adminMenuItems = [
