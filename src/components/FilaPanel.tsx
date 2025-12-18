@@ -28,21 +28,35 @@ export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelPro
     'em_atendimento_humano',
   ]);
 
-  // Calculate status counts
+  // Filtra conversas visíveis baseado no perfil do usuário
+  const conversasVisiveis = useMemo(() => {
+    if (!fila) return [];
+    
+    // Operadores só veem suas conversas + esperando_tria
+    if (currentUser?.tipo_usuario === 'opr') {
+      return fila.filter(conversa => 
+        conversa.agente_responsavel_id === currentUser.id || 
+        conversa.status === 'esperando_tria'
+      );
+    }
+    
+    // Supervisores e Admins veem tudo
+    return fila;
+  }, [fila, currentUser]);
+
+  // Calculate status counts (apenas das conversas visíveis)
   const statusCounts = useMemo(() => {
     return {
-      bot: fila?.filter(c => c.status === 'bot').length || 0,
-      esperando_tria: fila?.filter(c => c.status === 'esperando_tria').length || 0,
-      fila_humano: fila?.filter(c => c.status === 'fila_humano').length || 0,
-      em_atendimento_humano: fila?.filter(c => c.status === 'em_atendimento_humano').length || 0,
+      bot: conversasVisiveis.filter(c => c.status === 'bot').length,
+      esperando_tria: conversasVisiveis.filter(c => c.status === 'esperando_tria').length,
+      fila_humano: conversasVisiveis.filter(c => c.status === 'fila_humano').length,
+      em_atendimento_humano: conversasVisiveis.filter(c => c.status === 'em_atendimento_humano').length,
     };
-  }, [fila]);
+  }, [conversasVisiveis]);
 
   // Filter conversations
   const filteredConversas = useMemo(() => {
-    if (!fila) return [];
-
-    return fila
+    return conversasVisiveis
       .filter(conversa => {
         // Filter by status
         if (!selectedStatuses.includes(conversa.status || '')) return false;
@@ -63,7 +77,7 @@ export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelPro
         const dateB = new Date(b.last_message_at || 0).getTime();
         return dateB - dateA;
       });
-  }, [fila, selectedStatuses, searchQuery]);
+  }, [conversasVisiveis, selectedStatuses, searchQuery]);
 
   const handleToggleStatus = (status: string) => {
     setSelectedStatuses(prev =>
@@ -98,7 +112,7 @@ export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelPro
     );
   }
 
-  const totalConversas = fila?.length || 0;
+  const totalConversas = conversasVisiveis.length;
 
   if (totalConversas === 0) {
     return (
