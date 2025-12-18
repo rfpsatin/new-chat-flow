@@ -27,8 +27,8 @@ export default function HistoricoPage() {
   const [itemSelecionadoId, setItemSelecionadoId] = useState<string | null>(null);
   const [sessoesAbertasIds, setSessoesAbertasIds] = useState<string[]>([]);
 
-  // Detectar modo baseado nos filtros
-  const modoAtendentes = !filtros.busca && !filtros.operadorId;
+  // Detectar modo baseado nos filtros - modo atendentes só quando operador selecionado
+  const modoAtendentes = !!filtros.operadorId;
 
   // Queries
   const { data: atendentes = [], isLoading: loadingAtendentes } = useAtendentesComHistorico(empresaId);
@@ -73,8 +73,8 @@ export default function HistoricoPage() {
   };
 
   const handleFiltrosChange = (novosFiltros: FiltrosHistorico) => {
-    const modoAnterior = !filtros.busca && !filtros.operadorId;
-    const novoModo = !novosFiltros.busca && !novosFiltros.operadorId;
+    const modoAnterior = !!filtros.operadorId;
+    const novoModo = !!novosFiltros.operadorId;
     
     // Se mudou de modo, limpar seleção
     if (modoAnterior !== novoModo) {
@@ -109,8 +109,8 @@ export default function HistoricoPage() {
           <h1 className="text-xl font-bold">Histórico de Atendimentos</h1>
           <p className="text-sm text-muted-foreground">
             {modoAtendentes 
-              ? 'Selecione um atendente para ver suas sessões finalizadas' 
-              : 'Busque por contatos para ver histórico de conversas'}
+              ? 'Visualizando sessões do operador selecionado' 
+              : 'Selecione um contato para ver o histórico de conversas'}
           </p>
         </div>
 
