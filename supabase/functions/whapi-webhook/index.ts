@@ -140,21 +140,22 @@ Deno.serve(async (req) => {
           throw new Error('Failed to find or create contact')
         }
 
-        // 2. Find active conversation or create new one
+        // 2. Extract message content early (needed for satisfaction check)
+        const conteudo = extractMessageContent(message)
+        console.log(`[${requestId}] Message content: ${conteudo.substring(0, 100)}...`)
+
+        // 3. Find active conversation or create new one
         let conversa = await findOrCreateConversa(
           supabase,
           empresaId,
           contato.id,
+          conteudo,
           requestId
         )
 
         if (!conversa) {
           throw new Error('Failed to find or create conversation')
         }
-
-        // 3. Extract message content
-        const conteudo = extractMessageContent(message)
-        console.log(`[${requestId}] Message content: ${conteudo.substring(0, 100)}...`)
 
         // 4. Insert message
         const { error: msgError } = await supabase
@@ -292,6 +293,7 @@ async function findOrCreateConversa(
   supabase: any,
   empresaId: string,
   contatoId: string,
+  conteudo: string,
   requestId: string
 ) {
   console.log(`[${requestId}] Finding conversation for contact: ${contatoId}`)
@@ -311,8 +313,48 @@ async function findOrCreateConversa(
     throw findError
   }
 
-  // If conversation exists and is closed, reopen it
+  // Se conversa encerrada, verificar se é resposta de pesquisa de satisfação
   if (ultimaConversa && ultimaConversa.status === 'encerrado') {
+    // Verificar se pesquisa foi enviada e ainda não respondida
+    if (ultimaConversa.pesquisa_enviada_em && !ultimaConversa.pesquisa_respondida_em) {
+      // Verificar se está dentro da janela de 24h
+      const pesquisaEnviadaEm = new Date(ultimaConversa.pesquisa_enviada_em)
+      const agora = new Date()
+      const horasPassadas = (agora.getTime() - pesquisaEnviadaEm.getTime()) / (1000 * 60 * 60)
+      
+      console.log(`[${requestId}] Checking satisfaction response - Hours since survey: ${horasPassadas.toFixed(2)}`)
+      
+      // Verificar se a mensagem é uma nota de 1 a 5
+      const nota = parseInt(conteudo.trim())
+      const isNotaValida = !isNaN(nota) && nota >= 1 && nota <= 5
+      
+      if (horasPassadas <= 24 && isNotaValida) {
+        console.log(`[${requestId}] Valid satisfaction rating received: ${nota}`)
+        
+        // Atualizar nota de satisfação sem reabrir conversa
+        const { error: ratingError } = await supabase
+          .from('conversas')
+          .update({
+            nota_satisfacao: nota,
+            pesquisa_respondida_em: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', ultimaConversa.id)
+        
+        if (ratingError) {
+          console.error(`[${requestId}] ERROR updating satisfaction rating:`, ratingError)
+        } else {
+          console.log(`[${requestId}] Satisfaction rating saved successfully`)
+        }
+        
+        // Retornar conversa mantendo status encerrado (não reabre)
+        return { ...ultimaConversa, _skipMessageInsert: false }
+      }
+      
+      console.log(`[${requestId}] Not a valid satisfaction response (nota: ${conteudo}, isValid: ${isNotaValida}, withinWindow: ${horasPassadas <= 24})`)
+    }
+    
+    // Se não for resposta de pesquisa válida, reabrir conversa normalmente
     console.log(`[${requestId}] Found closed conversation: ${ultimaConversa.id}, reopening...`)
     
     const { error: updateError } = await supabase
@@ -323,6 +365,9 @@ async function findOrCreateConversa(
         encerrado_por_id: null,
         motivo_encerramento_id: null,
         agente_responsavel_id: null,
+        pesquisa_enviada_em: null,
+        pesquisa_respondida_em: null,
+        nota_satisfacao: null,
         updated_at: new Date().toISOString()
       })
       .eq('id', ultimaConversa.id)
