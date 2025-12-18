@@ -354,31 +354,28 @@ async function findOrCreateConversa(
       console.log(`[${requestId}] Not a valid satisfaction response (nota: ${conteudo}, isValid: ${isNotaValida}, withinWindow: ${horasPassadas <= 24})`)
     }
     
-    // Se não for resposta de pesquisa válida, reabrir conversa normalmente
-    console.log(`[${requestId}] Found closed conversation: ${ultimaConversa.id}, reopening...`)
+    // Se não for resposta de pesquisa válida, criar NOVA conversa (preserva histórico)
+    console.log(`[${requestId}] Found closed conversation ${ultimaConversa.id}, creating new session...`)
     
-    const { error: updateError } = await supabase
+    const { data: newConversa, error: createError } = await supabase
       .from('conversas')
-      .update({
+      .insert({
+        empresa_id: empresaId,
+        contato_id: contatoId,
         status: 'esperando_tria',
-        encerrado_em: null,
-        encerrado_por_id: null,
-        motivo_encerramento_id: null,
-        agente_responsavel_id: null,
-        pesquisa_enviada_em: null,
-        pesquisa_respondida_em: null,
-        nota_satisfacao: null,
-        updated_at: new Date().toISOString()
+        canal: 'whatsapp',
+        iniciado_por: 'cliente',
       })
-      .eq('id', ultimaConversa.id)
+      .select()
+      .single()
 
-    if (updateError) {
-      console.error(`[${requestId}] ERROR reopening conversation:`, updateError)
-      throw updateError
+    if (createError) {
+      console.error(`[${requestId}] ERROR creating new conversation:`, createError)
+      throw createError
     }
 
-    console.log(`[${requestId}] Conversation reopened: ${ultimaConversa.id}`)
-    return { ...ultimaConversa, status: 'esperando_tria' }
+    console.log(`[${requestId}] Created new conversation session: ${newConversa.id}`)
+    return newConversa
   }
 
   // If conversation exists and is active, use it
