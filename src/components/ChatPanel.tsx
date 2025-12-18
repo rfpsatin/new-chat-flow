@@ -170,34 +170,35 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
         )}
       </div>
       
-      {/* Input - FIXO NO BOTTOM */}
-      {canRespond && (
-        <div className="flex-shrink-0 p-4 border-t bg-card">
-          <form 
-            onSubmit={(e) => { e.preventDefault(); handleEnviar(); }}
-            className="flex items-center gap-3"
+      {/* Input - SEMPRE VISÍVEL */}
+      <div className="flex-shrink-0 p-4 border-t bg-card">
+        <form 
+          onSubmit={(e) => { e.preventDefault(); handleEnviar(); }}
+          className="flex items-center gap-3"
+        >
+          <Input
+            value={mensagemInput}
+            onChange={(e) => setMensagemInput(e.target.value)}
+            placeholder={canRespond 
+              ? "Digite sua mensagem..." 
+              : "Você não é o responsável por esta conversa"}
+            className="flex-1 h-11"
+            disabled={!canRespond}
+          />
+          <Button 
+            type="submit" 
+            size="icon" 
+            className="h-11 w-11"
+            disabled={!canRespond || !mensagemInput.trim() || enviarMensagem.isPending}
           >
-            <Input
-              value={mensagemInput}
-              onChange={(e) => setMensagemInput(e.target.value)}
-              placeholder="Digite sua mensagem..."
-              className="flex-1 h-11"
-            />
-            <Button 
-              type="submit" 
-              size="icon" 
-              className="h-11 w-11"
-              disabled={!mensagemInput.trim() || enviarMensagem.isPending}
-            >
-              {enviarMensagem.isPending ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Send className="w-5 h-5" />
-              )}
-            </Button>
-          </form>
-        </div>
-      )}
+            {enviarMensagem.isPending ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Send className="w-5 h-5" />
+            )}
+          </Button>
+        </form>
+      </div>
       
       {showEncerrar && (
         <EncerrarDialog
@@ -222,7 +223,37 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
     }
   };
 
+  // Extrai o conteúdo real de mensagens de reply
+  const getDisplayContent = () => {
+    if (mensagem.conteudo === '[reply]' && mensagem.payload) {
+      const payload = mensagem.payload as any;
+      // Reply de lista interativa
+      if (payload.reply?.list_reply?.title) {
+        return `📝 ${payload.reply.list_reply.title}`;
+      }
+      // Reply de botão
+      if (payload.reply?.buttons_reply?.title) {
+        return `📝 ${payload.reply.buttons_reply.title}`;
+      }
+      // Fallback para outros tipos de reply
+      if (payload.reply?.title) {
+        return `📝 ${payload.reply.title}`;
+      }
+    }
+    
+    // Lista interativa enviada
+    if (mensagem.conteudo === '[list]' && mensagem.payload) {
+      const payload = mensagem.payload as any;
+      if (payload.list?.header) {
+        return `📋 ${payload.list.header}`;
+      }
+    }
+    
+    return mensagem.conteudo;
+  };
+
   const senderLabel = getSenderLabel();
+  const displayContent = getDisplayContent();
 
   return (
     <div
@@ -248,7 +279,7 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
           </p>
         )}
         <p className="text-sm whitespace-pre-wrap break-words">
-          {mensagem.conteudo}
+          {displayContent}
         </p>
         <p className={cn(
           'text-xs mt-1',
