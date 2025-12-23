@@ -90,14 +90,11 @@ export default function UsuariosPage() {
     }
   };
 
-  const getAtendenteInfo = (usuario: UsuarioComAtendente) => {
-    if (!usuario.atendente || !usuario.atendente.ativo) {
-      return null;
-    }
-    return {
-      ehAtendente: true,
-      paraTriagem: usuario.atendente.para_triagem,
-    };
+  // Derivar info de atendente do tipo de usuário
+  const getAtendenteLabel = (tipoUsuario: string) => {
+    if (tipoUsuario === 'opr') return 'Atendente';
+    if (tipoUsuario === 'sup') return 'Triagem';
+    return '-';
   };
 
   return (
@@ -171,11 +168,7 @@ export default function UsuariosPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {usuariosFiltrados.map((usuario) => {
-                    const atendenteAtivo = usuario.atendente?.ativo;
-                    const paraTriagem = usuario.atendente?.para_triagem;
-                    
-                    return (
+                {usuariosFiltrados.map((usuario) => (
                       <TableRow key={usuario.id}>
                         <TableCell className="font-medium">{usuario.nome}</TableCell>
                         <TableCell>{usuario.email}</TableCell>
@@ -185,16 +178,10 @@ export default function UsuariosPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {atendenteAtivo ? (
-                            <div className="flex items-center gap-2">
-                              <Headphones className="w-4 h-4 text-primary" />
-                              <span className="text-sm">
-                                {paraTriagem ? 'Triagem' : 'Sim'}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">Não</span>
-                          )}
+                          <div className="flex items-center gap-2">
+                            <Headphones className="w-4 h-4 text-primary" />
+                            <span className="text-sm">{getAtendenteLabel(usuario.tipo_usuario)}</span>
+                          </div>
                         </TableCell>
                         <TableCell>
                           <Badge variant={usuario.ativo ? 'default' : 'outline'}>
@@ -224,8 +211,7 @@ export default function UsuariosPage() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    );
-                  })}
+                    ))}
                 </TableBody>
               </Table>
             )}
@@ -236,7 +222,6 @@ export default function UsuariosPage() {
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           usuario={usuarioEditando}
-          atendenteInfo={usuarioEditando ? getAtendenteInfo(usuarioEditando) : null}
           onSave={handleSalvar}
           isLoading={criarUsuario.isPending || editarUsuario.isPending}
         />
