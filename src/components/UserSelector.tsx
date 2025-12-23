@@ -1,18 +1,18 @@
-import { useState } from 'react';
-import { useApp } from '@/contexts/AppContext';
-import { useUsuarios } from '@/hooks/useUsuarios';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LogIn, MessageSquare } from 'lucide-react';
+import { useState } from "react";
+import { useApp } from "@/contexts/AppContext";
+import { useUsuarios } from "@/hooks/useUsuarios";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LogIn, MessageSquare } from "lucide-react";
 
 export function UserSelector() {
   const { empresaId, currentUser, setCurrentUser } = useApp();
   const { data: usuarios, isLoading } = useUsuarios(empresaId);
-  const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
 
   const handleLogin = () => {
-    const user = usuarios?.find(u => u.id === selectedUserId);
+    const user = usuarios?.find((u) => u.id === selectedUserId);
     if (user) {
       setCurrentUser(user);
     }
@@ -20,15 +20,24 @@ export function UserSelector() {
 
   const getRoleLabel = (tipo: string) => {
     switch (tipo) {
-      case 'adm': return 'Administrador';
-      case 'sup': return 'Supervisor';
-      case 'opr': return 'Operador';
-      default: return tipo;
+      case "adm":
+        return "Administrador";
+      case "sup":
+        return "Supervisor";
+      case "opr":
+        return "Operador";
+      default:
+        return tipo;
     }
   };
 
   const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
   };
 
   if (currentUser) {
@@ -42,49 +51,33 @@ export function UserSelector() {
           <div className="mx-auto w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
             <MessageSquare className="w-8 h-8 text-primary" />
           </div>
-          <CardTitle className="text-2xl font-bold">AtendeBem</CardTitle>
-          <p className="text-muted-foreground text-sm mt-1">
-            Sistema de Atendimento Omnichannel
-          </p>
+          <CardTitle className="text-2xl font-bold">Hub de Atedimento</CardTitle>
+          <p className="text-muted-foreground text-sm mt-1">Sistema de Atendimento Omnichannel</p>
         </CardHeader>
         <CardContent className="space-y-6 pt-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">
-              Selecione seu usuário
-            </label>
-            <Select
-              value={selectedUserId}
-              onValueChange={setSelectedUserId}
-              disabled={isLoading}
-            >
+            <label className="text-sm font-medium text-foreground">Selecione seu usuário</label>
+            <Select value={selectedUserId} onValueChange={setSelectedUserId} disabled={isLoading}>
               <SelectTrigger className="h-12">
                 <SelectValue placeholder="Escolha um usuário para entrar..." />
               </SelectTrigger>
               <SelectContent>
-                {usuarios?.map(user => (
+                {usuarios?.map((user) => (
                   <SelectItem key={user.id} value={user.id}>
                     <span className="font-medium">{user.nome}</span>
-                    <span className="text-muted-foreground ml-2">
-                      — {getRoleLabel(user.tipo_usuario)}
-                    </span>
+                    <span className="text-muted-foreground ml-2">— {getRoleLabel(user.tipo_usuario)}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          
-          <Button
-            className="w-full h-12 text-base font-medium"
-            onClick={handleLogin}
-            disabled={!selectedUserId}
-          >
+
+          <Button className="w-full h-12 text-base font-medium" onClick={handleLogin} disabled={!selectedUserId}>
             <LogIn className="w-5 h-5 mr-2" />
             Entrar no Sistema
           </Button>
-          
-          <p className="text-center text-xs text-muted-foreground">
-            Protótipo MVP - Ambiente de demonstração
-          </p>
+
+          <p className="text-center text-xs text-muted-foreground">Protótipo MVP - Ambiente de demonstração</p>
         </CardContent>
       </Card>
     </div>
