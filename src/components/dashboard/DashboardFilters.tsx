@@ -2,8 +2,16 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RefreshCw } from 'lucide-react';
+import { PeriodoFiltro } from '@/hooks/useDashboardStats';
 
-export function DashboardFilters() {
+interface DashboardFiltersProps {
+  periodo: PeriodoFiltro;
+  onPeriodoChange: (periodo: PeriodoFiltro) => void;
+  onRefresh: () => void;
+  isLoading?: boolean;
+}
+
+export function DashboardFilters({ periodo, onPeriodoChange, onRefresh, isLoading }: DashboardFiltersProps) {
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
       <Tabs defaultValue="atendimentos" className="w-auto">
@@ -11,26 +19,14 @@ export function DashboardFilters() {
           <TabsTrigger value="atendimentos" className="data-[state=active]:bg-background">
             Atendimentos
           </TabsTrigger>
-          <TabsTrigger value="integracoes" className="data-[state=active]:bg-background">
+          <TabsTrigger value="integracoes" className="data-[state=active]:bg-background" disabled>
             Integrações
           </TabsTrigger>
         </TabsList>
       </Tabs>
 
       <div className="flex items-center gap-3">
-        <Select defaultValue="todas">
-          <SelectTrigger className="w-[140px] bg-card">
-            <SelectValue placeholder="Fila" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todas">Todas as filas</SelectItem>
-            <SelectItem value="principal">Principal</SelectItem>
-            <SelectItem value="suporte">Suporte</SelectItem>
-            <SelectItem value="vendas">Vendas</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select defaultValue="hoje">
+        <Select value={periodo} onValueChange={(v) => onPeriodoChange(v as PeriodoFiltro)}>
           <SelectTrigger className="w-[140px] bg-card">
             <SelectValue placeholder="Período" />
           </SelectTrigger>
@@ -43,8 +39,14 @@ export function DashboardFilters() {
           </SelectContent>
         </Select>
 
-        <Button variant="outline" size="icon" className="bg-card">
-          <RefreshCw className="w-4 h-4" />
+        <Button 
+          variant="outline" 
+          size="icon" 
+          className="bg-card"
+          onClick={onRefresh}
+          disabled={isLoading}
+        >
+          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
         </Button>
       </div>
     </div>

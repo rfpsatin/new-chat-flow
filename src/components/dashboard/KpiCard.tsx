@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { TrendingDown, TrendingUp } from 'lucide-react';
 
 interface KpiCardProps {
@@ -8,10 +9,20 @@ interface KpiCardProps {
   change?: number;
   showCircle?: boolean;
   circlePercent?: number;
+  isLoading?: boolean;
 }
 
-export function KpiCard({ value, label, change, showCircle, circlePercent }: KpiCardProps) {
+export function KpiCard({ value, label, change, showCircle, circlePercent, isLoading }: KpiCardProps) {
   const isPositive = change !== undefined && change >= 0;
+  
+  if (isLoading) {
+    return (
+      <Card className="bg-card border-border p-4 flex flex-col gap-2">
+        <Skeleton className="h-8 w-16" />
+        <Skeleton className="h-4 w-24" />
+      </Card>
+    );
+  }
   
   return (
     <Card className="bg-card border-border p-4 flex flex-col gap-2">
