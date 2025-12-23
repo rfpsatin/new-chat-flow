@@ -1,5 +1,5 @@
-import { useLocation, useNavigate } from 'react-router-dom';
-import { useApp } from '@/contexts/AppContext';
+import { useLocation, useNavigate } from "react-router-dom";
+import { useApp } from "@/contexts/AppContext";
 import {
   Sidebar,
   SidebarContent,
@@ -11,14 +11,14 @@ import {
   SidebarMenuItem,
   SidebarHeader,
   SidebarFooter,
-} from '@/components/ui/sidebar';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { 
-  MessageSquare, 
-  Users, 
-  Clock, 
+} from "@/components/ui/sidebar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import {
+  MessageSquare,
+  Users,
+  Clock,
   LogOut,
   LayoutDashboard,
   Headphones,
@@ -26,18 +26,19 @@ import {
   UserCog,
   FileText,
   BarChart3,
-} from 'lucide-react';
+} from "lucide-react";
 
 const menuItems = [
-  { title: 'Fila de Atendimento', url: '/', icon: LayoutDashboard },
-  { title: 'Contatos', url: '/contatos', icon: Users },
-  { title: 'Histórico', url: '/historico', icon: Clock },
-  { title: 'Dashboard', url: '/dashboard', icon: BarChart3 },
+  { title: "Fila de Atendimento", url: "/", icon: LayoutDashboard },
+  { title: "Contatos", url: "/contatos", icon: Users },
+  { title: "Atendentes", url: "/atendentes", icon: Headphones },
+  { title: "Histórico", url: "/historico", icon: Clock },
+  { title: "Dashboard", url: "/dashboard", icon: BarChart3 },
 ];
 
 const adminMenuItems = [
-  { title: 'Usuários', url: '/admin/usuarios', icon: UserCog },
-  { title: 'Motivos Encerramento', url: '/admin/motivos', icon: FileText },
+  { title: "Usuários", url: "/admin/usuarios", icon: UserCog },
+  { title: "Motivos Encerramento", url: "/admin/motivos", icon: FileText },
 ];
 
 export function AppSidebar() {
@@ -45,36 +46,45 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const { currentUser, setCurrentUser, setSelectedConversa } = useApp();
 
-  const isAdmin = currentUser?.tipo_usuario === 'adm';
+  const isAdmin = currentUser?.tipo_usuario === "adm";
 
   const handleLogout = () => {
     setCurrentUser(null);
     setSelectedConversa(null);
-    navigate('/');
+    navigate("/");
   };
 
   const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
   };
 
   const getRoleLabel = (tipo: string) => {
     switch (tipo) {
-      case 'adm': return 'Administrador';
-      case 'sup': return 'Supervisor';
-      case 'opr': return 'Operador';
-      default: return tipo;
+      case "adm":
+        return "Administrador";
+      case "sup":
+        return "Supervisor";
+      case "opr":
+        return "Operador";
+      default:
+        return tipo;
     }
   };
 
-  const renderMenuItem = (item: typeof menuItems[0], isActive: boolean) => (
+  const renderMenuItem = (item: (typeof menuItems)[0], isActive: boolean) => (
     <SidebarMenuItem key={item.title}>
       <SidebarMenuButton
         asChild
         isActive={isActive}
         className={`h-11 px-3 rounded-lg transition-colors ${
-          isActive 
-            ? 'bg-sidebar-primary text-sidebar-primary-foreground' 
-            : 'text-sidebar-foreground hover:bg-sidebar-accent'
+          isActive
+            ? "bg-sidebar-primary text-sidebar-primary-foreground"
+            : "text-sidebar-foreground hover:bg-sidebar-accent"
         }`}
       >
         <button onClick={() => navigate(item.url)}>
@@ -93,12 +103,12 @@ export function AppSidebar() {
             <MessageSquare className="w-5 h-5 text-sidebar-primary" />
           </div>
           <div>
-            <h1 className="font-bold text-sidebar-foreground">AtendeBem</h1>
+            <h1 className="font-bold text-sidebar-foreground">Hub de Atedimento</h1>
             <p className="text-xs text-sidebar-foreground/60">Omnichannel</p>
           </div>
         </div>
       </SidebarHeader>
-      
+
       <SidebarContent className="p-2">
         <SidebarGroup>
           <SidebarGroupContent>
@@ -131,7 +141,7 @@ export function AppSidebar() {
           </>
         )}
       </SidebarContent>
-      
+
       <SidebarFooter className="p-4 border-t border-sidebar-border">
         {currentUser && (
           <div className="space-y-3">
@@ -142,12 +152,8 @@ export function AppSidebar() {
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-sidebar-foreground text-sm truncate">
-                  {currentUser.nome}
-                </p>
-                <p className="text-xs text-sidebar-foreground/60">
-                  {getRoleLabel(currentUser.tipo_usuario)}
-                </p>
+                <p className="font-medium text-sidebar-foreground text-sm truncate">{currentUser.nome}</p>
+                <p className="text-xs text-sidebar-foreground/60">{getRoleLabel(currentUser.tipo_usuario)}</p>
               </div>
             </div>
             <Button
