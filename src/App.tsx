@@ -7,7 +7,6 @@ import { AppProvider } from "@/contexts/AppContext";
 import FilaPage from "./pages/FilaPage";
 import ContatosPage from "./pages/ContatosPage";
 import HistoricoPage from "./pages/HistoricoPage";
-import AtendentesPage from "./pages/AtendentesPage";
 import DashboardAtendimentosPage from "./pages/DashboardAtendimentosPage";
 import UsuariosPage from "./pages/admin/UsuariosPage";
 import MotivosPage from "./pages/admin/MotivosPage";
@@ -26,7 +25,6 @@ const App = () => (
             <Route path="/" element={<FilaPage />} />
             <Route path="/contatos" element={<ContatosPage />} />
             <Route path="/historico" element={<HistoricoPage />} />
-            <Route path="/atendentes" element={<AtendentesPage />} />
             <Route path="/dashboard" element={<DashboardAtendimentosPage />} />
             <Route path="/admin/usuarios" element={<UsuariosPage />} />
             <Route path="/admin/motivos" element={<MotivosPage />} />

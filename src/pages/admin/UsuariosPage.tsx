@@ -23,7 +23,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Search, Pencil, UserCheck, UserX } from 'lucide-react';
+import { Plus, Search, Pencil, UserCheck, UserX, Headphones } from 'lucide-react';
+
+interface UsuarioComAtendente extends Usuario {
+  atendente?: {
+    id: string;
+    usuario_id: string;
+    nome: string;
+    para_triagem: boolean;
+    ativo: boolean;
+  } | null;
+}
 
 export default function UsuariosPage() {
   const { currentUser } = useApp();
@@ -32,12 +42,12 @@ export default function UsuariosPage() {
   const { usuarios, isLoading, criarUsuario, editarUsuario, toggleAtivoUsuario } = useGestaoUsuarios(empresaId);
   
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null);
+  const [usuarioEditando, setUsuarioEditando] = useState<UsuarioComAtendente | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filtroTipo, setFiltroTipo] = useState<string>('todos');
   const [filtroStatus, setFiltroStatus] = useState<string>('todos');
 
-  const usuariosFiltrados = usuarios.filter((u) => {
+  const usuariosFiltrados = (usuarios as UsuarioComAtendente[]).filter((u) => {
     const matchSearch = u.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
                        u.email.toLowerCase().includes(searchQuery.toLowerCase());
     const matchTipo = filtroTipo === 'todos' || u.tipo_usuario === filtroTipo;
@@ -52,7 +62,7 @@ export default function UsuariosPage() {
     setDialogOpen(true);
   };
 
-  const handleEditarUsuario = (usuario: Usuario) => {
+  const handleEditarUsuario = (usuario: UsuarioComAtendente) => {
     setUsuarioEditando(usuario);
     setDialogOpen(true);
   };
@@ -68,7 +78,7 @@ export default function UsuariosPage() {
     }
   };
 
-  const handleToggleAtivo = (usuario: Usuario) => {
+  const handleToggleAtivo = (usuario: UsuarioComAtendente) => {
     toggleAtivoUsuario.mutate({ id: usuario.id, ativo: !usuario.ativo });
   };
 
@@ -80,6 +90,16 @@ export default function UsuariosPage() {
     }
   };
 
+  const getAtendenteInfo = (usuario: UsuarioComAtendente) => {
+    if (!usuario.atendente || !usuario.atendente.ativo) {
+      return null;
+    }
+    return {
+      ehAtendente: true,
+      paraTriagem: usuario.atendente.para_triagem,
+    };
+  };
+
   return (
     <MainLayout>
       <AdminGuard>
@@ -88,7 +108,7 @@ export default function UsuariosPage() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h1 className="text-2xl font-bold text-foreground">Gestão de Usuários</h1>
-                <p className="text-muted-foreground">Gerencie operadores e supervisores</p>
+                <p className="text-muted-foreground">Gerencie operadores, supervisores e atendentes</p>
               </div>
               <Button onClick={handleNovoUsuario}>
                 <Plus className="w-4 h-4 mr-2" />
@@ -145,49 +165,67 @@ export default function UsuariosPage() {
                     <TableHead>Nome</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Tipo</TableHead>
+                    <TableHead>Atendente</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="w-[100px]">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {usuariosFiltrados.map((usuario) => (
-                    <TableRow key={usuario.id}>
-                      <TableCell className="font-medium">{usuario.nome}</TableCell>
-                      <TableCell>{usuario.email}</TableCell>
-                      <TableCell>
-                        <Badge variant={usuario.tipo_usuario === 'sup' ? 'default' : 'secondary'}>
-                          {getTipoLabel(usuario.tipo_usuario)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={usuario.ativo ? 'default' : 'outline'}>
-                          {usuario.ativo ? 'Ativo' : 'Inativo'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEditarUsuario(usuario)}
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleToggleAtivo(usuario)}
-                          >
-                            {usuario.ativo ? (
-                              <UserX className="w-4 h-4 text-destructive" />
-                            ) : (
-                              <UserCheck className="w-4 h-4 text-green-600" />
-                            )}
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {usuariosFiltrados.map((usuario) => {
+                    const atendenteAtivo = usuario.atendente?.ativo;
+                    const paraTriagem = usuario.atendente?.para_triagem;
+                    
+                    return (
+                      <TableRow key={usuario.id}>
+                        <TableCell className="font-medium">{usuario.nome}</TableCell>
+                        <TableCell>{usuario.email}</TableCell>
+                        <TableCell>
+                          <Badge variant={usuario.tipo_usuario === 'sup' ? 'default' : 'secondary'}>
+                            {getTipoLabel(usuario.tipo_usuario)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {atendenteAtivo ? (
+                            <div className="flex items-center gap-2">
+                              <Headphones className="w-4 h-4 text-primary" />
+                              <span className="text-sm">
+                                {paraTriagem ? 'Triagem' : 'Sim'}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">Não</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={usuario.ativo ? 'default' : 'outline'}>
+                            {usuario.ativo ? 'Ativo' : 'Inativo'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEditarUsuario(usuario)}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleToggleAtivo(usuario)}
+                            >
+                              {usuario.ativo ? (
+                                <UserX className="w-4 h-4 text-destructive" />
+                              ) : (
+                                <UserCheck className="w-4 h-4 text-green-600" />
+                              )}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
@@ -198,6 +236,7 @@ export default function UsuariosPage() {
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           usuario={usuarioEditando}
+          atendenteInfo={usuarioEditando ? getAtendenteInfo(usuarioEditando) : null}
           onSave={handleSalvar}
           isLoading={criarUsuario.isPending || editarUsuario.isPending}
         />
