@@ -7,31 +7,29 @@ import {
 } from '@/components/ui/chart';
 import { Pie, PieChart, Cell } from 'recharts';
 
-interface AtendimentoPorMotivo {
+interface AtendimentoPorCanal {
   name: string;
   value: number;
 }
 
-interface AtendimentosPorFechamentoChartProps {
-  data: AtendimentoPorMotivo[];
+interface AtendimentosPorCanalChartProps {
+  data: AtendimentoPorCanal[];
   isLoading?: boolean;
 }
 
 const COLORS = [
-  'hsl(142, 70%, 45%)', // Verde - Resolvido
-  'hsl(38, 92%, 50%)',  // Laranja - Cliente desistiu
-  'hsl(220, 70%, 50%)', // Azul - Transferido
-  'hsl(350, 65%, 50%)', // Vermelho - Spam
-  'hsl(280, 60%, 50%)', // Roxo
-  'hsl(180, 60%, 45%)', // Ciano
+  'hsl(142, 76%, 36%)', // WhatsApp green
+  'hsl(220, 70%, 50%)', 
+  'hsl(280, 60%, 50%)',
+  'hsl(350, 60%, 50%)',
 ];
 
-export function AtendimentosPorFechamentoChart({ data, isLoading }: AtendimentosPorFechamentoChartProps) {
+export function AtendimentosPorCanalChart({ data, isLoading }: AtendimentosPorCanalChartProps) {
   if (isLoading) {
     return (
-      <Card className="p-4 bg-card border-border">
+      <Card className="p-4 bg-card border-border h-full">
         <div className="flex items-center justify-between mb-4">
-          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-5 w-28" />
         </div>
         <Skeleton className="h-[160px] w-full" />
       </Card>
@@ -42,7 +40,7 @@ export function AtendimentosPorFechamentoChart({ data, isLoading }: Atendimentos
   const total = data.reduce((acc, d) => acc + d.value, 0);
 
   const chartConfig = data.reduce((acc, item, index) => {
-    acc[item.name.toLowerCase().replace(/\s/g, '_')] = {
+    acc[item.name.toLowerCase()] = {
       label: item.name,
       color: COLORS[index % COLORS.length],
     };
@@ -50,14 +48,14 @@ export function AtendimentosPorFechamentoChart({ data, isLoading }: Atendimentos
   }, {} as Record<string, { label: string; color: string }>);
 
   return (
-    <Card className="p-4 bg-card border-border">
+    <Card className="p-4 bg-card border-border h-full">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-foreground">Por Motivo de Encerramento</h3>
+        <h3 className="font-semibold text-foreground">Por Canal</h3>
       </div>
 
       {!temDados ? (
         <div className="h-[160px] flex items-center justify-center text-muted-foreground text-sm">
-          Sem dados no período selecionado
+          Sem dados no período
         </div>
       ) : (
         <div className="flex items-center gap-6">
@@ -87,9 +85,9 @@ export function AtendimentosPorFechamentoChart({ data, isLoading }: Atendimentos
                   className="w-3 h-3 rounded-sm" 
                   style={{ backgroundColor: COLORS[index % COLORS.length] }} 
                 />
-                <span className="text-sm text-muted-foreground truncate max-w-[140px]">{item.name}</span>
+                <span className="text-sm text-muted-foreground">{item.name}</span>
                 <span className="text-sm font-medium text-foreground ml-auto">
-                  {item.value} ({total > 0 ? Math.round((item.value / total) * 100) : 0}%)
+                  {total > 0 ? Math.round((item.value / total) * 100) : 0}%
                 </span>
               </div>
             ))}
