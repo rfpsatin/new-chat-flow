@@ -22,9 +22,6 @@ export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelPro
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([
-    'bot',
-    'esperando_tria',
-    'fila_humano',
     'em_atendimento_humano',
   ]);
 
