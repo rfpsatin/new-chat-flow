@@ -9,7 +9,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -20,16 +19,10 @@ import {
 import { Usuario } from '@/types/atendimento';
 import { UsuarioFormData } from '@/hooks/useGestaoUsuarios';
 
-interface AtendenteInfo {
-  ehAtendente: boolean;
-  paraTriagem: boolean;
-}
-
 interface UsuarioDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   usuario?: Usuario | null;
-  atendenteInfo?: AtendenteInfo | null;
   onSave: (dados: UsuarioFormData) => void;
   isLoading?: boolean;
 }
@@ -38,31 +31,24 @@ export function UsuarioDialog({
   open,
   onOpenChange,
   usuario,
-  atendenteInfo,
   onSave,
   isLoading,
 }: UsuarioDialogProps) {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [tipoUsuario, setTipoUsuario] = useState<'sup' | 'opr'>('opr');
-  const [ehAtendente, setEhAtendente] = useState(false);
-  const [paraTriagem, setParaTriagem] = useState(false);
 
   useEffect(() => {
     if (usuario) {
       setNome(usuario.nome);
       setEmail(usuario.email);
       setTipoUsuario(usuario.tipo_usuario as 'sup' | 'opr');
-      setEhAtendente(atendenteInfo?.ehAtendente ?? false);
-      setParaTriagem(atendenteInfo?.paraTriagem ?? false);
     } else {
       setNome('');
       setEmail('');
       setTipoUsuario('opr');
-      setEhAtendente(false);
-      setParaTriagem(false);
     }
-  }, [usuario, atendenteInfo, open]);
+  }, [usuario, open]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,12 +58,18 @@ export function UsuarioDialog({
       nome: nome.trim(),
       email: email.trim(),
       tipo_usuario: tipoUsuario,
-      ehAtendente,
-      paraTriagem: ehAtendente ? paraTriagem : false,
     });
   };
 
   const isEditing = !!usuario;
+
+  // Texto de ajuda baseado no tipo selecionado
+  const getTipoHelp = () => {
+    if (tipoUsuario === 'opr') {
+      return 'Operadores são atendentes que atendem clientes na fila.';
+    }
+    return 'Supervisores fazem triagem inicial das conversas.';
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -120,38 +112,7 @@ export function UsuarioDialog({
                 <SelectItem value="sup">Supervisor</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-          
-          <div className="border-t pt-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="ehAtendente">É Atendente</Label>
-                <p className="text-xs text-muted-foreground">
-                  Permite atender clientes na fila
-                </p>
-              </div>
-              <Switch
-                id="ehAtendente"
-                checked={ehAtendente}
-                onCheckedChange={setEhAtendente}
-              />
-            </div>
-            
-            {ehAtendente && (
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="paraTriagem">Para Triagem</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Recebe conversas para triagem inicial
-                  </p>
-                </div>
-                <Switch
-                  id="paraTriagem"
-                  checked={paraTriagem}
-                  onCheckedChange={setParaTriagem}
-                />
-              </div>
-            )}
+            <p className="text-xs text-muted-foreground">{getTipoHelp()}</p>
           </div>
 
           <DialogFooter>

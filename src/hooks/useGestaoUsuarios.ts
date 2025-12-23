@@ -7,8 +7,13 @@ export interface UsuarioFormData {
   nome: string;
   email: string;
   tipo_usuario: 'sup' | 'opr';
-  ehAtendente?: boolean;
-  paraTriagem?: boolean;
+}
+
+// Lógica automática: operador = atendente, supervisor = triagem
+function derivarAtendente(tipoUsuario: 'sup' | 'opr') {
+  const ehAtendente = tipoUsuario === 'opr' || tipoUsuario === 'sup';
+  const paraTriagem = tipoUsuario === 'sup';
+  return { ehAtendente, paraTriagem };
 }
 
 interface Atendente {
@@ -68,6 +73,8 @@ export function useGestaoUsuarios(empresaId: string) {
 
   const criarUsuario = useMutation({
     mutationFn: async (dados: UsuarioFormData) => {
+      const { ehAtendente, paraTriagem } = derivarAtendente(dados.tipo_usuario);
+      
       // Criar usuário
       const { data: usuario, error: usuarioError } = await supabase
         .from('usuarios')
@@ -83,15 +90,15 @@ export function useGestaoUsuarios(empresaId: string) {
       
       if (usuarioError) throw usuarioError;
       
-      // Se é atendente, criar registro na tabela atendentes
-      if (dados.ehAtendente && usuario) {
+      // Criar atendente automaticamente para operadores e supervisores
+      if (ehAtendente && usuario) {
         const { error: atendenteError } = await supabase
           .from('atendentes')
           .insert({
             empresa_id: empresaId,
             usuario_id: usuario.id,
             nome: dados.nome,
-            para_triagem: dados.paraTriagem ?? false,
+            para_triagem: paraTriagem,
             ativo: true,
           });
         
@@ -135,6 +142,10 @@ export function useGestaoUsuarios(empresaId: string) {
       
       if (usuarioError) throw usuarioError;
       
+      // Derivar atendente do tipo de usuário
+      const tipoUsuario = dados.tipo_usuario ?? usuario.tipo_usuario;
+      const { ehAtendente, paraTriagem } = derivarAtendente(tipoUsuario as 'sup' | 'opr');
+      
       // Verificar se já existe atendente
       const { data: atendenteExistente } = await supabase
         .from('atendentes')
@@ -143,14 +154,14 @@ export function useGestaoUsuarios(empresaId: string) {
         .eq('empresa_id', empresaId)
         .maybeSingle();
       
-      if (dados.ehAtendente) {
+      if (ehAtendente) {
         if (atendenteExistente) {
           // Atualizar atendente existente
           const { error: atendenteError } = await supabase
             .from('atendentes')
             .update({
               nome: dados.nome ?? usuario.nome,
-              para_triagem: dados.paraTriagem ?? false,
+              para_triagem: paraTriagem,
               ativo: true,
             })
             .eq('id', atendenteExistente.id);
@@ -164,20 +175,12 @@ export function useGestaoUsuarios(empresaId: string) {
               empresa_id: empresaId,
               usuario_id: id,
               nome: dados.nome ?? usuario.nome,
-              para_triagem: dados.paraTriagem ?? false,
+              para_triagem: paraTriagem,
               ativo: true,
             });
           
           if (atendenteError) throw atendenteError;
         }
-      } else if (dados.ehAtendente === false && atendenteExistente) {
-        // Desativar atendente (não deletar para manter histórico)
-        const { error: atendenteError } = await supabase
-          .from('atendentes')
-          .update({ ativo: false })
-          .eq('id', atendenteExistente.id);
-        
-        if (atendenteError) throw atendenteError;
       }
       
       return usuario;
