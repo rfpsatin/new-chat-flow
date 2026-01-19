@@ -95,6 +95,24 @@ export default function ConexaoPage() {
                 <Badge variant={statusMeta.variant}>{statusMeta.label}</Badge>
               </CardHeader>
               <CardContent className="space-y-3">
+                {/* Informações do canal */}
+                {(connectionInfo?.whapi_channel_name || connectionInfo?.whapi_phone || connectionInfo?.whapi_work_period) && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm p-4 bg-muted/50 rounded-lg mb-4">
+                    <div>
+                      <p className="text-muted-foreground">Nome do canal</p>
+                      <p className="font-medium text-lg">{connectionInfo?.whapi_channel_name || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Telefone</p>
+                      <p className="font-medium text-lg">{connectionInfo?.whapi_phone || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Período de trabalho</p>
+                      <p className="font-medium text-lg text-green-600">{connectionInfo?.whapi_work_period || '—'}</p>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div>
                     <p className="text-muted-foreground">Status bruto</p>
