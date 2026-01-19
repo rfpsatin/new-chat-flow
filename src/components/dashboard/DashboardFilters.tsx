@@ -101,6 +101,9 @@ export function DashboardFilters({
             <SelectItem value="7dias">Últimos 7 dias</SelectItem>
             <SelectItem value="30dias">Últimos 30 dias</SelectItem>
             <SelectItem value="mes">Este mês</SelectItem>
+          {activeTab === 'aberto' && (
+            <SelectItem value="prazo">Em aberto (sem prazo)</SelectItem>
+          )}
           </SelectContent>
         </Select>
 

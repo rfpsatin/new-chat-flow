@@ -26,6 +26,12 @@ export default function DashboardAtendimentosPage() {
   const { empresaId } = useApp();
   const [periodo, setPeriodo] = useState<PeriodoFiltro>('hoje');
   const [activeTab, setActiveTab] = useState<'atendimentos' | 'aberto'>('atendimentos');
+  const handleTabChange = (tab: 'atendimentos' | 'aberto') => {
+    setActiveTab(tab);
+    if (tab === 'atendimentos' && periodo === 'prazo') {
+      setPeriodo('hoje');
+    }
+  };
   const [somenteEmAndamento, setSomenteEmAndamento] = useState(true);
   const [filaAgenteId, setFilaAgenteId] = useState<string>('todos');
   const [atendimentoAgenteId, setAtendimentoAgenteId] = useState<string>('todos');
@@ -86,7 +92,7 @@ export default function DashboardAtendimentosPage() {
             onRefresh={handleRefresh}
             isLoading={isLoading}
             activeTab={activeTab}
-            onTabChange={setActiveTab}
+            onTabChange={handleTabChange}
             agentes={agentes}
             filaAgenteId={filaAgenteId}
             onFilaAgenteChange={setFilaAgenteId}

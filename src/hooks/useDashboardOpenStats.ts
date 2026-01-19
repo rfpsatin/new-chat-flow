@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { subDays, startOfMonth, startOfDay, endOfDay, format } from 'date-fns';
 
-export type PeriodoFiltro = 'hoje' | 'ontem' | '7dias' | '30dias' | 'mes';
+export type PeriodoFiltro = 'hoje' | 'ontem' | '7dias' | '30dias' | 'mes' | 'prazo';
 
 export interface OpenStatusMetrics {
   count: number;
@@ -73,12 +73,17 @@ export function useDashboardOpenStats(
       atendimentoAgenteId,
     ],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const query = supabase
         .from('conversas')
         .select('id, status, created_at, encerrado_em, agente_responsavel_id')
-        .eq('empresa_id', empresaId)
-        .gte('created_at', inicio.toISOString())
-        .lt('created_at', fim.toISOString());
+        .eq('empresa_id', empresaId);
+
+      const { data, error } =
+        periodo === 'prazo'
+          ? await query
+          : await query
+              .gte('created_at', inicio.toISOString())
+              .lt('created_at', fim.toISOString());
 
       if (error) throw error;
 

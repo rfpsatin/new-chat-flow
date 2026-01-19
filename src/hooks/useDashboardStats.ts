@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { subDays, startOfMonth, startOfDay, endOfDay } from 'date-fns';
 
-export type PeriodoFiltro = 'hoje' | 'ontem' | '7dias' | '30dias' | 'mes';
+export type PeriodoFiltro = 'hoje' | 'ontem' | '7dias' | '30dias' | 'mes' | 'prazo';
 
 interface KpiData {
   valor: number;
@@ -99,6 +99,13 @@ function getDateRange(periodo: PeriodoFiltro): {
         fim: endOfDay(agora),
         inicioAnterior: inicioMesAnterior,
         fimAnterior: inicioMes
+      };
+    case 'prazo':
+      return {
+        inicio: hoje,
+        fim: endOfDay(agora),
+        inicioAnterior: subDays(hoje, 1),
+        fimAnterior: hoje
       };
     default:
       return {
