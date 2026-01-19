@@ -6,7 +6,7 @@ const corsHeaders = {
 }
 
 const WHAPI_BASE_URL = 'https://gate.whapi.cloud'
-const STATUS_ENDPOINTS = ['/api/getState', '/api/get_state', '/api/status', '/api/state']
+const STATUS_ENDPOINT = '/api/getState'
 
 interface StatusResponse {
   empresa_id: string
@@ -83,43 +83,27 @@ Deno.serve(async (req) => {
       })
     }
 
-    let lastError: any = null
-    let whapiData: any = null
-    let usedEndpoint: string | null = null
-    let whapiResponseStatus = 502
+    const whapiResponse = await fetch(`${WHAPI_BASE_URL}${STATUS_ENDPOINT}`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${empresa.whapi_token}`,
+        'Content-Type': 'application/json',
+      },
+    })
 
-    for (const endpoint of STATUS_ENDPOINTS) {
-      const whapiResponse = await fetch(`${WHAPI_BASE_URL}${endpoint}`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${empresa.whapi_token}`,
-          'Content-Type': 'application/json',
-        },
-      })
+    const whapiData = await safeJson(whapiResponse)
 
-      const data = await safeJson(whapiResponse)
-      if (whapiResponse.ok) {
-        whapiData = data
-        usedEndpoint = endpoint
-        whapiResponseStatus = whapiResponse.status
-        break
-      }
-
-      lastError = data || { error: `Falha ao chamar ${endpoint}` }
-      whapiResponseStatus = whapiResponse.status
-    }
-
-    if (!whapiData) {
+    if (!whapiResponse.ok) {
       const errorMessage =
-        lastError?.error || lastError?.message || 'Erro ao consultar estado do Whapi'
+        whapiData?.error || whapiData?.message || 'Erro ao consultar estado do Whapi'
       await updateEmpresaStatus(supabase, empresaId, {
         whapi_status: 'error',
         whapi_status_raw: null,
         whapi_last_error: errorMessage,
         whapi_status_source: 'polling',
       })
-      return new Response(JSON.stringify({ error: errorMessage, details: lastError }), {
-        status: whapiResponseStatus,
+      return new Response(JSON.stringify({ error: errorMessage, details: whapiData }), {
+        status: whapiResponse.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
@@ -154,7 +138,7 @@ Deno.serve(async (req) => {
       empresa_id: empresaId,
       status: normalized,
       raw_status: rawState,
-      endpoint: usedEndpoint,
+      endpoint: STATUS_ENDPOINT,
       response: whapiData,
     }), {
       status: 200,
