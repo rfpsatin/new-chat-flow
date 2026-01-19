@@ -20,6 +20,14 @@ export interface DashboardOpenStats {
   fila: OpenStatusMetrics;
   atendimento: OpenStatusMetrics;
   leadTimeTimeline: LeadTimePoint[];
+  agentes: {
+    id: string;
+    nome: string;
+    filaCount: number;
+    filaAvgSeconds: number;
+    atendimentoCount: number;
+    atendimentoAvgSeconds: number;
+  }[];
 }
 
 function getDateRange(periodo: PeriodoFiltro): { inicio: Date; fim: Date } {
@@ -125,6 +133,68 @@ export function useDashboardOpenStats(
           return { dia: values.label, leadTimeSeconds: media };
         });
 
+      const { data: usuarios, error: usuariosError } = await supabase
+        .from('usuarios')
+        .select('id, nome')
+        .eq('empresa_id', empresaId)
+        .eq('ativo', true)
+        .in('tipo_usuario', ['opr', 'sup']);
+
+      if (usuariosError) throw usuariosError;
+
+      const agentesMap = new Map(
+        (usuarios || []).map((u) => [
+          u.id,
+          {
+            id: u.id,
+            nome: u.nome,
+            filaCount: 0,
+            filaAvgSeconds: 0,
+            atendimentoCount: 0,
+            atendimentoAvgSeconds: 0,
+            filaSamples: [] as number[],
+            atendimentoSamples: [] as number[],
+          },
+        ])
+      );
+
+      const nowMs = Date.now();
+      filtradas.forEach((c) => {
+        if (!c.agente_responsavel_id) return;
+        const agente = agentesMap.get(c.agente_responsavel_id);
+        if (!agente) return;
+        const inicioMs = new Date(c.created_at).getTime();
+        const duration = Math.max(0, (nowMs - inicioMs) / 1000);
+        if (c.status === 'fila_humano') {
+          agente.filaCount += 1;
+          agente.filaSamples.push(duration);
+        }
+        if (c.status === 'em_atendimento_humano') {
+          agente.atendimentoCount += 1;
+          agente.atendimentoSamples.push(duration);
+        }
+      });
+
+      const agentes = Array.from(agentesMap.values()).map((agente) => ({
+        id: agente.id,
+        nome: agente.nome,
+        filaCount: agente.filaCount,
+        filaAvgSeconds:
+          agente.filaSamples.length > 0
+            ? Math.round(
+                agente.filaSamples.reduce((acc, v) => acc + v, 0) / agente.filaSamples.length
+              )
+            : 0,
+        atendimentoCount: agente.atendimentoCount,
+        atendimentoAvgSeconds:
+          agente.atendimentoSamples.length > 0
+            ? Math.round(
+                agente.atendimentoSamples.reduce((acc, v) => acc + v, 0) /
+                  agente.atendimentoSamples.length
+              )
+            : 0,
+      }));
+
       return {
         bot: {
           count: bot.length,
@@ -143,6 +213,7 @@ export function useDashboardOpenStats(
           avgWaitSeconds: computeAverageSeconds(atendimento),
         },
         leadTimeTimeline,
+        agentes,
       } as DashboardOpenStats;
     },
     enabled: !!empresaId,

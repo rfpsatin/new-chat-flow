@@ -7,6 +7,7 @@ import { AtendimentosPorCanalChart } from '@/components/dashboard/AtendimentosPo
 import { AtendimentosPorFechamentoChart } from '@/components/dashboard/AtendimentosPorFechamentoChart';
 import { AgentesTable } from '@/components/dashboard/AgentesTable';
 import { LeadTimeTimelineChart } from '@/components/dashboard/LeadTimeTimelineChart';
+import { OpenAtendimentoAgentesTable } from '@/components/dashboard/OpenAtendimentoAgentesTable';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
@@ -198,6 +199,11 @@ export default function DashboardAtendimentosPage() {
 
               <LeadTimeTimelineChart
                 data={openStats?.leadTimeTimeline || []}
+                isLoading={isLoadingOpen}
+              />
+
+              <OpenAtendimentoAgentesTable
+                agentes={openStats?.agentes || []}
                 isLoading={isLoadingOpen}
               />
             </>
