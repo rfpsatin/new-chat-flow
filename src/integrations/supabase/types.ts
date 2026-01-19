@@ -455,6 +455,44 @@ export type Database = {
           },
         ]
       }
+      whapi_connection_events: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          event_type: string | null
+          id: string
+          payload: Json | null
+          source: string
+          state: string | null
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          event_type?: string | null
+          id?: string
+          payload?: Json | null
+          source: string
+          state?: string | null
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          event_type?: string | null
+          id?: string
+          payload?: Json | null
+          source?: string
+          state?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whapi_connection_events_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       usuarios: {
         Row: {
           ativo: boolean

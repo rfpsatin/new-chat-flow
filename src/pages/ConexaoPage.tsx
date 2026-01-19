@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useWhapiConnection } from '@/hooks/useWhapiConnection';
+import { useWhapiConnectionEvents } from '@/hooks/useWhapiConnectionEvents';
 
 function formatDate(value: string | null | undefined) {
   if (!value) return '—';
@@ -22,6 +23,7 @@ export default function ConexaoPage() {
     reconnect,
     updateToken,
   } = useWhapiConnection();
+  const { data: events = [] } = useWhapiConnectionEvents(10);
 
   const [tokenInput, setTokenInput] = useState('');
   const [qrImage, setQrImage] = useState<string | null>(null);
@@ -187,6 +189,40 @@ export default function ConexaoPage() {
                     Salvar token
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Últimos eventos</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {events.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Nenhum evento de conexão registrado ainda.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {events.map((event) => (
+                      <div
+                        key={event.id}
+                        className="flex flex-col md:flex-row md:items-center md:justify-between gap-1 rounded-md border border-border p-3 text-sm"
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium">
+                            {event.event_type || 'status'}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {event.state || '—'} · {event.source}
+                          </span>
+                        </div>
+                        <span className="text-muted-foreground">
+                          {formatDate(event.created_at)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

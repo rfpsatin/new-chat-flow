@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
 
     const { data: empresa, error: empresaError } = await supabase
       .from('empresas')
-      .select('id, nome_fantasia, whapi_token')
+      .select('id, nome_fantasia, whapi_token, whapi_status, whapi_status_raw')
       .eq('id', empresaId)
       .maybeSingle()
 
@@ -101,6 +101,22 @@ Deno.serve(async (req) => {
       whapi_last_error: null,
       whapi_status_source: 'polling',
     })
+
+    const hasChanged =
+      empresa?.whapi_status !== normalized ||
+      empresa?.whapi_status_raw !== rawState
+
+    if (hasChanged) {
+      await supabase
+        .from('whapi_connection_events')
+        .insert({
+          empresa_id: empresaId,
+          source: 'polling',
+          event_type: 'getState',
+          state: rawState,
+          payload: whapiData,
+        })
+    }
 
     return new Response(JSON.stringify({
       empresa_id: empresaId,

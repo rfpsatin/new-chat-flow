@@ -35,6 +35,7 @@ export function useWhapiConnection() {
       return data as WhapiConnectionInfo;
     },
     enabled: !!empresaId,
+    refetchInterval: 30000,
   });
 
   const refreshStatus = useMutation({

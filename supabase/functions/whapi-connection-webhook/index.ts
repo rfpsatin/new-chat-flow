@@ -41,6 +41,7 @@ Deno.serve(async (req) => {
     }
 
     const payload: WhapiConnectionEvent = await req.json()
+    const eventType = payload.event?.type || payload.type || null
     const rawState =
       payload.event?.state ||
       payload.event?.type ||
@@ -65,6 +66,16 @@ Deno.serve(async (req) => {
         whapi_status_updated_at: new Date().toISOString(),
       })
       .eq('id', empresaId)
+
+    await supabase
+      .from('whapi_connection_events')
+      .insert({
+        empresa_id: empresaId,
+        source: 'webhook',
+        event_type: eventType,
+        state: rawState,
+        payload,
+      })
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
