@@ -6,7 +6,7 @@ const corsHeaders = {
 }
 
 const WHAPI_BASE_URL = 'https://gate.whapi.cloud'
-const STATUS_ENDPOINT = '/api/getState'
+const STATUS_ENDPOINT = '/health'
 
 interface StatusResponse {
   empresa_id: string
@@ -175,8 +175,10 @@ async function updateEmpresaStatus(
 }
 
 function extractRawState(data: any): string | null {
-  const raw = data?.state || data?.status || data?.data?.state || data?.data?.status
+  // /health returns: { status: { text: "connected" } } or similar
+  const raw = data?.status?.text || data?.status || data?.state || data?.data?.state || data?.data?.status
   if (!raw) return null
+  if (typeof raw === 'object' && raw.text) return String(raw.text)
   return String(raw)
 }
 
