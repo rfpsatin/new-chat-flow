@@ -6,6 +6,7 @@ const corsHeaders = {
 }
 
 const WHAPI_BASE_URL = 'https://gate.whapi.cloud'
+const STATUS_ENDPOINTS = ['/api/getState', '/api/get_state', '/api/status', '/api/state']
 
 interface StatusResponse {
   empresa_id: string
@@ -69,31 +70,49 @@ Deno.serve(async (req) => {
       })
     }
 
-    const whapiResponse = await fetch(`${WHAPI_BASE_URL}/api/getState`, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${empresa.whapi_token}`,
-        'Content-Type': 'application/json',
-      },
-    })
+    let lastError: any = null
+    let whapiData: any = null
+    let usedEndpoint: string | null = null
+    let whapiResponseStatus = 502
 
-    const whapiData = await safeJson(whapiResponse)
-    const rawState = extractRawState(whapiData)
-    const normalized = normalizeState(rawState)
+    for (const endpoint of STATUS_ENDPOINTS) {
+      const whapiResponse = await fetch(`${WHAPI_BASE_URL}${endpoint}`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${empresa.whapi_token}`,
+          'Content-Type': 'application/json',
+        },
+      })
 
-    if (!whapiResponse.ok) {
-      const errorMessage = whapiData?.error || whapiData?.message || 'Erro ao consultar estado do Whapi'
+      const data = await safeJson(whapiResponse)
+      if (whapiResponse.ok) {
+        whapiData = data
+        usedEndpoint = endpoint
+        whapiResponseStatus = whapiResponse.status
+        break
+      }
+
+      lastError = data || { error: `Falha ao chamar ${endpoint}` }
+      whapiResponseStatus = whapiResponse.status
+    }
+
+    if (!whapiData) {
+      const errorMessage =
+        lastError?.error || lastError?.message || 'Erro ao consultar estado do Whapi'
       await updateEmpresaStatus(supabase, empresaId, {
         whapi_status: 'error',
-        whapi_status_raw: rawState,
-      whapi_last_error: errorMessage,
-      whapi_status_source: 'polling',
+        whapi_status_raw: null,
+        whapi_last_error: errorMessage,
+        whapi_status_source: 'polling',
       })
-      return new Response(JSON.stringify({ error: errorMessage, details: whapiData }), {
-        status: whapiResponse.status,
+      return new Response(JSON.stringify({ error: errorMessage, details: lastError }), {
+        status: whapiResponseStatus,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+
+    const rawState = extractRawState(whapiData)
+    const normalized = normalizeState(rawState)
 
     await updateEmpresaStatus(supabase, empresaId, {
       whapi_status: normalized,
@@ -122,6 +141,7 @@ Deno.serve(async (req) => {
       empresa_id: empresaId,
       status: normalized,
       raw_status: rawState,
+      endpoint: usedEndpoint,
       response: whapiData,
     }), {
       status: 200,
