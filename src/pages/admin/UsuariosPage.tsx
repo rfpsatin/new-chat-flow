@@ -203,9 +203,9 @@ export default function UsuariosPage() {
                               onClick={() => handleToggleAtivo(usuario)}
                             >
                               {usuario.ativo ? (
-                                <UserX className="w-4 h-4 text-destructive" />
-                              ) : (
                                 <UserCheck className="w-4 h-4 text-green-600" />
+                              ) : (
+                                <UserX className="w-4 h-4 text-destructive" />
                               )}
                             </Button>
                           </div>
