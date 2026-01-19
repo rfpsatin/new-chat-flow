@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { useUsuarios } from "@/hooks/useUsuarios";
 import { Button } from "@/components/ui/button";
@@ -10,11 +11,13 @@ export function UserSelector() {
   const { empresaId, currentUser, setCurrentUser } = useApp();
   const { data: usuarios, isLoading } = useUsuarios(empresaId);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const navigate = useNavigate();
 
   const handleLogin = () => {
     const user = usuarios?.find((u) => u.id === selectedUserId);
     if (user) {
       setCurrentUser(user);
+      navigate("/", { replace: true });
     }
   };
 
