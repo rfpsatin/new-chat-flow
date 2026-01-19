@@ -116,13 +116,11 @@ export function useWhapiConnection() {
   const updateToken = useMutation({
     mutationFn: async (token: string) => {
       if (!empresaId) throw new Error('Empresa não encontrada');
-      const { error } = await supabase
-        .from('empresas')
-        .update({ whapi_token: token })
-        .eq('id', empresaId);
-
+      const { data, error } = await supabase.functions.invoke('whapi-config', {
+        body: { empresa_id: empresaId, whapi_token: token },
+      });
       if (error) throw error;
-      return true;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['whapi-connection', empresaId] });
