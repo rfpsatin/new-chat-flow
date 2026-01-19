@@ -26,6 +26,7 @@ import {
   UserCog,
   FileText,
   BarChart3,
+  Wifi,
 } from "lucide-react";
 
 const menuItems = [
@@ -34,6 +35,7 @@ const menuItems = [
   { title: "Atendentes", url: "/atendentes", icon: Headphones },
   { title: "Histórico", url: "/historico", icon: Clock },
   { title: "Dashboard", url: "/dashboard", icon: BarChart3 },
+  { title: "Conexão", url: "/conexao", icon: Wifi },
 ];
 
 const adminMenuItems = [

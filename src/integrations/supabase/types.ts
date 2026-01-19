@@ -205,6 +205,11 @@ export type Database = {
           id: string
           nome_fantasia: string | null
           razao_social: string
+          whapi_last_error: string | null
+          whapi_last_qr_at: string | null
+          whapi_status: string | null
+          whapi_status_raw: string | null
+          whapi_status_updated_at: string | null
           whapi_token: string | null
         }
         Insert: {
@@ -214,6 +219,11 @@ export type Database = {
           id?: string
           nome_fantasia?: string | null
           razao_social: string
+          whapi_last_error?: string | null
+          whapi_last_qr_at?: string | null
+          whapi_status?: string | null
+          whapi_status_raw?: string | null
+          whapi_status_updated_at?: string | null
           whapi_token?: string | null
         }
         Update: {
@@ -223,6 +233,11 @@ export type Database = {
           id?: string
           nome_fantasia?: string | null
           razao_social?: string
+          whapi_last_error?: string | null
+          whapi_last_qr_at?: string | null
+          whapi_status?: string | null
+          whapi_status_raw?: string | null
+          whapi_status_updated_at?: string | null
           whapi_token?: string | null
         }
         Relationships: []
