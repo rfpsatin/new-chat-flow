@@ -205,13 +205,16 @@ export type Database = {
           id: string
           nome_fantasia: string | null
           razao_social: string
+          whapi_channel_name: string | null
           whapi_last_error: string | null
           whapi_last_qr_at: string | null
+          whapi_phone: string | null
           whapi_status: string | null
           whapi_status_raw: string | null
           whapi_status_source: string | null
           whapi_status_updated_at: string | null
           whapi_token: string | null
+          whapi_work_period: string | null
         }
         Insert: {
           ativo?: boolean
@@ -220,13 +223,16 @@ export type Database = {
           id?: string
           nome_fantasia?: string | null
           razao_social: string
+          whapi_channel_name?: string | null
           whapi_last_error?: string | null
           whapi_last_qr_at?: string | null
+          whapi_phone?: string | null
           whapi_status?: string | null
           whapi_status_raw?: string | null
           whapi_status_source?: string | null
           whapi_status_updated_at?: string | null
           whapi_token?: string | null
+          whapi_work_period?: string | null
         }
         Update: {
           ativo?: boolean
@@ -235,13 +241,16 @@ export type Database = {
           id?: string
           nome_fantasia?: string | null
           razao_social?: string
+          whapi_channel_name?: string | null
           whapi_last_error?: string | null
           whapi_last_qr_at?: string | null
+          whapi_phone?: string | null
           whapi_status?: string | null
           whapi_status_raw?: string | null
           whapi_status_source?: string | null
           whapi_status_updated_at?: string | null
           whapi_token?: string | null
+          whapi_work_period?: string | null
         }
         Relationships: []
       }

@@ -110,12 +110,16 @@ Deno.serve(async (req) => {
 
     const rawState = extractRawState(whapiData)
     const normalized = normalizeState(rawState)
+    const channelInfo = extractChannelInfo(whapiData)
 
     await updateEmpresaStatus(supabase, empresaId, {
       whapi_status: normalized,
       whapi_status_raw: rawState,
       whapi_last_error: null,
       whapi_status_source: 'polling',
+      whapi_channel_name: channelInfo.name,
+      whapi_phone: channelInfo.phone,
+      whapi_work_period: channelInfo.workPeriod,
     })
 
     const hasChanged =
@@ -162,24 +166,66 @@ async function updateEmpresaStatus(
     whapi_status_raw: string | null
     whapi_last_error: string | null
     whapi_status_source: string | null
+    whapi_channel_name?: string | null
+    whapi_phone?: string | null
+    whapi_work_period?: string | null
   }
 ) {
+  const updateData: Record<string, any> = {
+    whapi_status: data.whapi_status,
+    whapi_status_raw: data.whapi_status_raw,
+    whapi_last_error: data.whapi_last_error,
+    whapi_status_source: data.whapi_status_source,
+    whapi_status_updated_at: new Date().toISOString(),
+  }
+  
+  // Only update channel info if provided
+  if (data.whapi_channel_name !== undefined) {
+    updateData.whapi_channel_name = data.whapi_channel_name
+  }
+  if (data.whapi_phone !== undefined) {
+    updateData.whapi_phone = data.whapi_phone
+  }
+  if (data.whapi_work_period !== undefined) {
+    updateData.whapi_work_period = data.whapi_work_period
+  }
+
   await supabase
     .from('empresas')
-    .update({
-      ...data,
-      whapi_status_source: data.whapi_status_source,
-      whapi_status_updated_at: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq('id', empresaId)
 }
 
 function extractRawState(data: any): string | null {
-  // /health returns: { status: { text: "connected" } } or similar
+  // /health returns different structures depending on the Whapi version
+  // Common patterns: { status: { text: "AUTH" } }, { status: "AUTH" }, { state: "connected" }
   const raw = data?.status?.text || data?.status || data?.state || data?.data?.state || data?.data?.status
   if (!raw) return null
   if (typeof raw === 'object' && raw.text) return String(raw.text)
   return String(raw)
+}
+
+function extractChannelInfo(data: any): { name: string | null; phone: string | null; workPeriod: string | null } {
+  // Extract channel name
+  const name = data?.channel?.name || data?.name || data?.profile?.name || null
+  
+  // Extract phone number
+  const phone = data?.channel?.phone || data?.phone || data?.me?.phone || data?.profile?.phone || null
+  
+  // Extract work period / expiration
+  let workPeriod: string | null = null
+  const expiry = data?.channel?.expiry || data?.expiry || data?.work_till || data?.work_period
+  if (expiry) {
+    // If it's a timestamp, format it
+    if (typeof expiry === 'number' || !isNaN(Date.parse(expiry))) {
+      const date = new Date(typeof expiry === 'number' ? expiry * 1000 : expiry)
+      workPeriod = `Até ${date.toLocaleDateString('pt-BR')}`
+    } else {
+      workPeriod = String(expiry)
+    }
+  }
+  
+  return { name, phone, workPeriod }
 }
 
 function normalizeState(rawState: string | null): string {
@@ -188,13 +234,19 @@ function normalizeState(rawState: string | null): string {
   switch (state) {
     case 'CONNECTED':
     case 'READY':
+    case 'AUTH':
+    case 'AUTHORIZED':
+    case 'OK':
       return 'connected'
     case 'PAIRING':
     case 'SERVICE_SCAN':
+    case 'QR':
+    case 'WAITING_QR':
       return 'pairing'
     case 'DISCONNECTED':
     case 'CONNECTION_LOST':
     case 'CONNECTION_CLOSED':
+    case 'LOGOUT':
       return 'disconnected'
     case 'SERVICE_OFF':
     case 'STOPPED':

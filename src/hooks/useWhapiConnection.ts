@@ -11,6 +11,9 @@ export interface WhapiConnectionInfo {
   whapi_last_error: string | null;
   whapi_last_qr_at: string | null;
   whapi_token: string | null;
+  whapi_channel_name: string | null;
+  whapi_phone: string | null;
+  whapi_work_period: string | null;
 }
 
 export function useWhapiConnection() {
@@ -25,7 +28,7 @@ export function useWhapiConnection() {
       const { data, error } = await supabase
         .from('empresas')
         .select(
-          'whapi_status, whapi_status_raw, whapi_status_source, whapi_status_updated_at, whapi_last_error, whapi_last_qr_at, whapi_token'
+          'whapi_status, whapi_status_raw, whapi_status_source, whapi_status_updated_at, whapi_last_error, whapi_last_qr_at, whapi_token, whapi_channel_name, whapi_phone, whapi_work_period'
         )
         .eq('id', empresaId)
         .single();
