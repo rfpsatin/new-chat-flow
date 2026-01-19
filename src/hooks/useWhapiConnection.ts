@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 export interface WhapiConnectionInfo {
   whapi_status: string | null;
   whapi_status_raw: string | null;
+  whapi_status_source: string | null;
   whapi_status_updated_at: string | null;
   whapi_last_error: string | null;
   whapi_last_qr_at: string | null;
@@ -25,7 +26,7 @@ export function useWhapiConnection() {
       const { data, error } = await supabase
         .from('empresas')
         .select(
-          'whapi_status, whapi_status_raw, whapi_status_updated_at, whapi_last_error, whapi_last_qr_at, whapi_token'
+          'whapi_status, whapi_status_raw, whapi_status_source, whapi_status_updated_at, whapi_last_error, whapi_last_qr_at, whapi_token'
         )
         .eq('id', empresaId)
         .single();

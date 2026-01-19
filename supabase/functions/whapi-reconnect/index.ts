@@ -60,6 +60,7 @@ Deno.serve(async (req) => {
         whapi_last_error: 'Token do Whapi não configurado',
         whapi_status: 'not_configured',
         whapi_status_raw: null,
+        whapi_status_source: 'polling',
       })
       return new Response(JSON.stringify({ error: 'Whapi token not configured' }), {
         status: 400,
@@ -96,6 +97,7 @@ Deno.serve(async (req) => {
         whapi_last_error: errorMessage,
         whapi_status: 'error',
         whapi_status_raw: 'RECONNECT_FAILED',
+        whapi_status_source: 'polling',
       })
       return new Response(JSON.stringify({ error: errorMessage, details: lastError }), {
         status: 502,
@@ -107,6 +109,7 @@ Deno.serve(async (req) => {
       whapi_last_error: null,
       whapi_status: 'connecting',
       whapi_status_raw: 'RECONNECT_REQUESTED',
+      whapi_status_source: 'polling',
     })
 
     return new Response(JSON.stringify({
@@ -134,12 +137,14 @@ async function updateEmpresaReconnect(
     whapi_last_error: string | null
     whapi_status: string | null
     whapi_status_raw: string | null
+    whapi_status_source: string | null
   }
 ) {
   await supabase
     .from('empresas')
     .update({
       ...data,
+      whapi_status_source: data.whapi_status_source,
       whapi_status_updated_at: new Date().toISOString(),
     })
     .eq('id', empresaId)

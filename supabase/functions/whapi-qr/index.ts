@@ -134,6 +134,7 @@ async function updateEmpresaQr(
       whapi_last_qr_at: new Date().toISOString(),
       whapi_status: 'pairing',
       whapi_status_raw: 'QR_REQUESTED',
+      whapi_status_source: 'polling',
       whapi_status_updated_at: new Date().toISOString(),
     })
     .eq('id', empresaId)

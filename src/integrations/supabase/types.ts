@@ -209,6 +209,7 @@ export type Database = {
           whapi_last_qr_at: string | null
           whapi_status: string | null
           whapi_status_raw: string | null
+          whapi_status_source: string | null
           whapi_status_updated_at: string | null
           whapi_token: string | null
         }
@@ -223,6 +224,7 @@ export type Database = {
           whapi_last_qr_at?: string | null
           whapi_status?: string | null
           whapi_status_raw?: string | null
+          whapi_status_source?: string | null
           whapi_status_updated_at?: string | null
           whapi_token?: string | null
         }
@@ -237,6 +239,7 @@ export type Database = {
           whapi_last_qr_at?: string | null
           whapi_status?: string | null
           whapi_status_raw?: string | null
+          whapi_status_source?: string | null
           whapi_status_updated_at?: string | null
           whapi_token?: string | null
         }

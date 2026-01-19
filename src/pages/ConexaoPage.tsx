@@ -99,6 +99,12 @@ export default function ConexaoPage() {
                     <p className="font-medium">{connectionInfo?.whapi_status_raw || '—'}</p>
                   </div>
                   <div>
+                    <p className="text-muted-foreground">Fonte do status</p>
+                    <p className="font-medium">
+                      {connectionInfo?.whapi_status_source || '—'}
+                    </p>
+                  </div>
+                  <div>
                     <p className="text-muted-foreground">Atualizado em</p>
                     <p className="font-medium">
                       {formatDate(connectionInfo?.whapi_status_updated_at)}
