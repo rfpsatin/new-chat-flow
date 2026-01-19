@@ -14,8 +14,7 @@ export interface WhapiConnectionInfo {
 }
 
 export function useWhapiConnection() {
-  const { currentUser } = useApp();
-  const empresaId = currentUser?.empresa_id;
+  const { empresaId } = useApp();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 

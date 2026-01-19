@@ -13,8 +13,7 @@ export interface WhapiConnectionEvent {
 }
 
 export function useWhapiConnectionEvents(limit = 10) {
-  const { currentUser } = useApp();
-  const empresaId = currentUser?.empresa_id;
+  const { empresaId } = useApp();
 
   return useQuery({
     queryKey: ['whapi-connection-events', empresaId, limit],
