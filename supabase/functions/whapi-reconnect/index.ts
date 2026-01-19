@@ -67,6 +67,19 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+    if (looksLikeUuid(empresa.whapi_token)) {
+      const errorMessage = 'Token do Whapi inválido (parece ser um UUID)'
+      await updateEmpresaReconnect(supabase, empresaId, {
+        whapi_last_error: errorMessage,
+        whapi_status: 'error',
+        whapi_status_raw: 'TOKEN_INVALID',
+        whapi_status_source: 'polling',
+      })
+      return new Response(JSON.stringify({ error: errorMessage }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
     let lastError: any = null
     let responseData: any = null
@@ -156,4 +169,10 @@ async function safeJson(response: Response) {
   } catch {
     return null
   }
+}
+
+function looksLikeUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value.trim()
+  )
 }
