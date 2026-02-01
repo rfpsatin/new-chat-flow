@@ -6,7 +6,6 @@ const corsHeaders = {
 }
 
 const WHAPI_BASE_URL = 'https://gate.whapi.cloud'
-const QR_ENDPOINTS = ['/api/getQR', '/api/getQr', '/api/get_qr']
 
 interface QrRequest {
   empresa_id: string
@@ -75,34 +74,63 @@ Deno.serve(async (req) => {
       })
     }
 
-    let lastError: any = null
-    let qrData: any = null
+    // Use official /users/login endpoint for QR code
+    console.log(`[${requestId}] Calling /users/login for QR`)
+    const whapiResponse = await fetch(`${WHAPI_BASE_URL}/users/login`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${empresa.whapi_token}`,
+        'Content-Type': 'application/json',
+      },
+    })
 
-    for (const endpoint of QR_ENDPOINTS) {
-      const whapiResponse = await fetch(`${WHAPI_BASE_URL}${endpoint}`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${empresa.whapi_token}`,
-          'Content-Type': 'application/json',
-        },
+    const contentType = whapiResponse.headers.get('content-type')
+    console.log(`[${requestId}] Response status: ${whapiResponse.status}, content-type: ${contentType}`)
+
+    // Check if response is JSON
+    if (!contentType?.includes('application/json')) {
+      const textResponse = await whapiResponse.text()
+      console.error(`[${requestId}] Non-JSON response:`, textResponse.substring(0, 200))
+      
+      await updateEmpresaQr(supabase, empresaId, {
+        whapi_last_error: 'Resposta inesperada do Whapi (não é JSON)',
       })
-
-      const data = await safeJson(whapiResponse)
-      if (whapiResponse.ok) {
-        qrData = data
-        break
-      }
-
-      lastError = data || { error: `Falha ao chamar ${endpoint}` }
+      return new Response(JSON.stringify({ 
+        error: 'Resposta inesperada do Whapi',
+        status: whapiResponse.status 
+      }), {
+        status: 502,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
-    if (!qrData) {
-      const errorMessage = lastError?.error || lastError?.message || 'Erro ao obter QR do Whapi'
+    const qrData = await whapiResponse.json()
+    console.log(`[${requestId}] QR response keys:`, Object.keys(qrData || {}))
+
+    // Check if already authenticated (no QR needed)
+    if (qrData?.status === 'AUTH' || qrData?.status === 'AUTHORIZED' || qrData?.authorized === true) {
+      await updateEmpresaQr(supabase, empresaId, {
+        whapi_last_error: null,
+      })
+      return new Response(JSON.stringify({
+        empresa_id: empresaId,
+        qr_image: null,
+        already_authenticated: true,
+        message: 'Já autenticado, QR não necessário',
+        response: qrData,
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (!whapiResponse.ok) {
+      const errorMessage = qrData?.error || qrData?.message || 'Erro ao obter QR do Whapi'
       await updateEmpresaQr(supabase, empresaId, {
         whapi_last_error: errorMessage,
       })
-      return new Response(JSON.stringify({ error: errorMessage, details: lastError }), {
-        status: 502,
+      return new Response(JSON.stringify({ error: errorMessage, details: qrData }), {
+        status: whapiResponse.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }

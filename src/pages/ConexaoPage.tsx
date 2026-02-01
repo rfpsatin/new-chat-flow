@@ -58,12 +58,22 @@ export default function ConexaoPage() {
     setTokenInput('');
   };
 
+  const [qrMessage, setQrMessage] = useState<string | null>(null);
+
   const handleRequestQr = async () => {
     try {
+      setQrMessage(null);
       const result = await requestQr.mutateAsync();
-      setQrImage(result?.qr_image || null);
+      if (result?.already_authenticated) {
+        setQrMessage(result.message || 'Já autenticado, QR não necessário');
+        setQrImage(null);
+      } else {
+        setQrImage(result?.qr_image || null);
+        setQrMessage(null);
+      }
     } catch {
       setQrImage(null);
+      setQrMessage(null);
     }
   };
 
@@ -164,7 +174,13 @@ export default function ConexaoPage() {
                 <CardTitle>QR Code de pareamento</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {qrImage ? (
+                {qrMessage ? (
+                  <div className="flex flex-col items-center gap-3 p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+                    <p className="text-sm text-green-700 dark:text-green-300 font-medium">
+                      ✓ {qrMessage}
+                    </p>
+                  </div>
+                ) : qrImage ? (
                   <div className="flex flex-col items-center gap-3">
                     <img
                       src={qrImage}
