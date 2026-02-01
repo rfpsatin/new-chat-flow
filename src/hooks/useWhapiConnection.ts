@@ -72,7 +72,7 @@ export function useWhapiConnection() {
         body: { empresa_id: empresaId },
       });
       if (error) throw error;
-      return data as { qr_image?: string | null };
+      return data as { qr_image?: string | null; already_authenticated?: boolean; message?: string };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['whapi-connection', empresaId] });
