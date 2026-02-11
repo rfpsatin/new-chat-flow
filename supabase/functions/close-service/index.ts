@@ -3,7 +3,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const N8N_WEBHOOK_URL = 'http://162.240.152.122/webhook/YKu4UqLlWMoZ4dUk'
+const N8N_WEBHOOK_URL = 'https://n8n.maringaai.com.br/webhook/maia-beach-tennis-demo'
 
 async function updateAttendanceMode(conversaId: string, empresaId: string) {
   console.log(`[close-service] Updating attendanceMode to automated for conversa ${conversaId}, empresa ${empresaId}`)
