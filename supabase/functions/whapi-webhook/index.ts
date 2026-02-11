@@ -190,6 +190,35 @@ Deno.serve(async (req) => {
           console.error(`[${requestId}] ERROR updating conversation:`, updateError)
         }
 
+        // 6. Check if message contains "Falar com o atendente humano" and conversa is in bot status
+        if (conversa.status === 'bot' && conteudo.toLowerCase().includes('falar com o atendente humano')) {
+          console.log(`[${requestId}] Detected human attendance request, checking n8n...`)
+          try {
+            const n8nResponse = await fetch('http://162.240.152.122/workflow/YKu4UqLlWMoZ4dUk', { method: 'GET' })
+            if (n8nResponse.ok) {
+              const result = await n8nResponse.json()
+              const attendanceMode = result?.attendanceMode || result?.attendance_mode || 'automated'
+              console.log(`[${requestId}] n8n attendanceMode: ${attendanceMode}`)
+              if (attendanceMode === 'human') {
+                const { error: modeError } = await supabase
+                  .from('conversas')
+                  .update({ status: 'esperando_tria', updated_at: new Date().toISOString() })
+                  .eq('id', conversa.id)
+                  .eq('status', 'bot')
+                if (modeError) {
+                  console.error(`[${requestId}] ERROR updating to esperando_tria:`, modeError)
+                } else {
+                  console.log(`[${requestId}] Conversa moved to esperando_tria`)
+                }
+              }
+            } else {
+              console.error(`[${requestId}] n8n check failed: ${n8nResponse.status}`)
+            }
+          } catch (n8nError) {
+            console.error(`[${requestId}] Error checking n8n:`, n8nError)
+          }
+        }
+
         processedCount++
         console.log(`[${requestId}] Message ${message.id} processed successfully`)
 
@@ -362,7 +391,7 @@ async function findOrCreateConversa(
       .insert({
         empresa_id: empresaId,
         contato_id: contatoId,
-        status: 'esperando_tria',
+        status: 'bot',
         canal: 'whatsapp',
         iniciado_por: 'cliente',
       })
@@ -391,7 +420,7 @@ async function findOrCreateConversa(
     .insert({
       empresa_id: empresaId,
       contato_id: contatoId,
-      status: 'esperando_tria',
+      status: 'bot',
       canal: 'whatsapp',
       iniciado_por: 'cliente',
     })
