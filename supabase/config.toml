@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.whapi-send-message]
 verify_jwt = false
+
+[functions.check-attendance-mode]
+verify_jwt = false
+
+[functions.close-service]
+verify_jwt = false

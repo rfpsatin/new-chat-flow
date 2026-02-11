@@ -105,7 +105,28 @@ export function useEncerrarConversa() {
       
       if (updateError) throw updateError;
 
-      // 5. Encerrar conversa (isso arquiva as mensagens)
+      // 5. Chamar close-service para atualizar attendanceMode no n8n/Redis
+      try {
+        const closeResponse = await fetch(`${supabaseUrl}/functions/v1/close-service`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseAnonKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            conversa_id: conversaId,
+            empresa_id: empresaId,
+          }),
+        });
+
+        if (!closeResponse.ok) {
+          console.error('Erro ao chamar close-service:', await closeResponse.text());
+        }
+      } catch (closeError) {
+        console.error('Erro ao chamar close-service:', closeError);
+      }
+
+      // 6. Encerrar conversa (isso arquiva as mensagens)
       const { error } = await supabase.rpc('encerrar_conversa', {
         p_conversa_id: conversaId,
         p_motivo_id: motivoId,
