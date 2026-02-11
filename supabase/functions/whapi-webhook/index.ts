@@ -197,7 +197,7 @@ Deno.serve(async (req) => {
           console.log(`[${requestId}] Detected human attendance request, checking n8n...`)
           try {
             // Try GET with query params (same pattern that works for close-service)
-            const n8nUrl = new URL('http://162.240.152.122/webhook/YKu4UqLlWMoZ4dUk')
+            const n8nUrl = new URL('https://n8n.maringaai.com.br/webhook/maia-beach-tennis-demo')
             n8nUrl.searchParams.set('action', 'check')
             n8nUrl.searchParams.set('conversa_id', conversa.id)
             n8nUrl.searchParams.set('empresa_id', empresaId)
