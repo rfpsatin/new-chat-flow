@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const N8N_WEBHOOK_URL = 'http://162.240.152.122/workflow/YKu4UqLlWMoZ4dUk'
+const N8N_WEBHOOK_URL = 'http://162.240.152.122/webhook/YKu4UqLlWMoZ4dUk'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
