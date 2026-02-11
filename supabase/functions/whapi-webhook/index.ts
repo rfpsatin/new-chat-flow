@@ -191,7 +191,9 @@ Deno.serve(async (req) => {
         }
 
         // 6. Check if message contains "Falar com o atendente humano" and conversa is in bot status
-        if (conversa.status === 'bot' && conteudo.toLowerCase().includes('falar com o atendente humano')) {
+        const isHumanRequest = conteudo.toLowerCase().includes('falar com') && conteudo.toLowerCase().includes('atendente humano')
+        const isHumanButtonId = (message as any).reply?.buttons_reply?.id === 'ButtonsV3:atendimento_humano'
+        if (conversa.status === 'bot' && (isHumanRequest || isHumanButtonId)) {
           console.log(`[${requestId}] Detected human attendance request, checking n8n...`)
           try {
             const n8nResponse = await fetch('http://162.240.152.122/workflow/YKu4UqLlWMoZ4dUk', { method: 'GET' })
@@ -454,6 +456,16 @@ function extractMessageContent(message: WhapiMessage): string {
       return '[localização]'
     case 'contact':
       return '[contato]'
+    case 'reply': {
+      const reply = (message as any).reply
+      if (reply?.buttons_reply?.title) {
+        return reply.buttons_reply.title
+      }
+      if (reply?.list_reply?.title) {
+        return reply.list_reply.title
+      }
+      return reply?.body || '[reply]'
+    }
     default:
       return `[${message.type || 'mensagem'}]`
   }
