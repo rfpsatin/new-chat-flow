@@ -196,9 +196,25 @@ Deno.serve(async (req) => {
         if (conversa.status === 'bot' && (isHumanRequest || isHumanButtonId)) {
           console.log(`[${requestId}] Detected human attendance request, checking n8n...`)
           try {
-            const n8nResponse = await fetch('http://162.240.152.122/workflow/YKu4UqLlWMoZ4dUk', { method: 'GET' })
-            if (n8nResponse.ok) {
-              const result = await n8nResponse.json()
+            // Try GET with query params (same pattern that works for close-service)
+            const n8nUrl = new URL('http://162.240.152.122/workflow/YKu4UqLlWMoZ4dUk')
+            n8nUrl.searchParams.set('action', 'check')
+            n8nUrl.searchParams.set('conversa_id', conversa.id)
+            n8nUrl.searchParams.set('empresa_id', empresaId)
+            
+            const n8nResponse = await fetch(n8nUrl.toString(), { 
+              method: 'GET',
+              headers: { 'Accept': 'application/json' }
+            })
+            
+            console.log(`[${requestId}] n8n response status: ${n8nResponse.status}`)
+            const contentType = n8nResponse.headers.get('content-type') || ''
+            const responseText = await n8nResponse.text()
+            console.log(`[${requestId}] n8n response content-type: ${contentType}`)
+            console.log(`[${requestId}] n8n response body: ${responseText.substring(0, 500)}`)
+            
+            if (n8nResponse.ok && contentType.includes('application/json')) {
+              const result = JSON.parse(responseText)
               const attendanceMode = result?.attendanceMode || result?.attendance_mode || 'automated'
               console.log(`[${requestId}] n8n attendanceMode: ${attendanceMode}`)
               if (attendanceMode === 'human') {
@@ -213,11 +229,48 @@ Deno.serve(async (req) => {
                   console.log(`[${requestId}] Conversa moved to esperando_tria`)
                 }
               }
+            } else if (n8nResponse.ok) {
+              // n8n returned 200 but not JSON - try to parse anyway or fallback to solicitar_atendimento_humano
+              console.warn(`[${requestId}] n8n returned non-JSON response, falling back to direct status update`)
+              const { error: modeError } = await supabase
+                .from('conversas')
+                .update({ status: 'esperando_tria', updated_at: new Date().toISOString() })
+                .eq('id', conversa.id)
+                .eq('status', 'bot')
+              if (modeError) {
+                console.error(`[${requestId}] ERROR updating to esperando_tria:`, modeError)
+              } else {
+                console.log(`[${requestId}] Conversa moved to esperando_tria (fallback)`)
+              }
             } else {
               console.error(`[${requestId}] n8n check failed: ${n8nResponse.status}`)
+              // Fallback: move to esperando_tria anyway so customer isn't stuck
+              console.log(`[${requestId}] Falling back to direct status update`)
+              const { error: modeError } = await supabase
+                .from('conversas')
+                .update({ status: 'esperando_tria', updated_at: new Date().toISOString() })
+                .eq('id', conversa.id)
+                .eq('status', 'bot')
+              if (modeError) {
+                console.error(`[${requestId}] ERROR updating to esperando_tria:`, modeError)
+              } else {
+                console.log(`[${requestId}] Conversa moved to esperando_tria (fallback after error)`)
+              }
             }
           } catch (n8nError) {
             console.error(`[${requestId}] Error checking n8n:`, n8nError)
+            // Fallback: move to esperando_tria so customer isn't stuck
+            console.log(`[${requestId}] Falling back to direct status update after exception`)
+            try {
+              await supabase
+                .from('conversas')
+                .update({ status: 'esperando_tria', updated_at: new Date().toISOString() })
+                .eq('id', conversa.id)
+                .eq('status', 'bot')
+              console.log(`[${requestId}] Conversa moved to esperando_tria (exception fallback)`)
+            } catch (fallbackError) {
+              console.error(`[${requestId}] Fallback also failed:`, fallbackError)
+            }
           }
         }
 
