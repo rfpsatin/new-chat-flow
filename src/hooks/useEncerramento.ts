@@ -116,6 +116,7 @@ export function useEncerrarConversa() {
           body: JSON.stringify({
             conversa_id: conversaId,
             empresa_id: empresaId,
+            chat_id: contato.whatsapp_numero,
           }),
         });
 
