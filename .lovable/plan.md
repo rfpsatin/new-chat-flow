@@ -1,28 +1,48 @@
 
+# Atualizar payload do close-service para n8n
 
-# Corrigir URL do webhook n8n em todas as Edge Functions
-
-## Problema
-As Edge Functions `close-service`, `check-attendance-mode` e `whapi-webhook` estão usando uma URL incorreta (`http://162.240.152.122/webhook/YKu4UqLlWMoZ4dUk`). A URL real de producao do n8n e `https://n8n.maringaai.com.br/webhook/maia-beach-tennis-demo`.
+## Resumo
+Alterar o payload enviado ao webhook do n8n para:
+1. Renomear `chat_id` para `numero_participante`
+2. Substituir `empresa_id` pelo `whapi_token` da empresa, enviado como `channel_ID`
 
 ## Alteracoes
 
-Atualizar a constante `N8N_WEBHOOK_URL` nos 3 arquivos:
+### `supabase/functions/close-service/index.ts`
 
-1. **`supabase/functions/close-service/index.ts`** (linha 6)
-   - De: `http://162.240.152.122/webhook/YKu4UqLlWMoZ4dUk`
-   - Para: `https://n8n.maringaai.com.br/webhook/maia-beach-tennis-demo`
+**1. Alterar a funcao `updateAttendanceMode`**
+- Trocar a assinatura para receber `whatsappNumero` e `channelId` em vez de `chatId` e `empresaId`
+- Payload enviado ao n8n passara a ser:
 
-2. **`supabase/functions/check-attendance-mode/index.ts`** (linha 8)
-   - De: `http://162.240.152.122/webhook/YKu4UqLlWMoZ4dUk`
-   - Para: `https://n8n.maringaai.com.br/webhook/maia-beach-tennis-demo`
+```text
+{
+  "attendanceMode": "automated",
+  "action": "update",
+  "numero_participante": "<numero whatsapp do contato>",
+  "channel_ID": "<whapi_token da empresa>",
+  "conversa_id": "<id da conversa>"
+}
+```
 
-3. **`supabase/functions/whapi-webhook/index.ts`** (referencia inline na funcao)
-   - De: `http://162.240.152.122/webhook/YKu4UqLlWMoZ4dUk`
-   - Para: `https://n8n.maringaai.com.br/webhook/maia-beach-tennis-demo`
+**2. Buscar whapi_token da empresa no banco**
+- Apos resolver o chat_id (numero do contato), tambem buscar o `whapi_token` da tabela `empresas` usando o `empresa_id` recebido na request
+- Enviar esse token como `channel_ID` no payload
 
-## Validacao
-- Re-deploy das 3 funcoes
-- Testar close-service via curl para confirmar que o n8n responde com sucesso (status 200)
-- Verificar nos logs que o attendanceMode esta sendo alterado para "automated"
+**3. Fluxo completo da funcao**
+- Receber `conversa_id`, `empresa_id`, `chat_id` (opcional) da request
+- Se `chat_id` nao fornecido, buscar via conversas -> contatos (logica existente)
+- Buscar `whapi_token` da tabela `empresas` onde `id = empresa_id`
+- Montar payload com `numero_participante`, `channel_ID` e `conversa_id`
+- POST para o webhook do n8n
 
+### Secao tecnica
+
+Campos removidos do payload: `empresa_id`, `chat_id`
+Campos adicionados: `numero_participante` (mesmo valor do antigo `chat_id`), `channel_ID` (valor de `empresas.whapi_token`)
+
+Query adicional necessaria:
+```text
+supabase.from('empresas').select('whapi_token').eq('id', empresa_id).single()
+```
+
+O Supabase client ja esta sendo criado na funcao quando precisa buscar dados; sera reutilizado. Caso o `chat_id` ja venha na request, o client sera criado de qualquer forma para buscar o `whapi_token`.
