@@ -7,14 +7,14 @@ const corsHeaders = {
 
 const N8N_WEBHOOK_URL = 'https://n8n.maringaai.com.br/webhook/maia-beach-tennis-demo'
 
-async function updateAttendanceMode(chatId: string, empresaId: string, conversaId: string) {
-  console.log(`[close-service] Updating attendanceMode to automated for chat_id ${chatId}, empresa ${empresaId}`)
+async function updateAttendanceMode(numeroParticipante: string, channelId: string, conversaId: string) {
+  console.log(`[close-service] Updating attendanceMode to automated for numero_participante ${numeroParticipante}, channel_ID ${channelId}`)
 
   const payload = {
     attendanceMode: 'automated',
     action: 'update',
-    chat_id: chatId,
-    empresa_id: empresaId,
+    numero_participante: numeroParticipante,
+    channel_ID: channelId,
     conversa_id: conversaId,
   }
 
@@ -65,15 +65,16 @@ Deno.serve(async (req) => {
 
     console.log(`[close-service] Received request for conversa=${conversa_id}, empresa=${empresa_id}, chat_id=${chat_id}`)
 
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    )
+
     let resolvedChatId = chat_id
 
     // If chat_id not provided, look it up from the database
     if (!resolvedChatId) {
       console.log(`[close-service] chat_id not provided, looking up from database...`)
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-      )
 
       const { data: conversa, error: convError } = await supabase
         .from('conversas')
@@ -107,7 +108,24 @@ Deno.serve(async (req) => {
       console.log(`[close-service] Resolved chat_id from database: ${resolvedChatId}`)
     }
 
-    const result = await updateAttendanceMode(resolvedChatId, empresa_id, conversa_id)
+    // Fetch whapi_token from empresas table
+    const { data: empresa, error: empresaError } = await supabase
+      .from('empresas')
+      .select('whapi_token')
+      .eq('id', empresa_id)
+      .single()
+
+    if (empresaError || !empresa || !empresa.whapi_token) {
+      console.error(`[close-service] Failed to find empresa or whapi_token:`, empresaError)
+      return new Response(JSON.stringify({ error: 'Empresa or whapi_token not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    console.log(`[close-service] Resolved channel_ID (whapi_token) for empresa ${empresa_id}`)
+
+    const result = await updateAttendanceMode(resolvedChatId, empresa.whapi_token, conversa_id)
     console.log(`[close-service] Final result: ${result}`)
 
     return new Response(JSON.stringify({ success: result }), {
