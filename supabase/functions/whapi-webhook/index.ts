@@ -24,6 +24,19 @@ interface WhapiMessage {
     filename?: string
     link?: string
   }
+  interactive?: {
+    header?: string
+    body?: string
+    footer?: string
+    buttons?: Array<{ text: string; id: string; type?: string }>
+  }
+  list?: {
+    header?: string
+    body?: string
+    footer?: string
+    label?: string
+    sections?: Array<{ title: string; rows: Array<{ id: string; title: string }> }>
+  }
 }
 
 interface WhapiEvent {
@@ -561,6 +574,27 @@ function extractMessageContent(message: WhapiMessage): string {
         return reply.list_reply.title
       }
       return reply?.body || '[reply]'
+    }
+    case 'interactive': {
+      const parts: string[] = []
+      if (message.interactive?.header) parts.push(message.interactive.header)
+      if (message.interactive?.body) parts.push(message.interactive.body.trim())
+      if (message.interactive?.footer) parts.push(message.interactive.footer)
+      if (message.interactive?.buttons?.length) {
+        parts.push(message.interactive.buttons.map(b => `• ${b.text}`).join('\n'))
+      }
+      return parts.join('\n') || '[mensagem interativa]'
+    }
+    case 'list': {
+      const parts: string[] = []
+      if (message.list?.header) parts.push(message.list.header)
+      if (message.list?.body) parts.push(message.list.body.trim())
+      if (message.list?.footer) parts.push(message.list.footer)
+      if (message.list?.sections?.length) {
+        const items = message.list.sections.flatMap(s => s.rows.map(r => `• ${r.title}`))
+        parts.push(items.join('\n'))
+      }
+      return parts.join('\n') || '[lista interativa]'
     }
     default:
       return `[${message.type || 'mensagem'}]`
