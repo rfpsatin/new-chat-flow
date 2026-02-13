@@ -97,7 +97,7 @@ function FormattedHistoricoContent({ content, isOutgoing }: { content: string; i
                 <span className="shrink-0 mt-0.5 text-sm">▸</span>
                 <div className="flex flex-col">
                   <span className="text-sm font-medium">{renderBoldText(title)}</span>
-                  <span className="text-[10px] text-muted-foreground">({description})</span>
+                  <span className="text-[10px] text-muted-foreground pl-3">({description})</span>
                 </div>
               </div>
             );
@@ -169,7 +169,7 @@ export function SessaoCard({ sessao, onClose }: Props) {
 
       {/* Mensagens */}
       <ScrollArea className="flex-1">
-        <div className="p-3 space-y-2">
+        <div className="p-3 space-y-0 divide-y divide-border/30">
           {isLoading ? (
             <div className="text-center text-sm text-muted-foreground py-4">
               Carregando mensagens...
@@ -180,23 +180,24 @@ export function SessaoCard({ sessao, onClose }: Props) {
             </div>
           ) : (
             mensagens?.map((msg) => (
-              <div
-                key={msg.id}
-                className={cn(
-                  'max-w-[85%] p-2.5 rounded-lg text-sm',
-                  msg.direcao === 'in'
-                    ? 'bg-muted mr-auto'
-                    : 'bg-primary text-primary-foreground ml-auto'
-                )}
-              >
-                {msg.tipo_remetente !== 'cliente' && msg.direcao === 'out' && (
-                  <div className="text-xs opacity-70 mb-1">
-                    {msg.tipo_remetente === 'bot' ? '🤖 Bot' : '👤 Agente'}
+              <div key={msg.id} className="py-2">
+                <div
+                  className={cn(
+                    'max-w-[85%] p-2.5 rounded-lg text-sm',
+                    msg.direcao === 'in'
+                      ? 'bg-muted mr-auto'
+                      : 'bg-primary text-primary-foreground ml-auto'
+                  )}
+                >
+                  {msg.tipo_remetente !== 'cliente' && msg.direcao === 'out' && (
+                    <div className="text-xs opacity-70 mb-1">
+                      {msg.tipo_remetente === 'bot' ? '🤖 Bot' : '👤 Agente'}
+                    </div>
+                  )}
+                  <FormattedHistoricoContent content={getHistoricoDisplayContent(msg)} isOutgoing={msg.direcao === 'out'} />
+                  <div className="text-xs opacity-70 mt-1 text-right">
+                    {format(new Date(msg.criado_em), 'HH:mm', { locale: ptBR })}
                   </div>
-                )}
-                <FormattedHistoricoContent content={getHistoricoDisplayContent(msg)} isOutgoing={msg.direcao === 'out'} />
-                <div className="text-xs opacity-70 mt-1 text-right">
-                  {format(new Date(msg.criado_em), 'HH:mm', { locale: ptBR })}
                 </div>
               </div>
             ))
