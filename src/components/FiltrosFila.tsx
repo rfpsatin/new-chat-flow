@@ -1,4 +1,4 @@
-import { Search, Bot, Clock, Users, Headphones } from 'lucide-react';
+import { Search, Bot, Clock, Users, Headphones, LayoutGrid } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
@@ -12,12 +12,13 @@ interface StatusCount {
 interface FiltrosFilaProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  selectedStatuses: string[];
-  onToggleStatus: (status: string) => void;
+  selectedStatus: string;
+  onSelectStatus: (status: string) => void;
   statusCounts: StatusCount;
 }
 
 const statusConfig = [
+  { key: 'todos', label: 'Todos', icon: LayoutGrid },
   { key: 'bot', label: 'Bot', icon: Bot },
   { key: 'esperando_tria', label: 'Triagem', icon: Clock },
   { key: 'fila_humano', label: 'Na Fila', icon: Users },
@@ -27,10 +28,12 @@ const statusConfig = [
 export function FiltrosFila({
   searchQuery,
   onSearchChange,
-  selectedStatuses,
-  onToggleStatus,
+  selectedStatus,
+  onSelectStatus,
   statusCounts,
 }: FiltrosFilaProps) {
+  const totalCount = statusCounts.bot + statusCounts.esperando_tria + statusCounts.fila_humano + statusCounts.em_atendimento_humano;
+
   return (
     <div className="space-y-3">
       {/* Search input */}
@@ -44,16 +47,16 @@ export function FiltrosFila({
         />
       </div>
 
-      {/* Status chips */}
+      {/* Status chips - single select */}
       <div className="flex flex-wrap gap-2">
         {statusConfig.map(({ key, label, icon: Icon }) => {
-          const isActive = selectedStatuses.includes(key);
-          const count = statusCounts[key as keyof StatusCount] || 0;
+          const isActive = selectedStatus === key;
+          const count = key === 'todos' ? totalCount : (statusCounts[key as keyof StatusCount] || 0);
 
           return (
             <button
               key={key}
-              onClick={() => onToggleStatus(key)}
+              onClick={() => onSelectStatus(key)}
               className={cn(
                 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all',
                 'border',

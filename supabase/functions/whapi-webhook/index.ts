@@ -35,7 +35,7 @@ interface WhapiMessage {
     body?: string
     footer?: string
     label?: string
-    sections?: Array<{ title: string; rows: Array<{ id: string; title: string }> }>
+    sections?: Array<{ title: string; rows: Array<{ id: string; title: string; description?: string }> }>
   }
 }
 
@@ -591,7 +591,11 @@ function extractMessageContent(message: WhapiMessage): string {
       if (message.list?.body) parts.push(message.list.body.trim())
       if (message.list?.footer) parts.push(message.list.footer)
       if (message.list?.sections?.length) {
-        const items = message.list.sections.flatMap(s => s.rows.map(r => `• ${r.title}`))
+        const items = message.list.sections.flatMap(s => s.rows.map(r => {
+          let item = `• ${r.title}`
+          if (r.description) item += ` — ${r.description}`
+          return item
+        }))
         parts.push(items.join('\n'))
       }
       return parts.join('\n') || '[lista interativa]'
