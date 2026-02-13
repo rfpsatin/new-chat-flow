@@ -23,7 +23,7 @@ function getHistoricoDisplayContent(msg: { conteudo: string | null; payload?: an
       if (p?.buttons?.length) {
         parts.push(p.buttons.map((b: any) => `• ${b.text}`).join('\n'));
       }
-      if (p?.footer) parts.push(`(${p.footer})`);
+      if (p?.footer) parts.push(`{{FOOTER}}${p.footer}`);
       if (parts.length > 0) return parts.join('\n');
     }
 
@@ -42,14 +42,17 @@ function getHistoricoDisplayContent(msg: { conteudo: string | null; payload?: an
         );
         parts.push(items.join('\n'));
       }
-      if (p?.footer) parts.push(`(${p.footer})`);
+      if (p?.footer) parts.push(`{{FOOTER}}${p.footer}`);
       if (parts.length > 0) return parts.join('\n');
     }
   }
 
   if (msg.conteudo === '[reply]' && msg.payload) {
     if (msg.payload.reply?.buttons_reply?.title) return `📝 ${msg.payload.reply.buttons_reply.title}`;
-    if (msg.payload.reply?.list_reply?.title) return `📝 ${msg.payload.reply.list_reply.title}`;
+    if (msg.payload.reply?.list_reply?.title) {
+      const desc = msg.payload.reply.list_reply.description?.trim();
+      return desc ? `📝 ${msg.payload.reply.list_reply.title}   (${desc})` : `📝 ${msg.payload.reply.list_reply.title}`;
+    }
   }
 
   return msg.conteudo;
@@ -70,10 +73,11 @@ function FormattedHistoricoContent({ content, isOutgoing }: { content: string; i
   return (
     <div className="text-sm space-y-1">
       {lines.map((line, i) => {
-        if (line.startsWith('(') && line.endsWith(')')) {
+        if (line.startsWith('{{FOOTER}}')) {
+          const footerText = line.replace('{{FOOTER}}', '');
           return (
-            <p key={i} className="text-[10px] text-muted-foreground mt-1">
-              {line}
+            <p key={i} className="text-[10px] text-white/90 mt-1 text-center">
+              {footerText}
             </p>
           );
         }

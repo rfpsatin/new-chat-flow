@@ -162,12 +162,21 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
           </div>
         ) : (
-          <div className="space-y-0 divide-y divide-border/30">
-            {mensagens?.map((msg) => (
-              <div key={msg.id} className="py-2">
-                <MessageBubble mensagem={msg} />
-              </div>
-            ))}
+          <div className="space-y-0">
+            {mensagens?.map((msg, idx) => {
+              const prevMsg = idx > 0 ? mensagens[idx - 1] : null;
+              const differentContact = prevMsg && prevMsg.contato_id !== msg.contato_id;
+              return (
+                <div key={msg.id}>
+                  {differentContact && (
+                    <div className="my-3 border-t border-muted-foreground/20" />
+                  )}
+                  <div className="py-1.5">
+                    <MessageBubble mensagem={msg} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -220,7 +229,7 @@ function buildInteractiveText(interactive: any): string {
   if (interactive.buttons?.length) {
     parts.push(interactive.buttons.map((b: any) => `• ${b.text}`).join('\n'));
   }
-  if (interactive.footer) parts.push(`(${interactive.footer})`);
+  if (interactive.footer) parts.push(`{{FOOTER}}${interactive.footer}`);
   return parts.join('\n') || '[mensagem interativa]';
 }
 
@@ -239,7 +248,7 @@ function buildListText(list: any): string {
     );
     parts.push(items.join('\n'));
   }
-  if (list.footer) parts.push(`(${list.footer})`);
+  if (list.footer) parts.push(`{{FOOTER}}${list.footer}`);
   return parts.join('\n') || '[lista interativa]';
 }
 
@@ -251,10 +260,11 @@ function FormattedMessageContent({ content, isOutgoing }: { content: string; isO
     <div className="text-sm space-y-1">
       {lines.map((line, i) => {
         // Footer between parentheses - smaller muted text
-        if (line.startsWith('(') && line.endsWith(')')) {
+        if (line.startsWith('{{FOOTER}}')) {
+          const footerText = line.replace('{{FOOTER}}', '');
           return (
-            <p key={i} className="text-[10px] text-muted-foreground mt-1">
-              {line}
+            <p key={i} className="text-[10px] text-white/90 mt-1 text-center">
+              {footerText}
             </p>
           );
         }
@@ -337,7 +347,10 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
   const getDisplayContent = (): string => {
     if (mensagem.conteudo === '[reply]' && mensagem.payload) {
       const payload = mensagem.payload as any;
-      if (payload.reply?.list_reply?.title) return `📝 ${payload.reply.list_reply.title}`;
+      if (payload.reply?.list_reply?.title) {
+        const desc = payload.reply.list_reply.description?.trim();
+        return desc ? `📝 ${payload.reply.list_reply.title}   (${desc})` : `📝 ${payload.reply.list_reply.title}`;
+      }
       if (payload.reply?.buttons_reply?.title) return `📝 ${payload.reply.buttons_reply.title}`;
       if (payload.reply?.title) return `📝 ${payload.reply.title}`;
     }
