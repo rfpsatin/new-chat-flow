@@ -1,48 +1,150 @@
 
-# Exibir mensagens do bot no webhook
+# Exibir mensagens completas do bot para o atendente
 
-## Problema
-O webhook (`whapi-webhook`) atualmente:
-1. Rejeita requisicoes PUT (so aceita POST) - linha 49
-2. Sempre insere mensagens como `direcao: 'in'` e `tipo_remetente: 'cliente'` - linhas 167-168
-3. Para mensagens do bot, nao deve criar novas conversas nem disparar logica de handoff humano
+## Problema atual
+A funcao `extractMessageContent` no webhook nao reconhece os tipos `interactive` e `list` enviados pelo bot. Esses tipos caem no `default` e sao salvos como `[interactive]` ou `[list]` no banco, perdendo todo o conteudo textual.
 
-## Alteracoes em `supabase/functions/whapi-webhook/index.ts`
+## Payload real recebido do Whapi (exemplos dos logs)
 
-### 1. Aceitar metodo PUT alem de POST
-Alterar a validacao de metodo (linha 49) para aceitar tanto POST quanto PUT.
+**Tipo `interactive` (botoes):**
+```text
+{
+  "type": "interactive",
+  "interactive": {
+    "header": "Maia Beach Tennis Demo",
+    "body": "Ola! Seja bem-vindo(a)...",
+    "footer": "Escolha uma opcao abaixo:",
+    "buttons": [
+      { "text": "Agendar", "id": "ButtonsV3:sim_agendar" },
+      { "text": "Ver ou cancelar reservas", "id": "..." },
+      { "text": "Falar com atendente humano", "id": "..." }
+    ]
+  }
+}
+```
 
-### 2. Detectar mensagens do bot via `from_me`
-As mensagens enviadas pelo bot/canal vem com `from_me: true` no payload do Whapi. Usar esse campo para determinar:
-- `from_me: true` → `direcao: 'out'`, `tipo_remetente: 'bot'`
-- `from_me: false` → `direcao: 'in'`, `tipo_remetente: 'cliente'` (comportamento atual)
+**Tipo `list` (lista interativa):**
+```text
+{
+  "type": "list",
+  "list": {
+    "header": "Perfeito! Vamos dar inicio...",
+    "body": "Para que possamos mostrar...",
+    "footer": "Escolha uma opcao abaixo:",
+    "sections": [
+      { "title": "Servicos disponiveis", "rows": [
+        { "title": "Quadra Coberta p/ Beach Tennis" },
+        { "title": "Quadra p/ Beach Tennis" }
+      ]}
+    ]
+  }
+}
+```
 
-### 3. Pular logica de criacao de conversa e handoff para mensagens do bot
-Para mensagens com `from_me: true`:
-- Buscar a conversa ativa pelo `chat_id` (numero do contato destinatario), mas NAO criar nova conversa se nao existir
-- NAO disparar a logica de deteccao de "Falar com atendente humano"
-- NAO atualizar nome do contato
-- Se nao encontrar conversa ativa, ignorar a mensagem (o bot pode estar respondendo a conversas que nao estao no sistema)
+## Alteracoes
 
-### 4. Extrair numero do contato corretamente para mensagens do bot
-Para mensagens `from_me: true`, o campo `from` contem o numero do canal (nao do contato). O numero do contato esta no campo `chat_id`. Usar `chat_id` (removendo @s.whatsapp.net) para identificar o contato.
+### 1. Edge Function `whapi-webhook/index.ts` - Melhorar `extractMessageContent`
+
+Adicionar cases para `interactive` e `list` na funcao `extractMessageContent`:
+
+**Case `interactive`:** Concatenar header + body + footer + lista dos botoes
+```text
+Exemplo de saida:
+"Maia Beach Tennis Demo
+Ola! Seja bem-vindo(a) a nossa Central de Agendamentos.
+Escolha uma opcao abaixo:
+- Agendar
+- Ver ou cancelar reservas
+- Falar com atendente humano"
+```
+
+**Case `list`:** Concatenar header + body + footer + items das secoes
+```text
+Exemplo de saida:
+"Perfeito! Vamos dar inicio ao seu agendamento.
+Para que possamos mostrar as informacoes corretas...
+Escolha uma opcao abaixo:
+- Quadra Coberta p/ Beach Tennis
+- Quadra p/ Beach Tennis
+- Quadra p/ Futebol
+- Quadra p/ Volei
+- Sair do menu"
+```
+
+Tambem atualizar a interface `WhapiMessage` para incluir os campos `interactive` e `list`.
+
+### 2. Frontend `ChatPanel.tsx` - Melhorar `getDisplayContent`
+
+Atualizar a funcao `getDisplayContent` no `MessageBubble` para tratar mensagens que foram salvas anteriormente como `[list]` ou `[interactive]`, extraindo o conteudo do payload quando disponivel.
+
+Para mensagens novas, o conteudo ja vira completo do webhook (alteracao acima). Para mensagens antigas que ja estao como `[list]` ou `[interactive]`, o payload completo ja esta salvo na coluna `payload` - basta extrair dele.
 
 ### Secao tecnica
 
-Adicionar `from_me?: boolean` na interface `WhapiMessage`.
+**Arquivo:** `supabase/functions/whapi-webhook/index.ts`
 
-No loop de processamento de mensagens:
+Adicionar na interface `WhapiMessage`:
 ```text
-const isFromBot = message.from_me === true
-const whatsappNumero = isFromBot
-  ? message.chat_id.replace('@s.whatsapp.net', '').replace('@c.us', '')
-  : message.from.replace('@s.whatsapp.net', '').replace('@c.us', '')
+interactive?: {
+  header?: string
+  body?: string
+  footer?: string
+  buttons?: Array<{ text: string; id: string }>
+}
+list?: {
+  header?: string
+  body?: string
+  footer?: string
+  label?: string
+  sections?: Array<{ title: string; rows: Array<{ id: string; title: string }> }>
+}
 ```
 
-Na insercao da mensagem:
+Adicionar no switch de `extractMessageContent`:
 ```text
-direcao: isFromBot ? 'out' : 'in',
-tipo_remetente: isFromBot ? 'bot' : 'cliente',
+case 'interactive': {
+  const parts: string[] = []
+  if (message.interactive?.header) parts.push(message.interactive.header)
+  if (message.interactive?.body) parts.push(message.interactive.body.trim())
+  if (message.interactive?.footer) parts.push(message.interactive.footer)
+  if (message.interactive?.buttons?.length) {
+    parts.push(message.interactive.buttons.map(b => `• ${b.text}`).join('\n'))
+  }
+  return parts.join('\n') || '[mensagem interativa]'
+}
+case 'list': {
+  const parts: string[] = []
+  if (message.list?.header) parts.push(message.list.header)
+  if (message.list?.body) parts.push(message.list.body.trim())
+  if (message.list?.footer) parts.push(message.list.footer)
+  if (message.list?.sections?.length) {
+    const items = message.list.sections.flatMap(s => s.rows.map(r => `• ${r.title}`))
+    parts.push(items.join('\n'))
+  }
+  return parts.join('\n') || '[lista interativa]'
+}
 ```
 
-Pular blocos de handoff e criacao de conversa quando `isFromBot` for true. Se a conversa nao existir para uma mensagem do bot, logar e pular sem erro.
+**Arquivo:** `src/components/ChatPanel.tsx`
+
+Na funcao `getDisplayContent`, adicionar tratamento para `[interactive]` e `[list]`:
+```text
+// Mensagem interativa (payload do bot)
+if (mensagem.conteudo === '[interactive]' && mensagem.payload) {
+  const payload = mensagem.payload as any
+  const parts: string[] = []
+  if (payload.interactive?.header) parts.push(payload.interactive.header)
+  if (payload.interactive?.body) parts.push(payload.interactive.body.trim())
+  if (payload.interactive?.buttons?.length) {
+    parts.push(payload.interactive.buttons.map(b => `• ${b.text}`).join('\n'))
+  }
+  if (parts.length > 0) return parts.join('\n')
+}
+
+// Lista interativa (payload do bot)
+if (mensagem.conteudo === '[list]' && mensagem.payload) {
+  // (mesmo padrao, extraindo de payload.list)
+}
+```
+
+Tambem atualizar o mesmo tratamento em `SessaoCard.tsx` para o historico.
