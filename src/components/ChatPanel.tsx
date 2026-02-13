@@ -231,7 +231,7 @@ function buildListText(list: any): string {
     const items = list.sections.flatMap((s: any) =>
       s.rows.map((r: any) => {
         let item = `• ${r.title}`;
-        if (r.description) item += ` — ${r.description}`;
+        if (r.description?.trim()) item += ` — ${r.description.trim()}`;
         return item;
       })
     );
@@ -340,16 +340,15 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
       if (payload.reply?.title) return `📝 ${payload.reply.title}`;
     }
     
-    // Mensagem interativa (payload do bot) - retroativo
-    if (mensagem.conteudo === '[interactive]' && mensagem.payload) {
+    // Mensagem interativa (payload do bot) - sempre usa payload para garantir dados completos
+    if (mensagem.payload) {
       const payload = mensagem.payload as any;
-      return buildInteractiveText(payload.interactive);
-    }
-
-    // Lista interativa (payload do bot) - retroativo
-    if (mensagem.conteudo === '[list]' && mensagem.payload) {
-      const payload = mensagem.payload as any;
-      return buildListText(payload.list);
+      if (payload.type === 'interactive' || mensagem.conteudo === '[interactive]') {
+        return buildInteractiveText(payload.interactive);
+      }
+      if (payload.type === 'list' || mensagem.conteudo === '[list]') {
+        return buildListText(payload.list);
+      }
     }
     
     return mensagem.conteudo || '';
