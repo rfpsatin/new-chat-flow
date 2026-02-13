@@ -1,48 +1,48 @@
 
-# Atualizar payload do close-service para n8n
+# Exibir mensagens do bot no webhook
 
-## Resumo
-Alterar o payload enviado ao webhook do n8n para:
-1. Renomear `chat_id` para `numero_participante`
-2. Substituir `empresa_id` pelo `whapi_token` da empresa, enviado como `channel_ID`
+## Problema
+O webhook (`whapi-webhook`) atualmente:
+1. Rejeita requisicoes PUT (so aceita POST) - linha 49
+2. Sempre insere mensagens como `direcao: 'in'` e `tipo_remetente: 'cliente'` - linhas 167-168
+3. Para mensagens do bot, nao deve criar novas conversas nem disparar logica de handoff humano
 
-## Alteracoes
+## Alteracoes em `supabase/functions/whapi-webhook/index.ts`
 
-### `supabase/functions/close-service/index.ts`
+### 1. Aceitar metodo PUT alem de POST
+Alterar a validacao de metodo (linha 49) para aceitar tanto POST quanto PUT.
 
-**1. Alterar a funcao `updateAttendanceMode`**
-- Trocar a assinatura para receber `whatsappNumero` e `channelId` em vez de `chatId` e `empresaId`
-- Payload enviado ao n8n passara a ser:
+### 2. Detectar mensagens do bot via `from_me`
+As mensagens enviadas pelo bot/canal vem com `from_me: true` no payload do Whapi. Usar esse campo para determinar:
+- `from_me: true` → `direcao: 'out'`, `tipo_remetente: 'bot'`
+- `from_me: false` → `direcao: 'in'`, `tipo_remetente: 'cliente'` (comportamento atual)
 
-```text
-{
-  "attendanceMode": "automated",
-  "action": "update",
-  "numero_participante": "<numero whatsapp do contato>",
-  "channel_ID": "<whapi_token da empresa>",
-  "conversa_id": "<id da conversa>"
-}
-```
+### 3. Pular logica de criacao de conversa e handoff para mensagens do bot
+Para mensagens com `from_me: true`:
+- Buscar a conversa ativa pelo `chat_id` (numero do contato destinatario), mas NAO criar nova conversa se nao existir
+- NAO disparar a logica de deteccao de "Falar com atendente humano"
+- NAO atualizar nome do contato
+- Se nao encontrar conversa ativa, ignorar a mensagem (o bot pode estar respondendo a conversas que nao estao no sistema)
 
-**2. Buscar whapi_token da empresa no banco**
-- Apos resolver o chat_id (numero do contato), tambem buscar o `whapi_token` da tabela `empresas` usando o `empresa_id` recebido na request
-- Enviar esse token como `channel_ID` no payload
-
-**3. Fluxo completo da funcao**
-- Receber `conversa_id`, `empresa_id`, `chat_id` (opcional) da request
-- Se `chat_id` nao fornecido, buscar via conversas -> contatos (logica existente)
-- Buscar `whapi_token` da tabela `empresas` onde `id = empresa_id`
-- Montar payload com `numero_participante`, `channel_ID` e `conversa_id`
-- POST para o webhook do n8n
+### 4. Extrair numero do contato corretamente para mensagens do bot
+Para mensagens `from_me: true`, o campo `from` contem o numero do canal (nao do contato). O numero do contato esta no campo `chat_id`. Usar `chat_id` (removendo @s.whatsapp.net) para identificar o contato.
 
 ### Secao tecnica
 
-Campos removidos do payload: `empresa_id`, `chat_id`
-Campos adicionados: `numero_participante` (mesmo valor do antigo `chat_id`), `channel_ID` (valor de `empresas.whapi_token`)
+Adicionar `from_me?: boolean` na interface `WhapiMessage`.
 
-Query adicional necessaria:
+No loop de processamento de mensagens:
 ```text
-supabase.from('empresas').select('whapi_token').eq('id', empresa_id).single()
+const isFromBot = message.from_me === true
+const whatsappNumero = isFromBot
+  ? message.chat_id.replace('@s.whatsapp.net', '').replace('@c.us', '')
+  : message.from.replace('@s.whatsapp.net', '').replace('@c.us', '')
 ```
 
-O Supabase client ja esta sendo criado na funcao quando precisa buscar dados; sera reutilizado. Caso o `chat_id` ja venha na request, o client sera criado de qualquer forma para buscar o `whapi_token`.
+Na insercao da mensagem:
+```text
+direcao: isFromBot ? 'out' : 'in',
+tipo_remetente: isFromBot ? 'bot' : 'cliente',
+```
+
+Pular blocos de handoff e criacao de conversa quando `isFromBot` for true. Se a conversa nao existir para uma mensagem do bot, logar e pular sem erro.
