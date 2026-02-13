@@ -10,9 +10,10 @@ interface ConversaItemProps {
   conversa: FilaAtendimento;
   isSelected: boolean;
   onClick: () => void;
+  showBadge?: boolean;
 }
 
-export function ConversaItem({ conversa, isSelected, onClick }: ConversaItemProps) {
+export function ConversaItem({ conversa, isSelected, onClick, showBadge = true }: ConversaItemProps) {
   const getInitials = (name: string | null) => {
     if (!name) return '?';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -63,7 +64,7 @@ export function ConversaItem({ conversa, isSelected, onClick }: ConversaItemProp
           </div>
           
           <div className="flex items-center justify-between gap-2 pt-1">
-            <StatusBadge status={conversa.status} />
+            {showBadge && <StatusBadge status={conversa.status} />}
             {conversa.agente_nome && (
               <span className="text-xs text-muted-foreground truncate">
                 {conversa.agente_nome}

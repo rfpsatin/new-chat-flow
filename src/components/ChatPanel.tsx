@@ -215,10 +215,10 @@ function buildInteractiveText(interactive: any): string {
   const parts: string[] = [];
   if (interactive.header) parts.push(interactive.header);
   if (interactive.body) parts.push(interactive.body.trim());
-  if (interactive.footer) parts.push(interactive.footer);
   if (interactive.buttons?.length) {
     parts.push(interactive.buttons.map((b: any) => `• ${b.text}`).join('\n'));
   }
+  if (interactive.footer) parts.push(`(${interactive.footer})`);
   return parts.join('\n') || '[mensagem interativa]';
 }
 
@@ -227,7 +227,6 @@ function buildListText(list: any): string {
   const parts: string[] = [];
   if (list.header) parts.push(list.header);
   if (list.body) parts.push(list.body.trim());
-  if (list.footer) parts.push(list.footer);
   if (list.sections?.length) {
     const items = list.sections.flatMap((s: any) =>
       s.rows.map((r: any) => {
@@ -238,6 +237,7 @@ function buildListText(list: any): string {
     );
     parts.push(items.join('\n'));
   }
+  if (list.footer) parts.push(`(${list.footer})`);
   return parts.join('\n') || '[lista interativa]';
 }
 
@@ -248,18 +248,47 @@ function FormattedMessageContent({ content, isOutgoing }: { content: string; isO
   return (
     <div className="text-sm space-y-1">
       {lines.map((line, i) => {
+        // Footer between parentheses - smaller muted text
+        if (line.startsWith('(') && line.endsWith(')')) {
+          return (
+            <p key={i} className="text-[10px] text-muted-foreground mt-1">
+              {line}
+            </p>
+          );
+        }
+
         const isBullet = line.startsWith('• ');
         
         if (isBullet) {
           const bulletContent = line.slice(2);
+          const dashIndex = bulletContent.indexOf(' — ');
+          
+          if (dashIndex !== -1) {
+            const title = bulletContent.slice(0, dashIndex);
+            const description = bulletContent.slice(dashIndex + 3);
+            return (
+              <div
+                key={i}
+                className={cn(
+                  'flex items-start gap-2 px-2 py-1 rounded-md',
+                  isOutgoing ? 'bg-primary-foreground/10' : 'bg-muted'
+                )}
+              >
+                <span className="shrink-0 mt-0.5 text-xs">▸</span>
+                <div>
+                  <span className="text-xs font-medium">{renderBoldText(title)}</span>
+                  <span className="text-[10px] text-muted-foreground ml-1">{description}</span>
+                </div>
+              </div>
+            );
+          }
+          
           return (
             <div
               key={i}
               className={cn(
                 'flex items-start gap-2 px-2 py-1 rounded-md text-xs',
-                isOutgoing
-                  ? 'bg-primary-foreground/10'
-                  : 'bg-muted'
+                isOutgoing ? 'bg-primary-foreground/10' : 'bg-muted'
               )}
             >
               <span className="shrink-0 mt-0.5">▸</span>

@@ -13,23 +13,24 @@ function getHistoricoDisplayContent(msg: { conteudo: string | null; payload?: an
   if (!msg.conteudo) return '';
   
   if (msg.conteudo === '[interactive]' && msg.payload) {
+    const p = msg.payload.interactive;
     const parts: string[] = [];
-    if (msg.payload.interactive?.header) parts.push(msg.payload.interactive.header);
-    if (msg.payload.interactive?.body) parts.push(msg.payload.interactive.body.trim());
-    if (msg.payload.interactive?.footer) parts.push(msg.payload.interactive.footer);
-    if (msg.payload.interactive?.buttons?.length) {
-      parts.push(msg.payload.interactive.buttons.map((b: any) => `• ${b.text}`).join('\n'));
+    if (p?.header) parts.push(p.header);
+    if (p?.body) parts.push(p.body.trim());
+    if (p?.buttons?.length) {
+      parts.push(p.buttons.map((b: any) => `• ${b.text}`).join('\n'));
     }
+    if (p?.footer) parts.push(`(${p.footer})`);
     if (parts.length > 0) return parts.join('\n');
   }
 
   if (msg.conteudo === '[list]' && msg.payload) {
+    const p = msg.payload.list;
     const parts: string[] = [];
-    if (msg.payload.list?.header) parts.push(msg.payload.list.header);
-    if (msg.payload.list?.body) parts.push(msg.payload.list.body.trim());
-    if (msg.payload.list?.footer) parts.push(msg.payload.list.footer);
-    if (msg.payload.list?.sections?.length) {
-      const items = msg.payload.list.sections.flatMap((s: any) =>
+    if (p?.header) parts.push(p.header);
+    if (p?.body) parts.push(p.body.trim());
+    if (p?.sections?.length) {
+      const items = p.sections.flatMap((s: any) =>
         s.rows.map((r: any) => {
           let item = `• ${r.title}`;
           if (r.description) item += ` — ${r.description}`;
@@ -38,6 +39,7 @@ function getHistoricoDisplayContent(msg: { conteudo: string | null; payload?: an
       );
       parts.push(items.join('\n'));
     }
+    if (p?.footer) parts.push(`(${p.footer})`);
     if (parts.length > 0) return parts.join('\n');
   }
 
@@ -64,8 +66,39 @@ function FormattedHistoricoContent({ content, isOutgoing }: { content: string; i
   return (
     <div className="text-sm space-y-1">
       {lines.map((line, i) => {
+        if (line.startsWith('(') && line.endsWith(')')) {
+          return (
+            <p key={i} className="text-[10px] text-muted-foreground mt-1">
+              {line}
+            </p>
+          );
+        }
+
         const isBullet = line.startsWith('• ');
         if (isBullet) {
+          const bulletContent = line.slice(2);
+          const dashIndex = bulletContent.indexOf(' — ');
+          
+          if (dashIndex !== -1) {
+            const title = bulletContent.slice(0, dashIndex);
+            const description = bulletContent.slice(dashIndex + 3);
+            return (
+              <div
+                key={i}
+                className={cn(
+                  'flex items-start gap-2 px-2 py-1 rounded-md',
+                  isOutgoing ? 'bg-primary-foreground/10' : 'bg-background/60'
+                )}
+              >
+                <span className="shrink-0 mt-0.5 text-xs">▸</span>
+                <div>
+                  <span className="text-xs font-medium">{renderBoldText(title)}</span>
+                  <span className="text-[10px] text-muted-foreground ml-1">{description}</span>
+                </div>
+              </div>
+            );
+          }
+
           return (
             <div
               key={i}
@@ -75,7 +108,7 @@ function FormattedHistoricoContent({ content, isOutgoing }: { content: string; i
               )}
             >
               <span className="shrink-0 mt-0.5">▸</span>
-              <span>{renderBoldText(line.slice(2))}</span>
+              <span>{renderBoldText(bulletContent)}</span>
             </div>
           );
         }
