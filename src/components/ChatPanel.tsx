@@ -162,9 +162,11 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-0 divide-y divide-border/30">
             {mensagens?.map((msg) => (
-              <MessageBubble key={msg.id} mensagem={msg} />
+              <div key={msg.id} className="py-2">
+                <MessageBubble mensagem={msg} />
+              </div>
             ))}
           </div>
         )}
@@ -277,7 +279,7 @@ function FormattedMessageContent({ content, isOutgoing }: { content: string; isO
                 <span className="shrink-0 mt-0.5 text-sm">▸</span>
                 <div className="flex flex-col">
                   <span className="text-sm font-medium">{renderBoldText(title)}</span>
-                  <span className="text-[10px] text-muted-foreground">({description})</span>
+                  <span className="text-[10px] text-muted-foreground pl-3">({description})</span>
                 </div>
               </div>
             );
