@@ -592,7 +592,7 @@ function extractMessageContent(message: WhapiMessage): string {
       if (message.list?.sections?.length) {
         const items = message.list.sections.flatMap(s => s.rows.map(r => {
           let item = `• ${r.title}`
-          if (r.description) item += ` — ${r.description}`
+          if (r.description?.trim()) item += ` — ${r.description.trim()}`
           return item
         }))
         parts.push(items.join('\n'))

@@ -12,35 +12,39 @@ import { SatisfacaoStars } from './SatisfacaoStars';
 function getHistoricoDisplayContent(msg: { conteudo: string | null; payload?: any }): string {
   if (!msg.conteudo) return '';
   
-  if (msg.conteudo === '[interactive]' && msg.payload) {
-    const p = msg.payload.interactive;
-    const parts: string[] = [];
-    if (p?.header) parts.push(p.header);
-    if (p?.body) parts.push(p.body.trim());
-    if (p?.buttons?.length) {
-      parts.push(p.buttons.map((b: any) => `• ${b.text}`).join('\n'));
+  // Always use payload for interactive/list to ensure complete data with descriptions
+  if (msg.payload) {
+    const payload = msg.payload as any;
+    if (payload.type === 'interactive' || msg.conteudo === '[interactive]') {
+      const p = payload.interactive;
+      const parts: string[] = [];
+      if (p?.header) parts.push(p.header);
+      if (p?.body) parts.push(p.body.trim());
+      if (p?.buttons?.length) {
+        parts.push(p.buttons.map((b: any) => `• ${b.text}`).join('\n'));
+      }
+      if (p?.footer) parts.push(`(${p.footer})`);
+      if (parts.length > 0) return parts.join('\n');
     }
-    if (p?.footer) parts.push(`(${p.footer})`);
-    if (parts.length > 0) return parts.join('\n');
-  }
 
-  if (msg.conteudo === '[list]' && msg.payload) {
-    const p = msg.payload.list;
-    const parts: string[] = [];
-    if (p?.header) parts.push(p.header);
-    if (p?.body) parts.push(p.body.trim());
-    if (p?.sections?.length) {
-      const items = p.sections.flatMap((s: any) =>
-        s.rows.map((r: any) => {
-          let item = `• ${r.title}`;
-          if (r.description) item += ` — ${r.description}`;
-          return item;
-        })
-      );
-      parts.push(items.join('\n'));
+    if (payload.type === 'list' || msg.conteudo === '[list]') {
+      const p = payload.list;
+      const parts: string[] = [];
+      if (p?.header) parts.push(p.header);
+      if (p?.body) parts.push(p.body.trim());
+      if (p?.sections?.length) {
+        const items = p.sections.flatMap((s: any) =>
+          s.rows.map((r: any) => {
+            let item = `• ${r.title}`;
+            if (r.description?.trim()) item += ` — ${r.description.trim()}`;
+            return item;
+          })
+        );
+        parts.push(items.join('\n'));
+      }
+      if (p?.footer) parts.push(`(${p.footer})`);
+      if (parts.length > 0) return parts.join('\n');
     }
-    if (p?.footer) parts.push(`(${p.footer})`);
-    if (parts.length > 0) return parts.join('\n');
   }
 
   if (msg.conteudo === '[reply]' && msg.payload) {
