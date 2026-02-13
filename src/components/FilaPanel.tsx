@@ -153,6 +153,7 @@ export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelPro
                     conversa={conversa}
                     isSelected={selectedConversaId === conversa.conversa_id}
                     onClick={() => onSelectConversa(conversa)}
+                    showBadge={selectedStatus === 'todos'}
                   />
                   {isDesignadoParaMim && (
                     <Button

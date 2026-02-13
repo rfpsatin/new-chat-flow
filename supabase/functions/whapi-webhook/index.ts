@@ -579,17 +579,16 @@ function extractMessageContent(message: WhapiMessage): string {
       const parts: string[] = []
       if (message.interactive?.header) parts.push(message.interactive.header)
       if (message.interactive?.body) parts.push(message.interactive.body.trim())
-      if (message.interactive?.footer) parts.push(message.interactive.footer)
       if (message.interactive?.buttons?.length) {
         parts.push(message.interactive.buttons.map(b => `• ${b.text}`).join('\n'))
       }
+      if (message.interactive?.footer) parts.push(`(${message.interactive.footer})`)
       return parts.join('\n') || '[mensagem interativa]'
     }
     case 'list': {
       const parts: string[] = []
       if (message.list?.header) parts.push(message.list.header)
       if (message.list?.body) parts.push(message.list.body.trim())
-      if (message.list?.footer) parts.push(message.list.footer)
       if (message.list?.sections?.length) {
         const items = message.list.sections.flatMap(s => s.rows.map(r => {
           let item = `• ${r.title}`
@@ -598,6 +597,7 @@ function extractMessageContent(message: WhapiMessage): string {
         }))
         parts.push(items.join('\n'))
       }
+      if (message.list?.footer) parts.push(`(${message.list.footer})`)
       return parts.join('\n') || '[lista interativa]'
     }
     default:
