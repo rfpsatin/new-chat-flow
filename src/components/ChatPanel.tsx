@@ -241,12 +241,31 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
       }
     }
     
-    // Lista interativa enviada
+    // Mensagem interativa (payload do bot) - retroativo
+    if (mensagem.conteudo === '[interactive]' && mensagem.payload) {
+      const payload = mensagem.payload as any;
+      const parts: string[] = [];
+      if (payload.interactive?.header) parts.push(payload.interactive.header);
+      if (payload.interactive?.body) parts.push(payload.interactive.body.trim());
+      if (payload.interactive?.footer) parts.push(payload.interactive.footer);
+      if (payload.interactive?.buttons?.length) {
+        parts.push(payload.interactive.buttons.map((b: any) => `• ${b.text}`).join('\n'));
+      }
+      if (parts.length > 0) return parts.join('\n');
+    }
+
+    // Lista interativa (payload do bot) - retroativo
     if (mensagem.conteudo === '[list]' && mensagem.payload) {
       const payload = mensagem.payload as any;
-      if (payload.list?.header) {
-        return `📋 ${payload.list.header}`;
+      const parts: string[] = [];
+      if (payload.list?.header) parts.push(payload.list.header);
+      if (payload.list?.body) parts.push(payload.list.body.trim());
+      if (payload.list?.footer) parts.push(payload.list.footer);
+      if (payload.list?.sections?.length) {
+        const items = payload.list.sections.flatMap((s: any) => s.rows.map((r: any) => `• ${r.title}`));
+        parts.push(items.join('\n'));
       }
+      if (parts.length > 0) return parts.join('\n');
     }
     
     return mensagem.conteudo;

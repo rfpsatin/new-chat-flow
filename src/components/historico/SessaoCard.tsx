@@ -8,6 +8,40 @@ import { HistoricoConversa } from '@/types/atendimento';
 import { useMensagensHistorico } from '@/hooks/useHistorico';
 import { SatisfacaoStars } from './SatisfacaoStars';
 
+function getHistoricoDisplayContent(msg: { conteudo: string | null; payload?: any }): string {
+  if (!msg.conteudo) return '';
+  
+  if (msg.conteudo === '[interactive]' && msg.payload) {
+    const parts: string[] = [];
+    if (msg.payload.interactive?.header) parts.push(msg.payload.interactive.header);
+    if (msg.payload.interactive?.body) parts.push(msg.payload.interactive.body.trim());
+    if (msg.payload.interactive?.footer) parts.push(msg.payload.interactive.footer);
+    if (msg.payload.interactive?.buttons?.length) {
+      parts.push(msg.payload.interactive.buttons.map((b: any) => `• ${b.text}`).join('\n'));
+    }
+    if (parts.length > 0) return parts.join('\n');
+  }
+
+  if (msg.conteudo === '[list]' && msg.payload) {
+    const parts: string[] = [];
+    if (msg.payload.list?.header) parts.push(msg.payload.list.header);
+    if (msg.payload.list?.body) parts.push(msg.payload.list.body.trim());
+    if (msg.payload.list?.footer) parts.push(msg.payload.list.footer);
+    if (msg.payload.list?.sections?.length) {
+      const items = msg.payload.list.sections.flatMap((s: any) => s.rows.map((r: any) => `• ${r.title}`));
+      parts.push(items.join('\n'));
+    }
+    if (parts.length > 0) return parts.join('\n');
+  }
+
+  if (msg.conteudo === '[reply]' && msg.payload) {
+    if (msg.payload.reply?.buttons_reply?.title) return `📝 ${msg.payload.reply.buttons_reply.title}`;
+    if (msg.payload.reply?.list_reply?.title) return `📝 ${msg.payload.reply.list_reply.title}`;
+  }
+
+  return msg.conteudo;
+}
+
 interface Props {
   sessao: HistoricoConversa;
   onClose: () => void;
@@ -76,7 +110,7 @@ export function SessaoCard({ sessao, onClose }: Props) {
                     {msg.tipo_remetente === 'bot' ? '🤖 Bot' : '👤 Agente'}
                   </div>
                 )}
-                <p className="whitespace-pre-wrap break-words">{msg.conteudo}</p>
+                <p className="whitespace-pre-wrap break-words">{getHistoricoDisplayContent(msg)}</p>
                 <div className="text-xs opacity-70 mt-1 text-right">
                   {format(new Date(msg.criado_em), 'HH:mm', { locale: ptBR })}
                 </div>
