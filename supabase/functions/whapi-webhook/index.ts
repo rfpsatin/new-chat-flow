@@ -8,6 +8,7 @@ const corsHeaders = {
 interface WhapiMessage {
   id: string
   from: string
+  from_me?: boolean
   from_name?: string
   chat_id: string
   timestamp: number
@@ -46,7 +47,7 @@ Deno.serve(async (req) => {
   }
 
   // Only accept POST
-  if (req.method !== 'POST') {
+  if (req.method !== 'POST' && req.method !== 'PUT') {
     console.log(`[${requestId}] Method not allowed: ${req.method}`)
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
@@ -117,55 +118,95 @@ Deno.serve(async (req) => {
     for (const message of messages) {
       try {
         console.log(`[${requestId}] ---- Processing message ${message.id} ----`)
-        console.log(`[${requestId}] From: ${message.from}`)
+        console.log(`[${requestId}] From: ${message.from}, from_me: ${message.from_me}`)
         console.log(`[${requestId}] Type: ${message.type}`)
         
-        // Extract WhatsApp number (remove @s.whatsapp.net or @c.us)
-        const whatsappNumero = message.from
+        const isFromBot = message.from_me === true
+        
+        // For bot messages, contact number is in chat_id; for client messages, in from
+        const whatsappNumero = (isFromBot ? message.chat_id : message.from)
           .replace('@s.whatsapp.net', '')
           .replace('@c.us', '')
         
-        console.log(`[${requestId}] WhatsApp number: ${whatsappNumero}`)
+        console.log(`[${requestId}] WhatsApp number: ${whatsappNumero}, isFromBot: ${isFromBot}`)
 
-        // 1. Find or create contact
-        let contato = await findOrCreateContato(
-          supabase, 
-          empresaId, 
-          whatsappNumero, 
-          message.from_name,
-          requestId
-        )
+        let contato: any
+        let conversa: any
 
-        if (!contato) {
-          throw new Error('Failed to find or create contact')
+        if (isFromBot) {
+          // For bot messages: find existing contact and conversation, don't create new ones
+          const { data: existingContato, error: findContatoError } = await supabase
+            .from('contatos')
+            .select('*')
+            .eq('empresa_id', empresaId)
+            .eq('whatsapp_numero', whatsappNumero)
+            .maybeSingle()
+
+          if (findContatoError || !existingContato) {
+            console.log(`[${requestId}] Bot message: contact not found for ${whatsappNumero}, skipping`)
+            continue
+          }
+          contato = existingContato
+
+          // Find active conversation (not encerrado)
+          const { data: activeConversa, error: findConversaError } = await supabase
+            .from('conversas')
+            .select('*')
+            .eq('empresa_id', empresaId)
+            .eq('contato_id', contato.id)
+            .neq('status', 'encerrado')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+          if (findConversaError || !activeConversa) {
+            console.log(`[${requestId}] Bot message: no active conversation for contact ${contato.id}, skipping`)
+            continue
+          }
+          conversa = activeConversa
+        } else {
+          // Client messages: original flow - find or create contact and conversation
+          contato = await findOrCreateContato(
+            supabase, 
+            empresaId, 
+            whatsappNumero, 
+            message.from_name,
+            requestId
+          )
+
+          if (!contato) {
+            throw new Error('Failed to find or create contact')
+          }
         }
 
-        // 2. Extract message content early (needed for satisfaction check)
+        // Extract message content
         const conteudo = extractMessageContent(message)
         console.log(`[${requestId}] Message content: ${conteudo.substring(0, 100)}...`)
 
-        // 3. Find active conversation or create new one
-        let conversa = await findOrCreateConversa(
-          supabase,
-          empresaId,
-          contato.id,
-          conteudo,
-          requestId
-        )
+        if (!isFromBot) {
+          // Only client messages: find or create conversation
+          conversa = await findOrCreateConversa(
+            supabase,
+            empresaId,
+            contato.id,
+            conteudo,
+            requestId
+          )
 
-        if (!conversa) {
-          throw new Error('Failed to find or create conversation')
+          if (!conversa) {
+            throw new Error('Failed to find or create conversation')
+          }
         }
 
-        // 4. Insert message
+        // Insert message with correct direction
         const { error: msgError } = await supabase
           .from('mensagens_ativas')
           .insert({
             empresa_id: empresaId,
             conversa_id: conversa.id,
             contato_id: contato.id,
-            direcao: 'in',
-            tipo_remetente: 'cliente',
+            direcao: isFromBot ? 'out' : 'in',
+            tipo_remetente: isFromBot ? 'bot' : 'cliente',
             conteudo: conteudo,
             payload: message,
           })
@@ -175,7 +216,7 @@ Deno.serve(async (req) => {
           throw msgError
         }
 
-        console.log(`[${requestId}] Message inserted successfully`)
+        console.log(`[${requestId}] Message inserted successfully (direction: ${isFromBot ? 'out/bot' : 'in/cliente'})`)
 
         // 5. Update conversation last_message_at
         const { error: updateError } = await supabase
@@ -190,7 +231,8 @@ Deno.serve(async (req) => {
           console.error(`[${requestId}] ERROR updating conversation:`, updateError)
         }
 
-        // 6. Check if message contains "Falar com o atendente humano" and conversa is in bot status
+        // 6. Check if message contains "Falar com o atendente humano" and conversa is in bot status (only for client messages)
+        if (!isFromBot) {
         const isHumanRequest = conteudo.toLowerCase().includes('falar com') && conteudo.toLowerCase().includes('atendente humano')
         const isHumanButtonId = (message as any).reply?.buttons_reply?.id === 'ButtonsV3:atendimento_humano'
         if (conversa.status === 'bot' && (isHumanRequest || isHumanButtonId)) {
@@ -273,6 +315,7 @@ Deno.serve(async (req) => {
             }
           }
         }
+        } // end if (!isFromBot)
 
         processedCount++
         console.log(`[${requestId}] Message ${message.id} processed successfully`)
