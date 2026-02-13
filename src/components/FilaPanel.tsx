@@ -21,9 +21,7 @@ export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelPro
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([
-    'em_atendimento_humano',
-  ]);
+  const [selectedStatus, setSelectedStatus] = useState('todos');
 
   // Filtra conversas visíveis baseado no perfil do usuário
   const conversasVisiveis = useMemo(() => {
@@ -56,7 +54,7 @@ export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelPro
     return conversasVisiveis
       .filter(conversa => {
         // Filter by status
-        if (!selectedStatuses.includes(conversa.status || '')) return false;
+        if (selectedStatus !== 'todos' && conversa.status !== selectedStatus) return false;
 
         // Filter by search query
         if (searchQuery.trim()) {
@@ -69,20 +67,11 @@ export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelPro
         return true;
       })
       .sort((a, b) => {
-        // Sort by last_message_at descending (most recent first)
         const dateA = new Date(a.last_message_at || 0).getTime();
         const dateB = new Date(b.last_message_at || 0).getTime();
         return dateB - dateA;
       });
-  }, [conversasVisiveis, selectedStatuses, searchQuery]);
-
-  const handleToggleStatus = (status: string) => {
-    setSelectedStatuses(prev =>
-      prev.includes(status)
-        ? prev.filter(s => s !== status)
-        : [...prev, status]
-    );
-  };
+  }, [conversasVisiveis, selectedStatus, searchQuery]);
 
   // Atendente assumes conversation designated to them
   const handleAssumirConversa = async (conversa: FilaAtendimento, e: React.MouseEvent) => {
@@ -132,8 +121,8 @@ export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelPro
         <FiltrosFila
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          selectedStatuses={selectedStatuses}
-          onToggleStatus={handleToggleStatus}
+          selectedStatus={selectedStatus}
+          onSelectStatus={setSelectedStatus}
           statusCounts={statusCounts}
         />
       </div>
@@ -147,9 +136,7 @@ export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelPro
             </div>
             <h3 className="font-medium text-foreground mb-1">Nenhuma conversa</h3>
             <p className="text-sm text-muted-foreground">
-              {selectedStatuses.length === 0
-                ? 'Selecione ao menos um filtro de status'
-                : 'Nenhuma conversa corresponde aos filtros'}
+              Nenhuma conversa corresponde aos filtros
             </p>
           </div>
         ) : (

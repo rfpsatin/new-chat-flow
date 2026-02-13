@@ -210,6 +210,85 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
   );
 }
 
+function buildInteractiveText(interactive: any): string {
+  if (!interactive) return '[mensagem interativa]';
+  const parts: string[] = [];
+  if (interactive.header) parts.push(interactive.header);
+  if (interactive.body) parts.push(interactive.body.trim());
+  if (interactive.footer) parts.push(interactive.footer);
+  if (interactive.buttons?.length) {
+    parts.push(interactive.buttons.map((b: any) => `• ${b.text}`).join('\n'));
+  }
+  return parts.join('\n') || '[mensagem interativa]';
+}
+
+function buildListText(list: any): string {
+  if (!list) return '[lista interativa]';
+  const parts: string[] = [];
+  if (list.header) parts.push(list.header);
+  if (list.body) parts.push(list.body.trim());
+  if (list.footer) parts.push(list.footer);
+  if (list.sections?.length) {
+    const items = list.sections.flatMap((s: any) =>
+      s.rows.map((r: any) => {
+        let item = `• ${r.title}`;
+        if (r.description) item += ` — ${r.description}`;
+        return item;
+      })
+    );
+    parts.push(items.join('\n'));
+  }
+  return parts.join('\n') || '[lista interativa]';
+}
+
+// Renderiza texto com formatação: *negrito* e opções com bullet points estilizados
+function FormattedMessageContent({ content, isOutgoing }: { content: string; isOutgoing: boolean }) {
+  const lines = content.split('\n');
+  
+  return (
+    <div className="text-sm space-y-1">
+      {lines.map((line, i) => {
+        const isBullet = line.startsWith('• ');
+        
+        if (isBullet) {
+          const bulletContent = line.slice(2);
+          return (
+            <div
+              key={i}
+              className={cn(
+                'flex items-start gap-2 px-2 py-1 rounded-md text-xs',
+                isOutgoing
+                  ? 'bg-primary-foreground/10'
+                  : 'bg-muted'
+              )}
+            >
+              <span className="shrink-0 mt-0.5">▸</span>
+              <span>{renderBoldText(bulletContent)}</span>
+            </div>
+          );
+        }
+        
+        return (
+          <p key={i} className="whitespace-pre-wrap break-words">
+            {renderBoldText(line)}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+function renderBoldText(text: string): React.ReactNode {
+  // Regex para *texto* → negrito
+  const parts = text.split(/(\*[^*]+\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
+      return <strong key={i}>{part.slice(1, -1)}</strong>;
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
 function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
   const isOutgoing = mensagem.direcao === 'out';
   
@@ -224,51 +303,27 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
   };
 
   // Extrai o conteúdo real de mensagens de reply
-  const getDisplayContent = () => {
+  const getDisplayContent = (): string => {
     if (mensagem.conteudo === '[reply]' && mensagem.payload) {
       const payload = mensagem.payload as any;
-      // Reply de lista interativa
-      if (payload.reply?.list_reply?.title) {
-        return `📝 ${payload.reply.list_reply.title}`;
-      }
-      // Reply de botão
-      if (payload.reply?.buttons_reply?.title) {
-        return `📝 ${payload.reply.buttons_reply.title}`;
-      }
-      // Fallback para outros tipos de reply
-      if (payload.reply?.title) {
-        return `📝 ${payload.reply.title}`;
-      }
+      if (payload.reply?.list_reply?.title) return `📝 ${payload.reply.list_reply.title}`;
+      if (payload.reply?.buttons_reply?.title) return `📝 ${payload.reply.buttons_reply.title}`;
+      if (payload.reply?.title) return `📝 ${payload.reply.title}`;
     }
     
     // Mensagem interativa (payload do bot) - retroativo
     if (mensagem.conteudo === '[interactive]' && mensagem.payload) {
       const payload = mensagem.payload as any;
-      const parts: string[] = [];
-      if (payload.interactive?.header) parts.push(payload.interactive.header);
-      if (payload.interactive?.body) parts.push(payload.interactive.body.trim());
-      if (payload.interactive?.footer) parts.push(payload.interactive.footer);
-      if (payload.interactive?.buttons?.length) {
-        parts.push(payload.interactive.buttons.map((b: any) => `• ${b.text}`).join('\n'));
-      }
-      if (parts.length > 0) return parts.join('\n');
+      return buildInteractiveText(payload.interactive);
     }
 
     // Lista interativa (payload do bot) - retroativo
     if (mensagem.conteudo === '[list]' && mensagem.payload) {
       const payload = mensagem.payload as any;
-      const parts: string[] = [];
-      if (payload.list?.header) parts.push(payload.list.header);
-      if (payload.list?.body) parts.push(payload.list.body.trim());
-      if (payload.list?.footer) parts.push(payload.list.footer);
-      if (payload.list?.sections?.length) {
-        const items = payload.list.sections.flatMap((s: any) => s.rows.map((r: any) => `• ${r.title}`));
-        parts.push(items.join('\n'));
-      }
-      if (parts.length > 0) return parts.join('\n');
+      return buildListText(payload.list);
     }
     
-    return mensagem.conteudo;
+    return mensagem.conteudo || '';
   };
 
   const senderLabel = getSenderLabel();
@@ -297,9 +352,7 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
             {senderLabel}
           </p>
         )}
-        <p className="text-sm whitespace-pre-wrap break-words">
-          {displayContent}
-        </p>
+        <FormattedMessageContent content={displayContent} isOutgoing={isOutgoing} />
         <p className={cn(
           'text-xs mt-1',
           isOutgoing ? 'text-chat-outgoing-text/60' : 'text-muted-foreground'
