@@ -90,10 +90,10 @@ function FormattedHistoricoContent({ content, isOutgoing }: { content: string; i
                   isOutgoing ? 'bg-primary-foreground/10' : 'bg-background/60'
                 )}
               >
-                <span className="shrink-0 mt-0.5 text-xs">▸</span>
-                <div>
-                  <span className="text-xs font-medium">{renderBoldText(title)}</span>
-                  <span className="text-[10px] text-muted-foreground ml-1">{description}</span>
+                <span className="shrink-0 mt-0.5 text-sm">▸</span>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">{renderBoldText(title)}</span>
+                  <span className="text-[10px] text-muted-foreground">({description})</span>
                 </div>
               </div>
             );
@@ -103,12 +103,12 @@ function FormattedHistoricoContent({ content, isOutgoing }: { content: string; i
             <div
               key={i}
               className={cn(
-                'flex items-start gap-2 px-2 py-1 rounded-md text-xs',
+                'flex items-start gap-2 px-2 py-1 rounded-md text-sm',
                 isOutgoing ? 'bg-primary-foreground/10' : 'bg-background/60'
               )}
             >
               <span className="shrink-0 mt-0.5">▸</span>
-              <span>{renderBoldText(bulletContent)}</span>
+              <span className="font-medium">{renderBoldText(bulletContent)}</span>
             </div>
           );
         }
