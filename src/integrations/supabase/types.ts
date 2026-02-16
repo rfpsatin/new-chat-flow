@@ -98,57 +98,69 @@ export type Database = {
         Row: {
           agente_responsavel_id: string | null
           canal: string
+          channel: string | null
           contato_id: string
           created_at: string
           empresa_id: string
           encerrado_em: string | null
           encerrado_por_id: string | null
+          human_mode: boolean | null
           id: string
           iniciado_por: string
           last_message_at: string
           motivo_encerramento_id: string | null
+          n8n_webhook_id: string | null
           nota_satisfacao: number | null
           pesquisa_enviada_em: string | null
           pesquisa_respondida_em: string | null
           resumo: string | null
+          source: string | null
           status: string
           updated_at: string
         }
         Insert: {
           agente_responsavel_id?: string | null
           canal?: string
+          channel?: string | null
           contato_id: string
           created_at?: string
           empresa_id: string
           encerrado_em?: string | null
           encerrado_por_id?: string | null
+          human_mode?: boolean | null
           id?: string
           iniciado_por?: string
           last_message_at?: string
           motivo_encerramento_id?: string | null
+          n8n_webhook_id?: string | null
           nota_satisfacao?: number | null
           pesquisa_enviada_em?: string | null
           pesquisa_respondida_em?: string | null
           resumo?: string | null
+          source?: string | null
           status: string
           updated_at?: string
         }
         Update: {
           agente_responsavel_id?: string | null
           canal?: string
+          channel?: string | null
           contato_id?: string
           created_at?: string
           empresa_id?: string
           encerrado_em?: string | null
           encerrado_por_id?: string | null
+          human_mode?: boolean | null
           id?: string
           iniciado_por?: string
           last_message_at?: string
           motivo_encerramento_id?: string | null
+          n8n_webhook_id?: string | null
           nota_satisfacao?: number | null
           pesquisa_enviada_em?: string | null
           pesquisa_respondida_em?: string | null
           resumo?: string | null
+          source?: string | null
           status?: string
           updated_at?: string
         }
