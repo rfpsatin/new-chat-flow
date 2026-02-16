@@ -1,35 +1,43 @@
 
 
-## Plano: Corrigir deploy da edge function n8n-webhook-cinemkt
+## Plano: Atualizar view vw_fila_atendimento para incluir source e channel
 
-### Problema identificado
-A edge function `n8n-webhook-cinemkt` retorna **404 (NOT_FOUND)** ao ser chamada, mesmo apos o deploy reportar sucesso. Outras edge functions como `whapi-status` funcionam normalmente. O deploy parece nao estar sendo efetivado para esta funcao especifica.
+### Problema
+A view `vw_fila_atendimento` nao inclui os campos `source` e `channel` da tabela `conversas`. O frontend ja tenta exibir essas etiquetas via `ConversaTags`, mas recebe `undefined` porque a view nao retorna esses dados.
 
-### Causa provavel
-O deploy pode estar falhando silenciosamente ou o cache do deploy anterior nao esta sendo invalidado. Uma pequena alteracao no codigo forca um novo hash e um deploy efetivo.
+Todo o restante do plano original esta implementado corretamente:
+- Colunas no banco de dados
+- Edge functions (n8n-webhook-cinemkt e n8n-reset-human-mode)
+- Frontend (ConversaTags, ConversaItem, ChatPanel)
+- Tipos TypeScript
+- Logica de encerramento condicional
+- Configuracao do config.toml
 
 ### Solucao
 
-**1. Adicionar comentario de versao no topo da funcao para forcar novo deploy**
-Adicionar uma linha de comentario no inicio do arquivo `supabase/functions/n8n-webhook-cinemkt/index.ts`:
-```text
-// n8n-webhook-cinemkt v2
+**Unica alteracao necessaria:** Recriar a view `vw_fila_atendimento` adicionando `c.source` e `c.channel`.
+
+```sql
+CREATE OR REPLACE VIEW vw_fila_atendimento AS
+SELECT c.id AS conversa_id,
+    c.empresa_id,
+    co.id AS contato_id,
+    co.nome AS contato_nome,
+    co.whatsapp_numero,
+    c.status,
+    c.last_message_at,
+    c.created_at,
+    c.agente_responsavel_id,
+    u.nome AS agente_nome,
+    c.resumo,
+    c.source,
+    c.channel
+FROM conversas c
+JOIN contatos co ON co.id = c.contato_id
+LEFT JOIN usuarios u ON u.id = c.agente_responsavel_id
+WHERE c.status = ANY (ARRAY['bot', 'esperando_tria', 'fila_humano', 'em_atendimento_humano'])
+ORDER BY c.last_message_at DESC;
 ```
 
-**2. Fazer o mesmo para n8n-reset-human-mode**
-Adicionar comentario similar em `supabase/functions/n8n-reset-human-mode/index.ts`.
-
-**3. Fazer deploy das duas funcoes**
-Executar o deploy de ambas as funcoes.
-
-**4. Testar chamada**
-Validar que a funcao responde corretamente (nao mais 404) enviando um POST de teste com `empresa_id` valido.
-
-### Detalhes tecnicos
-
-Arquivos a editar:
-- `supabase/functions/n8n-webhook-cinemkt/index.ts` - adicionar comentario na linha 1
-- `supabase/functions/n8n-reset-human-mode/index.ts` - adicionar comentario na linha 1
-
-Apos editar, fazer deploy e testar com curl para confirmar que a funcao esta ativa.
+Apos essa migracao, as etiquetas de source/channel passarao a aparecer automaticamente no painel.
 
