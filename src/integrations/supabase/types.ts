@@ -561,6 +561,7 @@ export type Database = {
         Row: {
           agente_nome: string | null
           agente_responsavel_id: string | null
+          channel: string | null
           contato_id: string | null
           contato_nome: string | null
           conversa_id: string | null
@@ -568,6 +569,7 @@ export type Database = {
           empresa_id: string | null
           last_message_at: string | null
           resumo: string | null
+          source: string | null
           status: string | null
           whatsapp_numero: string | null
         }
