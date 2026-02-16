@@ -1,39 +1,35 @@
 
-## Plano: Deploy e correção das edge functions n8n
+
+## Plano: Corrigir deploy da edge function n8n-webhook-cinemkt
 
 ### Problema identificado
-As colunas `source`, `channel`, `n8n_webhook_id` e `human_mode` ainda nao existem na tabela `conversas` no banco de dados. Isso causa:
-1. **Erro de build** no TypeScript (`useEncerramento.ts` tenta selecionar essas colunas)
-2. **Falha nas edge functions** `n8n-webhook-cinemkt` e `n8n-reset-human-mode` que escrevem/leem essas colunas
+A edge function `n8n-webhook-cinemkt` retorna **404 (NOT_FOUND)** ao ser chamada, mesmo apos o deploy reportar sucesso. Outras edge functions como `whapi-status` funcionam normalmente. O deploy parece nao estar sendo efetivado para esta funcao especifica.
 
-### Etapas
+### Causa provavel
+O deploy pode estar falhando silenciosamente ou o cache do deploy anterior nao esta sendo invalidado. Uma pequena alteracao no codigo forca um novo hash e um deploy efetivo.
 
-**1. Migrar banco de dados**
-Adicionar as 4 colunas que faltam na tabela `conversas`:
-- `source` (text, nullable)
-- `channel` (text, nullable)  
-- `n8n_webhook_id` (text, nullable)
-- `human_mode` (boolean, default false)
+### Solucao
 
-**2. Deploy das edge functions**
-Fazer deploy de `n8n-webhook-cinemkt` e `n8n-reset-human-mode` que ja existem no codigo.
+**1. Adicionar comentario de versao no topo da funcao para forcar novo deploy**
+Adicionar uma linha de comentario no inicio do arquivo `supabase/functions/n8n-webhook-cinemkt/index.ts`:
+```text
+// n8n-webhook-cinemkt v2
+```
 
-**3. Corrigir erro de build**
-Apos a migracao, os tipos serao regenerados automaticamente e o erro em `useEncerramento.ts` sera resolvido (as colunas passarao a existir no tipo gerado).
+**2. Fazer o mesmo para n8n-reset-human-mode**
+Adicionar comentario similar em `supabase/functions/n8n-reset-human-mode/index.ts`.
+
+**3. Fazer deploy das duas funcoes**
+Executar o deploy de ambas as funcoes.
+
+**4. Testar chamada**
+Validar que a funcao responde corretamente (nao mais 404) enviando um POST de teste com `empresa_id` valido.
 
 ### Detalhes tecnicos
 
-```text
-SQL Migration:
-  ALTER TABLE public.conversas
-    ADD COLUMN IF NOT EXISTS source text,
-    ADD COLUMN IF NOT EXISTS channel text,
-    ADD COLUMN IF NOT EXISTS n8n_webhook_id text,
-    ADD COLUMN IF NOT EXISTS human_mode boolean DEFAULT false;
-```
+Arquivos a editar:
+- `supabase/functions/n8n-webhook-cinemkt/index.ts` - adicionar comentario na linha 1
+- `supabase/functions/n8n-reset-human-mode/index.ts` - adicionar comentario na linha 1
 
-Edge functions a deployar:
-- `supabase/functions/n8n-webhook-cinemkt/index.ts`
-- `supabase/functions/n8n-reset-human-mode/index.ts`
+Apos editar, fazer deploy e testar com curl para confirmar que a funcao esta ativa.
 
-Ambas ja estao configuradas em `supabase/config.toml` com `verify_jwt = false`.
