@@ -105,26 +105,61 @@ export function useEncerrarConversa() {
       
       if (updateError) throw updateError;
 
-      // 5. Chamar close-service para atualizar attendanceMode no n8n/Redis
-      try {
-        const closeResponse = await fetch(`${supabaseUrl}/functions/v1/close-service`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${supabaseAnonKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            conversa_id: conversaId,
-            empresa_id: empresaId,
-            chat_id: contato.whatsapp_numero,
-          }),
-        });
+      // 5. Verificar se é conversa do novo webhook n8n (whatsapp_cinemkt) ou do webhook antigo
+      // Buscar dados da conversa para verificar source/channel
+      const { data: conversaData, error: conversaDataError } = await supabase
+        .from('conversas')
+        .select('source, channel, n8n_webhook_id')
+        .eq('id', conversaId)
+        .single();
 
-        if (!closeResponse.ok) {
-          console.error('Erro ao chamar close-service:', await closeResponse.text());
+      const isN8nCinemktConversa = conversaData && (conversaData.source || conversaData.channel || conversaData.n8n_webhook_id);
+
+      // 5a. Se for conversa do novo webhook n8n, resetar human_mode
+      if (isN8nCinemktConversa) {
+        try {
+          const resetResponse = await fetch(`${supabaseUrl}/functions/v1/n8n-reset-human-mode`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${supabaseAnonKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              conversa_id: conversaId,
+              empresa_id: empresaId,
+            }),
+          });
+
+          if (!resetResponse.ok) {
+            console.error('Erro ao resetar human_mode no n8n:', await resetResponse.text());
+          }
+        } catch (resetError) {
+          console.error('Erro ao resetar human_mode no n8n:', resetError);
         }
-      } catch (closeError) {
-        console.error('Erro ao chamar close-service:', closeError);
+      }
+
+      // 5b. Se for conversa do webhook antigo, chamar close-service (comportamento original)
+      if (!isN8nCinemktConversa) {
+        try {
+          const closeResponse = await fetch(`${supabaseUrl}/functions/v1/close-service`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${supabaseAnonKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              conversa_id: conversaId,
+              empresa_id: empresaId,
+              chat_id: contato.whatsapp_numero,
+            }),
+          });
+
+          if (!closeResponse.ok) {
+            console.error('Erro ao chamar close-service:', await closeResponse.text());
+          }
+        } catch (closeError) {
+          console.error('Erro ao chamar close-service:', closeError);
+        }
       }
 
       // 6. Encerrar conversa (isso arquiva as mensagens)

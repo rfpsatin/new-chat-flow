@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.close-service]
 verify_jwt = false
+
+[functions.n8n-webhook-cinemkt]
+verify_jwt = false
+
+[functions.n8n-reset-human-mode]
+verify_jwt = false

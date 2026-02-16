@@ -5,6 +5,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Phone } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ConversaTags } from '@/components/ConversaTags';
 
 interface ConversaItemProps {
   conversa: FilaAtendimento;
@@ -62,6 +63,9 @@ export function ConversaItem({ conversa, isSelected, onClick, showBadge = true }
             <Phone className="w-3 h-3" />
             <span>{formatPhone(conversa.whatsapp_numero)}</span>
           </div>
+          
+          {/* Etiquetas source e channel */}
+          <ConversaTags source={conversa.source} channel={conversa.channel} />
           
           <div className="flex items-center justify-between gap-2 pt-1">
             {showBadge && <StatusBadge status={conversa.status} />}

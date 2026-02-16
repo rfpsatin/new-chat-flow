@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { EncerrarDialog } from '@/components/EncerrarDialog';
 import { AtribuirAtendentePopover } from '@/components/AtribuirAtendentePopover';
 import { HistoricoClienteCollapsible } from '@/components/HistoricoClienteCollapsible';
+import { ConversaTags } from '@/components/ConversaTags';
 
 interface ChatPanelProps {
   conversa: FilaAtendimento | null;
@@ -114,6 +115,10 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Phone className="w-3 h-3" />
                 <span>{formatPhone(conversa.whatsapp_numero)}</span>
+              </div>
+              {/* Etiquetas source e channel */}
+              <div className="mt-1.5">
+                <ConversaTags source={conversa.source} channel={conversa.channel} />
               </div>
             </div>
           </div>

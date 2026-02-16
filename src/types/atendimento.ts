@@ -55,6 +55,11 @@ export interface Conversa {
   created_at: string;
   updated_at: string;
   last_message_at: string;
+  // Campos específicos do webhook n8n whatsapp_cinemkt (opcionais)
+  source?: string | null;
+  channel?: string | null;
+  human_mode?: boolean | null;
+  n8n_webhook_id?: string | null;
 }
 
 export interface MensagemAtiva {
@@ -89,6 +94,9 @@ export interface FilaAtendimento {
   agente_responsavel_id: string | null;
   agente_nome: string | null;
   resumo: string | null;
+  // Campos específicos do webhook n8n whatsapp_cinemkt (opcionais)
+  source?: string | null;
+  channel?: string | null;
 }
 
 export interface HistoricoConversa {
