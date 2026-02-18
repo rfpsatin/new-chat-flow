@@ -110,6 +110,7 @@ export type Database = {
           last_message_at: string
           motivo_encerramento_id: string | null
           n8n_webhook_id: string | null
+          nr_protocolo: string | null
           nota_satisfacao: number | null
           pesquisa_enviada_em: string | null
           pesquisa_respondida_em: string | null
@@ -133,6 +134,7 @@ export type Database = {
           last_message_at?: string
           motivo_encerramento_id?: string | null
           n8n_webhook_id?: string | null
+          nr_protocolo?: string | null
           nota_satisfacao?: number | null
           pesquisa_enviada_em?: string | null
           pesquisa_respondida_em?: string | null
@@ -156,6 +158,7 @@ export type Database = {
           last_message_at?: string
           motivo_encerramento_id?: string | null
           n8n_webhook_id?: string | null
+          nr_protocolo?: string | null
           nota_satisfacao?: number | null
           pesquisa_enviada_em?: string | null
           pesquisa_respondida_em?: string | null
@@ -568,6 +571,7 @@ export type Database = {
           created_at: string | null
           empresa_id: string | null
           last_message_at: string | null
+          nr_protocolo: string | null
           resumo: string | null
           source: string | null
           status: string | null
@@ -603,6 +607,7 @@ export type Database = {
           iniciado_em: string | null
           motivo_encerramento: string | null
           nota_satisfacao: number | null
+          nr_protocolo: string | null
           resumo: string | null
           status: string | null
           whatsapp_numero: string | null

@@ -97,6 +97,8 @@ export interface FilaAtendimento {
   // Campos específicos do webhook n8n whatsapp_cinemkt (opcionais)
   source?: string | null;
   channel?: string | null;
+  /** Número de protocolo (ex: 20260218-0000002). Gerado automaticamente; reinicia a cada dia. */
+  nr_protocolo?: string | null;
 }
 
 export interface HistoricoConversa {
@@ -114,6 +116,8 @@ export interface HistoricoConversa {
   whatsapp_numero: string | null;
   agente_responsavel_id: string | null;
   agente_nome: string | null;
+  /** Número de protocolo (ex: 20260218-0000002). */
+  nr_protocolo: string | null;
 }
 
 export interface ContatoComHistorico {
