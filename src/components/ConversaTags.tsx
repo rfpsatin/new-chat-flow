@@ -33,14 +33,14 @@ export function ConversaTags({ source, channel, className }: ConversaTagsProps) 
   const formattedChannel = formatChannel(channel);
 
   return (
-    <div className={cn('flex items-center gap-1.5 flex-wrap', className)}>
+    <div className={cn('flex items-center gap-1.5 flex-nowrap', className)}>
       {formattedSource && (
-        <Badge variant="outline" className="text-xs">
+        <Badge variant="outline" className="text-xs shrink-0">
           {formattedSource}
         </Badge>
       )}
       {formattedChannel && (
-        <Badge variant="outline" className="text-xs">
+        <Badge variant="outline" className="text-xs shrink-0">
           {formattedChannel}
         </Badge>
       )}

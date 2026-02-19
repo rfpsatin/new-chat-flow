@@ -62,7 +62,10 @@ export function FiltrosFila({
       </div>
 
       {/* Status chips - single select */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className={cn(
+        'flex items-center gap-2',
+        isOperador ? 'flex-nowrap' : 'flex-wrap'
+      )}>
         {visibleFilters.map(({ key, label, icon: Icon }) => {
           const isActive = selectedStatus === key;
           const count = key === 'todos' ? totalCount : (statusCounts[key as keyof StatusCount] || 0);
@@ -72,8 +75,9 @@ export function FiltrosFila({
               key={key}
               onClick={() => onSelectStatus(key)}
               className={cn(
-                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all',
-                'border',
+                'inline-flex items-center gap-1.5 rounded-full text-xs font-medium transition-all',
+                'border shrink-0',
+                isOperador ? 'px-2.5 py-1.5' : 'px-3 py-1.5',
                 isActive
                   ? 'bg-primary text-primary-foreground border-primary'
                   : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted'

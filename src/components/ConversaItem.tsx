@@ -12,9 +12,10 @@ interface ConversaItemProps {
   isSelected: boolean;
   onClick: () => void;
   showBadge?: boolean;
+  showAgentName?: boolean;
 }
 
-export function ConversaItem({ conversa, isSelected, onClick, showBadge = true }: ConversaItemProps) {
+export function ConversaItem({ conversa, isSelected, onClick, showBadge = true, showAgentName = true }: ConversaItemProps) {
   const getInitials = (name: string | null) => {
     if (!name) return '?';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -97,11 +98,15 @@ export function ConversaItem({ conversa, isSelected, onClick, showBadge = true }
           <ConversaTags source={conversa.source} channel={conversa.channel} />
           
           <div className="flex items-center justify-between gap-2 pt-1">
-            {showBadge && <StatusBadge status={conversa.status} />}
-            {conversa.agente_nome && (
+            {showAgentName && conversa.agente_nome && (
               <span className="text-xs text-muted-foreground truncate">
                 {conversa.agente_nome}
               </span>
+            )}
+            {showBadge && (
+              <div className={cn(showAgentName && conversa.agente_nome ? '' : 'ml-auto')}>
+                <StatusBadge status={conversa.status} />
+              </div>
             )}
           </div>
         </div>

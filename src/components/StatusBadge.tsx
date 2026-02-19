@@ -6,31 +6,26 @@ interface StatusBadgeProps {
   className?: string;
 }
 
-const statusConfig: Record<StatusConversa, { label: string; bgClass: string; textClass: string }> = {
+const statusConfig: Record<StatusConversa, { label: string; dotColor: string }> = {
   bot: {
     label: 'Bot',
-    bgClass: 'bg-status-bot-bg',
-    textClass: 'text-status-bot',
+    dotColor: 'bg-muted-foreground',
   },
   esperando_tria: {
-    label: 'Aguardando Triagem',
-    bgClass: 'bg-status-waiting-bg',
-    textClass: 'text-status-waiting',
+    label: 'Triagem',
+    dotColor: 'bg-muted-foreground',
   },
   fila_humano: {
     label: 'Na Fila',
-    bgClass: 'bg-status-queue-bg',
-    textClass: 'text-status-queue',
+    dotColor: 'bg-muted-foreground',
   },
   em_atendimento_humano: {
-    label: 'Em Atendimento',
-    bgClass: 'bg-status-active-bg',
-    textClass: 'text-status-active',
+    label: 'Em atendimento',
+    dotColor: 'bg-green-500',
   },
   encerrado: {
     label: 'Encerrado',
-    bgClass: 'bg-status-closed-bg',
-    textClass: 'text-status-closed',
+    dotColor: 'bg-muted-foreground',
   },
 };
 
@@ -40,13 +35,11 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-        config.bgClass,
-        config.textClass,
+        'inline-flex items-center gap-1.5 text-xs text-muted-foreground',
         className
       )}
     >
-      <span className={cn('w-1.5 h-1.5 rounded-full mr-1.5', `bg-current`)} />
+      <span className={cn('w-1.5 h-1.5 rounded-full', config.dotColor)} />
       {config.label}
     </span>
   );

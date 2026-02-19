@@ -161,21 +161,25 @@ export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelPro
             </p>
           </div>
         ) : (
-          <div className="py-2 px-2 space-y-1">
-            {filteredConversas.map(conversa => {
+          <div className="py-2 px-2">
+            {filteredConversas.map((conversa, index) => {
               // Show "Assumir" button only for fila_humano conversations designated to current user
               const isDesignadoParaMim =
                 conversa.status === 'fila_humano' &&
                 conversa.agente_responsavel_id === currentUser?.id;
+              const isLast = index === filteredConversas.length - 1;
 
               return (
                 <div key={conversa.conversa_id} className="relative group">
-                  <ConversaItem
-                    conversa={conversa}
-                    isSelected={selectedConversaId === conversa.conversa_id}
-                    onClick={() => onSelectConversa(conversa)}
-                    showBadge={selectedStatus === 'todos'}
-                  />
+                  <div className={!isLast ? 'border-b border-border/30' : ''}>
+                    <ConversaItem
+                      conversa={conversa}
+                      isSelected={selectedConversaId === conversa.conversa_id}
+                      onClick={() => onSelectConversa(conversa)}
+                      showBadge={selectedStatus === 'todos'}
+                      showAgentName={currentUser?.tipo_usuario !== 'opr'}
+                    />
+                  </div>
                   {isDesignadoParaMim && (
                     <Button
                       size="sm"
