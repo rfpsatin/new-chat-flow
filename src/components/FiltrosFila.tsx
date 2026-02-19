@@ -47,6 +47,10 @@ export function FiltrosFila({
   const isOperador = tipoUsuario === 'opr';
   const botCount = allStatusCounts?.bot || 0;
   const triagemCount = allStatusCounts?.esperando_tria || 0;
+  
+  // Determinar se deve usar espaçamento justificado (apenas quando há 3 filtros)
+  const numFilters = visibleFilters.length;
+  const shouldJustify = numFilters === 3;
 
   return (
     <div className="space-y-3">
@@ -64,7 +68,9 @@ export function FiltrosFila({
       {/* Status chips - single select */}
       <div className={cn(
         'flex items-center w-full',
-        isOperador ? 'flex-nowrap justify-between' : 'flex-wrap justify-between'
+        isOperador ? 'flex-nowrap' : 'flex-wrap',
+        shouldJustify ? 'justify-between' : 'gap-2',
+        !isOperador && numFilters > 3 && 'gap-y-3'
       )}>
         {visibleFilters.map(({ key, label, icon: Icon }) => {
           const isActive = selectedStatus === key;
@@ -77,7 +83,11 @@ export function FiltrosFila({
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-full text-xs font-medium transition-all',
                 'border shrink-0',
-                isOperador ? 'px-2.5 py-1.5' : 'px-3 py-1.5',
+                isOperador 
+                  ? 'px-2.5 py-1.5' 
+                  : numFilters > 3 
+                    ? 'px-4 py-1.5' 
+                    : 'px-3 py-1.5',
                 isActive
                   ? 'bg-primary text-primary-foreground border-primary'
                   : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted'
