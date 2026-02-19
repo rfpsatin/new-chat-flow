@@ -3,7 +3,6 @@ import { useApp } from '@/contexts/AppContext';
 import { MainLayout } from '@/components/MainLayout';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { ContatosMasterPanel } from '@/components/historico/ContatosMasterPanel';
-import { SessoesDetailPanel } from '@/components/historico/SessoesDetailPanel';
 import { MensagensMultiplasPanel } from '@/components/historico/MensagensMultiplasPanel';
 import { 
   useAtendentesComHistorico, 
@@ -116,7 +115,7 @@ export default function HistoricoPage() {
 
         <ResizablePanelGroup direction="horizontal" className="flex-1">
           {/* Painel Master - Atendentes ou Contatos */}
-          <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
+          <ResizablePanel defaultSize={30} minSize={20} maxSize={40}>
             <ContatosMasterPanel
               modo={modoAtendentes ? 'atendentes' : 'contatos'}
               atendentes={atendentes}
@@ -132,25 +131,16 @@ export default function HistoricoPage() {
 
           <ResizableHandle withHandle />
 
-          {/* Painel Detail - Sessões */}
-          <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
-            <SessoesDetailPanel
+          {/* Painel de Mensagens Múltiplas */}
+          <ResizablePanel defaultSize={70} minSize={60}>
+            <MensagensMultiplasPanel
               modo={modoAtendentes ? 'atendentes' : 'contatos'}
               atendente={atendenteSelecionado}
               contato={contatoSelecionado}
               sessoes={sessoes}
               isLoading={loadingSessoes}
-              sessoesAbertas={sessoesAbertasIds}
+              sessoesAbertas={sessoesAbertas}
               onToggleSessao={handleToggleSessao}
-            />
-          </ResizablePanel>
-
-          <ResizableHandle withHandle />
-
-          {/* Painel de Mensagens Múltiplas */}
-          <ResizablePanel defaultSize={50} minSize={30}>
-            <MensagensMultiplasPanel
-              sessoes={sessoesAbertas}
               onCloseSessao={handleCloseSessao}
             />
           </ResizablePanel>
