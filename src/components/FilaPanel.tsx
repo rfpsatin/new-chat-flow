@@ -27,11 +27,11 @@ export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelPro
   const conversasVisiveis = useMemo(() => {
     if (!fila) return [];
     
-    // Operadores só veem suas conversas + esperando_tria
+    // Operadores veem apenas suas próprias conversas (fila_humano + em_atendimento_humano)
     if (currentUser?.tipo_usuario === 'opr') {
       return fila.filter(conversa => 
-        conversa.agente_responsavel_id === currentUser.id || 
-        conversa.status === 'esperando_tria'
+        conversa.agente_responsavel_id === currentUser.id &&
+        (conversa.status === 'fila_humano' || conversa.status === 'em_atendimento_humano')
       );
     }
     
@@ -39,15 +39,23 @@ export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelPro
     return fila;
   }, [fila, currentUser]);
 
-  // Calculate status counts (apenas das conversas visíveis)
+  // Calculate status counts (apenas das conversas visíveis do operador, sem bot/triagem)
   const statusCounts = useMemo(() => {
+    if (currentUser?.tipo_usuario === 'opr') {
+      return {
+        bot: 0,
+        esperando_tria: 0,
+        fila_humano: conversasVisiveis.filter(c => c.status === 'fila_humano').length,
+        em_atendimento_humano: conversasVisiveis.filter(c => c.status === 'em_atendimento_humano').length,
+      };
+    }
     return {
       bot: conversasVisiveis.filter(c => c.status === 'bot').length,
       esperando_tria: conversasVisiveis.filter(c => c.status === 'esperando_tria').length,
       fila_humano: conversasVisiveis.filter(c => c.status === 'fila_humano').length,
       em_atendimento_humano: conversasVisiveis.filter(c => c.status === 'em_atendimento_humano').length,
     };
-  }, [conversasVisiveis]);
+  }, [conversasVisiveis, currentUser]);
 
   // Calculate status counts de TODAS as conversas (não filtradas por visibilidade)
   // Usado para mostrar quantidades discretas para operadores

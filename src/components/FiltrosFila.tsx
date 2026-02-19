@@ -98,25 +98,25 @@ export function FiltrosFila({
             </button>
           );
         })}
-
-        {/* Quantidades discretas para operadores */}
-        {isOperador && (botCount > 0 || triagemCount > 0) && (
-          <div className="flex items-center gap-3 ml-2 text-xs text-muted-foreground">
-            {botCount > 0 && (
-              <div className="flex items-center gap-1.5">
-                <Bot className="w-3 h-3 opacity-50" />
-                <span className="opacity-70">Bot: {botCount}</span>
-              </div>
-            )}
-            {triagemCount > 0 && (
-              <div className="flex items-center gap-1.5">
-                <Clock className="w-3 h-3 opacity-50" />
-                <span className="opacity-70">Triagem: {triagemCount}</span>
-              </div>
-            )}
-          </div>
-        )}
       </div>
+
+      {/* Quantidades discretas para operadores - linha separada abaixo dos chips */}
+      {isOperador && (botCount > 0 || triagemCount > 0) && (
+        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+          {botCount > 0 && (
+            <div className="flex items-center gap-1.5">
+              <Bot className="w-3 h-3 opacity-50" />
+              <span className="opacity-70">Bot: {botCount}</span>
+            </div>
+          )}
+          {triagemCount > 0 && (
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-3 h-3 opacity-50" />
+              <span className="opacity-70">Triagem: {triagemCount}</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
