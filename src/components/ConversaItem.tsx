@@ -82,33 +82,62 @@ export function ConversaItem({ conversa, isSelected, onClick, showBadge = true, 
             </span>
           </div>
           
-          {/* Mostrar ID para conversas do n8n-webhook-cinemkt, telefone para outras */}
-          {isN8nCinemktConversa() ? (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span>id: {formatWebchatId(conversa.whatsapp_numero)}</span>
-            </div>
+          {/* Layout diferente para admin/supervisor vs operador */}
+          {showAgentName ? (
+            <>
+              {/* Linha do telefone/id com tag de canal à direita */}
+              {isN8nCinemktConversa() ? (
+                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <span>id: {formatWebchatId(conversa.whatsapp_numero)}</span>
+                  <ConversaTags source={conversa.source} channel={conversa.channel} />
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1.5">
+                    <Phone className="w-3 h-3" />
+                    <span>{formatPhone(conversa.whatsapp_numero)}</span>
+                  </div>
+                  <ConversaTags source={conversa.source} channel={conversa.channel} />
+                </div>
+              )}
+              
+              {/* Linha abaixo: Atendente à esquerda, Status à direita (alinhado com tag de canal) */}
+              <div className="flex items-center justify-between gap-2 pt-1.5">
+                {conversa.agente_nome ? (
+                  <span className="text-xs text-muted-foreground truncate">
+                    Atendente: {conversa.agente_nome}
+                  </span>
+                ) : (
+                  <span></span>
+                )}
+                {showBadge && (
+                  <StatusBadge status={conversa.status} />
+                )}
+              </div>
+            </>
           ) : (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Phone className="w-3 h-3" />
-              <span>{formatPhone(conversa.whatsapp_numero)}</span>
-            </div>
+            <>
+              {/* Layout para operador: manter como estava */}
+              {isN8nCinemktConversa() ? (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span>id: {formatWebchatId(conversa.whatsapp_numero)}</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Phone className="w-3 h-3" />
+                  <span>{formatPhone(conversa.whatsapp_numero)}</span>
+                </div>
+              )}
+              
+              {/* Tag de channel abaixo do telefone e status na mesma linha alinhado à direita */}
+              <div className="flex items-center justify-between gap-2">
+                <ConversaTags source={conversa.source} channel={conversa.channel} />
+                {showBadge && (
+                  <StatusBadge status={conversa.status} />
+                )}
+              </div>
+            </>
           )}
-          
-          {/* Tag de channel abaixo do telefone e status na mesma linha alinhado à direita */}
-          <div className="flex items-center justify-between gap-2">
-            <ConversaTags source={conversa.source} channel={conversa.channel} />
-            {showBadge && (
-              <StatusBadge status={conversa.status} />
-            )}
-          </div>
-          
-          <div className="flex items-center justify-between gap-2 pt-1">
-            {showAgentName && conversa.agente_nome && (
-              <span className="text-xs text-muted-foreground truncate">
-                {conversa.agente_nome}
-              </span>
-            )}
-          </div>
         </div>
       </div>
     </button>

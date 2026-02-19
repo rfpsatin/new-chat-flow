@@ -179,7 +179,7 @@ export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelPro
 
               return (
                 <div key={conversa.conversa_id} className="relative group">
-                  <div className={!isLast ? 'border-b border-border/30' : ''}>
+                  <div className={!isLast ? 'border-b border-border/40' : ''}>
                     <ConversaItem
                       conversa={conversa}
                       isSelected={selectedConversaId === conversa.conversa_id}

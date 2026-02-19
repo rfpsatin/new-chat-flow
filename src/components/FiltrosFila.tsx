@@ -63,8 +63,8 @@ export function FiltrosFila({
 
       {/* Status chips - single select */}
       <div className={cn(
-        'flex items-center gap-2',
-        isOperador ? 'flex-nowrap' : 'flex-wrap'
+        'flex items-center w-full',
+        isOperador ? 'flex-nowrap justify-between' : 'flex-wrap justify-between'
       )}>
         {visibleFilters.map(({ key, label, icon: Icon }) => {
           const isActive = selectedStatus === key;

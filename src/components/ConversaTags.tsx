@@ -51,17 +51,17 @@ export function ConversaTags({ source, channel, className }: ConversaTagsProps) 
   return (
     <div className={cn('flex items-center gap-1.5 flex-nowrap', className)}>
       {formattedSource && (
-        <Badge variant="outline" className="text-xs shrink-0">
+        <Badge variant="outline" className="text-xs shrink-0 rounded-md">
           {formattedSource}
         </Badge>
       )}
       {formattedChannel && (
-        <Badge variant="outline" className="text-xs shrink-0">
+        <Badge variant="outline" className="text-xs shrink-0 rounded-md">
           {formattedChannel}
         </Badge>
       )}
       {showWhatsApp && (
-        <Badge variant="outline" className="text-xs shrink-0">
+        <Badge variant="outline" className="text-xs shrink-0 rounded-md">
           WhatsApp
         </Badge>
       )}
