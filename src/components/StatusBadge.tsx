@@ -13,11 +13,11 @@ const statusConfig: Record<StatusConversa, { label: string; dotColor: string }> 
   },
   esperando_tria: {
     label: 'Triagem',
-    dotColor: 'bg-muted-foreground',
+    dotColor: 'bg-yellow-500',
   },
   fila_humano: {
     label: 'Na Fila',
-    dotColor: 'bg-muted-foreground',
+    dotColor: 'bg-orange-500',
   },
   em_atendimento_humano: {
     label: 'Em atendimento',

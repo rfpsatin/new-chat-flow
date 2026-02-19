@@ -60,12 +60,12 @@ export function ConversaItem({ conversa, isSelected, onClick, showBadge = true, 
     <button
       onClick={onClick}
       className={cn(
-        'w-full p-4 text-left rounded-lg transition-all duration-200',
+        'w-full p-4 text-left rounded-lg transition-all duration-200 min-h-[100px]',
         'hover:bg-accent/50',
         isSelected && 'bg-accent ring-1 ring-primary/20'
       )}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-3 h-full">
         <Avatar className="h-11 w-11 shrink-0">
           <AvatarFallback className="bg-primary/10 text-primary font-medium">
             {getInitials(conversa.contato_nome)}
@@ -94,19 +94,19 @@ export function ConversaItem({ conversa, isSelected, onClick, showBadge = true, 
             </div>
           )}
           
-          {/* Etiquetas source e channel */}
-          <ConversaTags source={conversa.source} channel={conversa.channel} />
+          {/* Tag de channel abaixo do telefone e status na mesma linha alinhado à direita */}
+          <div className="flex items-center justify-between gap-2">
+            <ConversaTags source={conversa.source} channel={conversa.channel} />
+            {showBadge && (
+              <StatusBadge status={conversa.status} />
+            )}
+          </div>
           
           <div className="flex items-center justify-between gap-2 pt-1">
             {showAgentName && conversa.agente_nome && (
               <span className="text-xs text-muted-foreground truncate">
                 {conversa.agente_nome}
               </span>
-            )}
-            {showBadge && (
-              <div className={cn(showAgentName && conversa.agente_nome ? '' : 'ml-auto')}>
-                <StatusBadge status={conversa.status} />
-              </div>
             )}
           </div>
         </div>
