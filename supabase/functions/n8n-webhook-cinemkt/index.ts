@@ -15,6 +15,31 @@ interface N8nCinemktPayload {
   resposta?: string
 }
 
+/**
+ * Normaliza o campo channel:
+ * - "comercial" → "Comercial"
+ * - "mkt" → "Marketing"
+ * - null/undefined/vazio → "WhatsApp" (quando não há channel, significa que veio do fluxo maia-beach-tennis-demo)
+ */
+function normalizeChannel(channel: string | null | undefined): string | null {
+  if (!channel || channel.trim() === '') {
+    return 'WhatsApp'
+  }
+  
+  const normalized = channel.toLowerCase().trim()
+  
+  if (normalized === 'comercial') {
+    return 'Comercial'
+  }
+  
+  if (normalized === 'mkt') {
+    return 'Marketing'
+  }
+  
+  // Se não for nenhum dos valores esperados, retorna WhatsApp como padrão
+  return 'WhatsApp'
+}
+
 Deno.serve(async (req) => {
   const requestId = crypto.randomUUID().slice(0, 8)
   console.log(`[${requestId}] ========== N8N WEBHOOK CINEMKT RECEIVED ==========`)
@@ -70,11 +95,12 @@ Deno.serve(async (req) => {
     const n8nWebhookId = body.to
     const mensagemUsuario = body.body
     const source = body.source || null
-    const channel = body.channel || null
+    const rawChannel = body.channel || null
+    const channel = normalizeChannel(rawChannel) // Normaliza o channel antes de usar
     const humanMode = body.human_mode === true
     const respostaBot = body.resposta || null
 
-    console.log(`[${requestId}] n8n_webhook_id: ${n8nWebhookId}, source: ${source}, channel: ${channel}, human_mode: ${humanMode}`)
+    console.log(`[${requestId}] n8n_webhook_id: ${n8nWebhookId}, source: ${source}, channel (raw): ${rawChannel}, channel (normalized): ${channel}, human_mode: ${humanMode}`)
 
     // Find or create contact
     const contato = await findOrCreateContato(supabase, empresaId, n8nWebhookId, requestId)
@@ -204,6 +230,7 @@ async function findOrCreateConversa(
     console.log(`[${requestId}] Found active conversa: ${active.id} (${active.status})`)
     const updateData: any = { updated_at: new Date().toISOString() }
     if (source !== null) updateData.source = source
+    // Sempre atualiza o channel quando fornecido (já vem normalizado)
     if (channel !== null) updateData.channel = channel
     if (humanMode !== undefined) updateData.human_mode = humanMode
     if (n8nWebhookId) updateData.n8n_webhook_id = n8nWebhookId

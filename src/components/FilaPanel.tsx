@@ -49,6 +49,25 @@ export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelPro
     };
   }, [conversasVisiveis]);
 
+  // Calculate status counts de TODAS as conversas (não filtradas por visibilidade)
+  // Usado para mostrar quantidades discretas para operadores
+  const allStatusCounts = useMemo(() => {
+    if (!fila) {
+      return {
+        bot: 0,
+        esperando_tria: 0,
+        fila_humano: 0,
+        em_atendimento_humano: 0,
+      };
+    }
+    return {
+      bot: fila.filter(c => c.status === 'bot').length,
+      esperando_tria: fila.filter(c => c.status === 'esperando_tria').length,
+      fila_humano: fila.filter(c => c.status === 'fila_humano').length,
+      em_atendimento_humano: fila.filter(c => c.status === 'em_atendimento_humano').length,
+    };
+  }, [fila]);
+
   // Filter conversations
   const filteredConversas = useMemo(() => {
     return conversasVisiveis
@@ -124,6 +143,8 @@ export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelPro
           selectedStatus={selectedStatus}
           onSelectStatus={setSelectedStatus}
           statusCounts={statusCounts}
+          tipoUsuario={currentUser?.tipo_usuario}
+          allStatusCounts={allStatusCounts}
         />
       </div>
 

@@ -15,6 +15,8 @@ interface FiltrosFilaProps {
   selectedStatus: string;
   onSelectStatus: (status: string) => void;
   statusCounts: StatusCount;
+  tipoUsuario?: 'adm' | 'sup' | 'opr';
+  allStatusCounts?: StatusCount;
 }
 
 const statusConfig = [
@@ -31,8 +33,20 @@ export function FiltrosFila({
   selectedStatus,
   onSelectStatus,
   statusCounts,
+  tipoUsuario,
+  allStatusCounts,
 }: FiltrosFilaProps) {
   const totalCount = statusCounts.bot + statusCounts.esperando_tria + statusCounts.fila_humano + statusCounts.em_atendimento_humano;
+
+  // Filtrar filtros baseado no tipo de usuário
+  const visibleFilters = tipoUsuario === 'opr' 
+    ? statusConfig.filter(f => ['todos', 'fila_humano', 'em_atendimento_humano'].includes(f.key))
+    : statusConfig;
+
+  // Para operadores, mostrar quantidades discretas de bot e triagem
+  const isOperador = tipoUsuario === 'opr';
+  const botCount = allStatusCounts?.bot || 0;
+  const triagemCount = allStatusCounts?.esperando_tria || 0;
 
   return (
     <div className="space-y-3">
@@ -48,8 +62,8 @@ export function FiltrosFila({
       </div>
 
       {/* Status chips - single select */}
-      <div className="flex flex-wrap gap-2">
-        {statusConfig.map(({ key, label, icon: Icon }) => {
+      <div className="flex flex-wrap items-center gap-2">
+        {visibleFilters.map(({ key, label, icon: Icon }) => {
           const isActive = selectedStatus === key;
           const count = key === 'todos' ? totalCount : (statusCounts[key as keyof StatusCount] || 0);
 
@@ -80,6 +94,24 @@ export function FiltrosFila({
             </button>
           );
         })}
+
+        {/* Quantidades discretas para operadores */}
+        {isOperador && (botCount > 0 || triagemCount > 0) && (
+          <div className="flex items-center gap-3 ml-2 text-xs text-muted-foreground">
+            {botCount > 0 && (
+              <div className="flex items-center gap-1.5">
+                <Bot className="w-3 h-3 opacity-50" />
+                <span className="opacity-70">Bot: {botCount}</span>
+              </div>
+            )}
+            {triagemCount > 0 && (
+              <div className="flex items-center gap-1.5">
+                <Clock className="w-3 h-3 opacity-50" />
+                <span className="opacity-70">Triagem: {triagemCount}</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

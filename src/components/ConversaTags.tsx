@@ -24,8 +24,9 @@ export function ConversaTags({ source, channel, className }: ConversaTagsProps) 
 
   const formatChannel = (channel: string | null | undefined): string | null => {
     if (!channel) return null;
-    // "mkt" -> "Mkt", "comercial" -> "Comercial"
-    return channel.charAt(0).toUpperCase() + channel.slice(1);
+    // Os valores já vêm normalizados do banco (Comercial, Marketing, WhatsApp)
+    // Apenas retorna o valor como está
+    return channel;
   };
 
   const formattedSource = formatSource(source);

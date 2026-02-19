@@ -57,6 +57,29 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
     setMensagemInput('');
   };
 
+  /**
+   * Verifica se a conversa vem do n8n-webhook-cinemkt
+   * Retorna true se tem source OU (channel existe E channel !== "WhatsApp")
+   */
+  const isN8nCinemktConversa = () => {
+    if (!conversa) return false;
+    const hasSource = !!conversa.source;
+    const hasChannel = !!conversa.channel;
+    const isWhatsAppChannel = conversa.channel === 'WhatsApp';
+    
+    return hasSource || (hasChannel && !isWhatsAppChannel);
+  };
+
+  /**
+   * Remove o prefixo "webchat-" do número e retorna apenas o ID
+   */
+  const formatWebchatId = (numero: string) => {
+    if (numero.startsWith('webchat-')) {
+      return numero.replace('webchat-', '');
+    }
+    return numero;
+  };
+
   const formatPhone = (phone: string) => {
     const cleaned = phone.replace(/\D/g, '');
     if (cleaned.length === 13) {
@@ -112,10 +135,17 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
               <h2 className="font-semibold text-foreground">
                 {conversa.contato_nome || 'Sem nome'}
               </h2>
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Phone className="w-3 h-3" />
-                <span>{formatPhone(conversa.whatsapp_numero)}</span>
-              </div>
+              {/* Mostrar ID para conversas do n8n-webhook-cinemkt, telefone para outras */}
+              {isN8nCinemktConversa() ? (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span>id: {formatWebchatId(conversa.whatsapp_numero)}</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Phone className="w-3 h-3" />
+                  <span>{formatPhone(conversa.whatsapp_numero)}</span>
+                </div>
+              )}
               {/* Etiquetas source e channel */}
               <div className="mt-1.5">
                 <ConversaTags source={conversa.source} channel={conversa.channel} />
