@@ -10,6 +10,8 @@ interface N8nCinemktPayload {
   to: string
   body: string
   source?: string
+  /** Alternativa a source: alguns fluxos n8n enviam chat_name (ex.: "web-chat") */
+  chat_name?: string
   channel?: string
   human_mode?: boolean
   resposta?: string
@@ -94,7 +96,7 @@ Deno.serve(async (req) => {
 
     const n8nWebhookId = body.to
     const mensagemUsuario = body.body
-    const source = body.source || null
+    const source = body.source ?? body.chat_name ?? null
     const rawChannel = body.channel || null
     const channel = normalizeChannel(rawChannel) // Normaliza o channel antes de usar
     const humanMode = body.human_mode === true

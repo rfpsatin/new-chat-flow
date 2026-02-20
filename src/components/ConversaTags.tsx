@@ -1,45 +1,32 @@
 import { cn } from '@/lib/utils';
 
 interface ConversaTagsProps {
+  /** Origem (webhook envia source ou chat_name); "web-chat" = Chat-Web (círculo azul) */
   source?: string | null;
   channel?: string | null;
   className?: string;
 }
 
-/** Círculo azul = Chat-Web; círculo verde = WhatsApp */
+/**
+ * Tag do canal: círculo + texto.
+ * - source/chat_name = "web-chat" → círculo azul escuro; texto = Marketing ou Comercial (conforme channel).
+ * - Sem source → círculo verde escuro; texto = WhatsApp.
+ */
 export function ConversaTags({ source, channel, className }: ConversaTagsProps) {
-  const formatChannel = (channel: string | null | undefined): string | null => {
-    if (!channel || channel.trim() === '') {
-      return null;
-    }
+  const normalizedSource = (source ?? '').trim().toLowerCase();
+  const isWebChat = normalizedSource === 'web-chat';
 
-    const normalized = channel.toLowerCase().trim();
-
-    if (normalized === 'comercial') {
-      return 'Comercial';
-    }
-    if (normalized === 'mkt' || normalized === 'marketing') {
-      return 'Marketing';
-    }
-    if (normalized === 'whatsapp') {
-      return 'WhatsApp';
-    }
-    return channel.charAt(0).toUpperCase() + channel.slice(1).toLowerCase();
-  };
-
-  const normalizedSource = source?.trim().toLowerCase() || '';
-  const formattedChannel = formatChannel(channel);
-
-  let isWebChat: boolean;
+  const normalizedChannel = (channel ?? '').trim().toLowerCase();
   let label: string;
-  if (normalizedSource === 'web-chat' && formattedChannel && (formattedChannel === 'Comercial' || formattedChannel === 'Marketing')) {
-    isWebChat = true;
-    label = formattedChannel;
-  } else if (!normalizedSource && formattedChannel === 'WhatsApp') {
-    isWebChat = false;
-    label = 'Automação';
+  if (isWebChat) {
+    if (normalizedChannel === 'mkt' || normalizedChannel === 'marketing') {
+      label = 'Marketing';
+    } else if (normalizedChannel === 'comercial') {
+      label = 'Comercial';
+    } else {
+      label = 'Chat-Web';
+    }
   } else {
-    isWebChat = false;
     label = 'WhatsApp';
   }
 
@@ -48,7 +35,7 @@ export function ConversaTags({ source, channel, className }: ConversaTagsProps) 
       <span
         className={cn(
           'shrink-0 rounded-full w-2 h-2',
-          isWebChat ? 'bg-blue-500' : 'bg-green-500'
+          isWebChat ? 'bg-blue-700' : 'bg-green-700'
         )}
         aria-hidden
       />

@@ -1,7 +1,6 @@
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { FilaAtendimento } from '@/types/atendimento';
-import { StatusBadge } from '@/components/StatusBadge';
+import { FilaAtendimento, StatusConversa } from '@/types/atendimento';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Phone } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -76,9 +75,17 @@ export function ConversaItem({ conversa, isSelected, onClick, showBadge = true, 
     locale: ptBR,
   });
 
+  const statusLabel: Record<StatusConversa, string> = {
+    bot: 'Bot',
+    esperando_tria: 'Triagem',
+    fila_humano: 'Em fila',
+    em_atendimento_humano: 'Atendimento',
+    encerrado: 'Encerrado',
+  };
   const showAgentNameInStatus =
     (conversa.status === 'fila_humano' || conversa.status === 'em_atendimento_humano') &&
     !!conversa.agente_nome;
+  const primeiroNome = conversa.agente_nome?.split(/\s+/)[0] ?? '';
 
   return (
     <button
@@ -101,12 +108,9 @@ export function ConversaItem({ conversa, isSelected, onClick, showBadge = true, 
             <span className="font-semibold text-foreground truncate">
               {getDisplayName()}
             </span>
-            <span className="text-xs text-muted-foreground shrink-0">
-              {timeAgo}
-            </span>
           </div>
 
-          {/* Telefone ou id (sempre à esquerda) */}
+          {/* Telefone ou id */}
           {isN8nCinemktConversa() ? (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span>id: {formatWebchatId(conversa.whatsapp_numero)}</span>
@@ -119,22 +123,24 @@ export function ConversaItem({ conversa, isSelected, onClick, showBadge = true, 
           )}
         </div>
 
-        {/* Coluna direita: tag (círculo + label) e abaixo status | atendente */}
-        <div className="flex flex-col items-end gap-0.5 shrink-0">
-          <ConversaTags source={conversa.source} channel={conversa.channel} />
-          {showBadge && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <StatusBadge status={conversa.status} />
-              {showAgentNameInStatus && (
-                <>
-                  <span>|</span>
+        {/* Canto superior direito: tempo; canto inferior direito: tag + |Status| Nome */}
+        <div className="flex flex-col items-end justify-between gap-1 shrink-0 min-h-[52px]">
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
+            {timeAgo}
+          </span>
+          <div className="flex flex-col items-end gap-0.5">
+            <ConversaTags source={conversa.source} channel={conversa.channel} />
+            {showBadge && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground flex-wrap justify-end">
+                <span>|{statusLabel[conversa.status]}|</span>
+                {showAgentNameInStatus && primeiroNome && (
                   <span className="truncate max-w-[80px]" title={conversa.agente_nome ?? undefined}>
-                    {conversa.agente_nome}
+                    {primeiroNome}
                   </span>
-                </>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </button>

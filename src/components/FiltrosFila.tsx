@@ -85,16 +85,16 @@ export function FiltrosFila({
               <p className="font-medium text-foreground">Legenda</p>
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="rounded-full w-2 h-2 bg-blue-500 shrink-0" aria-hidden />
-                  <span>Chat-Web (ex.: Marketing, Comercial)</span>
+                  <span className="rounded-full w-2 h-2 bg-blue-700 shrink-0" aria-hidden />
+                  <span>Chat-Web (Marketing, Comercial)</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="rounded-full w-2 h-2 bg-green-500 shrink-0" aria-hidden />
-                  <span>WhatsApp (direto ou Automação)</span>
+                  <span className="rounded-full w-2 h-2 bg-green-700 shrink-0" aria-hidden />
+                  <span>WhatsApp</span>
                 </div>
               </div>
               <p className="text-muted-foreground pt-0.5 border-t border-border/50">
-                Cada conversa mostra o círculo e o canal no card.
+                Cada conversa mostra o círculo e o canal no canto inferior direito do card.
               </p>
             </div>
           </TooltipContent>
