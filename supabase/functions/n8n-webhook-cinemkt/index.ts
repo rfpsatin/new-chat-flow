@@ -96,13 +96,15 @@ Deno.serve(async (req) => {
 
     const n8nWebhookId = body.to
     const mensagemUsuario = body.body
-    const source = body.source ?? body.chat_name ?? null
+    // Priorizar chat_name sobre source; normalizar para "web-chat" em minúsculas se for web-chat
+    const rawSource = body.chat_name ?? body.source ?? null
+    const source = rawSource ? rawSource.trim().toLowerCase() === 'web-chat' ? 'web-chat' : rawSource.trim().toLowerCase() : null
     const rawChannel = body.channel || null
     const channel = normalizeChannel(rawChannel) // Normaliza o channel antes de usar
     const humanMode = body.human_mode === true
     const respostaBot = body.resposta || null
 
-    console.log(`[${requestId}] n8n_webhook_id: ${n8nWebhookId}, source: ${source}, channel (raw): ${rawChannel}, channel (normalized): ${channel}, human_mode: ${humanMode}`)
+    console.log(`[${requestId}] n8n_webhook_id: ${n8nWebhookId}, chat_name: ${body.chat_name}, source (original): ${body.source}, source (normalized): ${source}, channel (raw): ${rawChannel}, channel (normalized): ${channel}, human_mode: ${humanMode}`)
 
     // Find or create contact
     const contato = await findOrCreateContato(supabase, empresaId, n8nWebhookId, requestId)
@@ -231,7 +233,10 @@ async function findOrCreateConversa(
   if (active) {
     console.log(`[${requestId}] Found active conversa: ${active.id} (${active.status})`)
     const updateData: any = { updated_at: new Date().toISOString() }
-    if (source !== null) updateData.source = source
+    if (source !== null) {
+      updateData.source = source
+      console.log(`[${requestId}] Updating conversa source to: ${source}`)
+    }
     // Sempre atualiza o channel quando fornecido (já vem normalizado)
     if (channel !== null) updateData.channel = channel
     if (humanMode !== undefined) updateData.human_mode = humanMode
