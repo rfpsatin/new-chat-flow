@@ -132,7 +132,7 @@ export function ConversaItem({ conversa, isSelected, onClick, showBadge = true, 
             <ConversaTags source={conversa.source} channel={conversa.channel} />
             {showBadge && (
               <div className="flex items-center gap-1 text-xs text-muted-foreground flex-wrap justify-end">
-                <span>|{statusLabel[conversa.status]}|</span>
+                <span>| {statusLabel[conversa.status]} |</span>
                 {showAgentNameInStatus && primeiroNome && (
                   <span className="truncate max-w-[80px]" title={conversa.agente_nome ?? undefined}>
                     {primeiroNome}
