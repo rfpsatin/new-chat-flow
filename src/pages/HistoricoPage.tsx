@@ -139,7 +139,7 @@ export default function HistoricoPage() {
               contato={contatoSelecionado}
               sessoes={sessoes}
               isLoading={loadingSessoes}
-              sessoesAbertas={sessoesAbertas}
+              sessoesAbertas={sessoesAbertasIds}
               onToggleSessao={handleToggleSessao}
               onCloseSessao={handleCloseSessao}
             />
