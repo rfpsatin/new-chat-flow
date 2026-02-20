@@ -34,6 +34,26 @@ export function ConversaItem({ conversa, isSelected, onClick, showBadge = true, 
   };
 
   /**
+   * Verifica se o channel é Marketing ou Comercial
+   */
+  const isMktOrComercialChannel = () => {
+    return conversa.channel === 'Marketing' || conversa.channel === 'Comercial';
+  };
+
+  /**
+   * Retorna o nome a ser exibido: protocolo se channel mkt/comercial e sem nome, senão o nome
+   */
+  const getDisplayName = () => {
+    const hasName = conversa.contato_nome && conversa.contato_nome !== 'Sem nome';
+    
+    if (isMktOrComercialChannel() && !hasName) {
+      return conversa.nr_protocolo || 'Sem nome';
+    }
+    
+    return conversa.contato_nome || 'Sem nome';
+  };
+
+  /**
    * Remove o prefixo "webchat-" do número e retorna apenas o ID
    */
   const formatWebchatId = (numero: string) => {
@@ -68,14 +88,14 @@ export function ConversaItem({ conversa, isSelected, onClick, showBadge = true, 
       <div className="flex items-start gap-3 h-full">
         <Avatar className="h-11 w-11 shrink-0">
           <AvatarFallback className="bg-primary/10 text-primary font-medium">
-            {getInitials(conversa.contato_nome)}
+            {getInitials(getDisplayName())}
           </AvatarFallback>
         </Avatar>
         
         <div className="flex-1 min-w-0 space-y-1">
           <div className="flex items-center justify-between gap-2">
             <span className="font-semibold text-foreground truncate">
-              {conversa.contato_nome || 'Sem nome'}
+              {getDisplayName()}
             </span>
             <span className="text-xs text-muted-foreground shrink-0">
               {timeAgo}

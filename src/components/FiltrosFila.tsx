@@ -51,6 +51,10 @@ export function FiltrosFila({
   // Determinar se deve usar espaçamento justificado (apenas quando há 3 filtros)
   const numFilters = visibleFilters.length;
   const shouldJustify = numFilters === 3;
+  
+  // Separar filtros em primeira linha (máximo 3) e segunda linha (resto)
+  const firstRowFilters = visibleFilters.slice(0, 3);
+  const secondRowFilters = visibleFilters.slice(3);
 
   return (
     <div className="space-y-3">
@@ -66,48 +70,87 @@ export function FiltrosFila({
       </div>
 
       {/* Status chips - single select */}
-      <div className={cn(
-        'flex items-center w-full',
-        isOperador ? 'flex-nowrap' : 'flex-wrap',
-        shouldJustify ? 'justify-between' : 'gap-2',
-        !isOperador && numFilters > 3 && 'gap-y-3'
-      )}>
-        {visibleFilters.map(({ key, label, icon: Icon }) => {
-          const isActive = selectedStatus === key;
-          const count = key === 'todos' ? totalCount : (statusCounts[key as keyof StatusCount] || 0);
+      <div className="flex flex-col gap-4">
+        {/* Primeira linha - justificada quando há 3 filtros */}
+        <div className={cn(
+          'flex items-center w-full',
+          isOperador ? 'flex-nowrap' : 'flex-wrap',
+          shouldJustify ? 'justify-between' : 'gap-2'
+        )}>
+          {firstRowFilters.map(({ key, label, icon: Icon }) => {
+            const isActive = selectedStatus === key;
+            const count = key === 'todos' ? totalCount : (statusCounts[key as keyof StatusCount] || 0);
 
-          return (
-            <button
-              key={key}
-              onClick={() => onSelectStatus(key)}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-full text-xs font-medium transition-all',
-                'border shrink-0',
-                isOperador 
-                  ? 'px-2.5 py-1.5' 
-                  : numFilters > 3 
-                    ? 'px-4 py-1.5' 
-                    : 'px-3 py-1.5',
-                isActive
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted'
-              )}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              <span>{label}</span>
-              <span
+            return (
+              <button
+                key={key}
+                onClick={() => onSelectStatus(key)}
                 className={cn(
-                  'px-1.5 py-0.5 rounded-full text-[10px] min-w-[20px] text-center',
+                  'inline-flex items-center gap-1.5 rounded-full text-xs font-medium transition-all',
+                  'border shrink-0',
+                  isOperador 
+                    ? 'px-2.5 py-1.5' 
+                    : numFilters > 3 
+                      ? 'px-4 py-1.5' 
+                      : 'px-3 py-1.5',
                   isActive
-                    ? 'bg-primary-foreground/20 text-primary-foreground'
-                    : 'bg-muted text-muted-foreground'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted'
                 )}
               >
-                {count}
-              </span>
-            </button>
-          );
-        })}
+                <Icon className="w-3.5 h-3.5" />
+                <span>{label}</span>
+                <span
+                  className={cn(
+                    'px-1.5 py-0.5 rounded-full text-[10px] min-w-[20px] text-center',
+                    isActive
+                      ? 'bg-primary-foreground/20 text-primary-foreground'
+                      : 'bg-muted text-muted-foreground'
+                  )}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Segunda linha - sem justificação, com gap pequeno */}
+        {secondRowFilters.length > 0 && (
+          <div className="flex items-center gap-2">
+            {secondRowFilters.map(({ key, label, icon: Icon }) => {
+              const isActive = selectedStatus === key;
+              const count = key === 'todos' ? totalCount : (statusCounts[key as keyof StatusCount] || 0);
+
+              return (
+                <button
+                  key={key}
+                  onClick={() => onSelectStatus(key)}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full text-xs font-medium transition-all',
+                    'border shrink-0 px-4 py-1.5',
+                    isActive
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted'
+                  )}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{label}</span>
+                  <span
+                    className={cn(
+                      'px-1.5 py-0.5 rounded-full text-[10px] min-w-[20px] text-center',
+                      isActive
+                        ? 'bg-primary-foreground/20 text-primary-foreground'
+                        : 'bg-muted text-muted-foreground'
+                    )}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Quantidades discretas para operadores - linha separada abaixo dos chips */}

@@ -33,16 +33,9 @@ export function MensagensMultiplasPanel({
   const temSelecao = isAtendentes ? !!atendente : !!contato;
   const sessoesAbertasObjetos = sessoes.filter(s => sessoesAbertas.includes(s.conversa_id));
 
-  // Se não há seleção, mostrar mensagem
+  // Se não há seleção, não mostrar nada
   if (!temSelecao) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center bg-muted/30 text-muted-foreground">
-        <FolderOpen className="w-10 h-10 mb-2" />
-        <p className="text-sm">
-          {isAtendentes ? 'Selecione um atendente' : 'Selecione um contato'}
-        </p>
-      </div>
-    );
+    return null;
   }
 
   // Se há sessões abertas, mostrar os cards de mensagens

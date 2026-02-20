@@ -71,6 +71,28 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
   };
 
   /**
+   * Verifica se o channel é Marketing ou Comercial
+   */
+  const isMktOrComercialChannel = () => {
+    if (!conversa) return false;
+    return conversa.channel === 'Marketing' || conversa.channel === 'Comercial';
+  };
+
+  /**
+   * Retorna o nome a ser exibido: protocolo se channel mkt/comercial e sem nome, senão o nome
+   */
+  const getDisplayName = () => {
+    if (!conversa) return 'Sem nome';
+    const hasName = conversa.contato_nome && conversa.contato_nome !== 'Sem nome';
+    
+    if (isMktOrComercialChannel() && !hasName) {
+      return conversa.nr_protocolo || 'Sem nome';
+    }
+    
+    return conversa.contato_nome || 'Sem nome';
+  };
+
+  /**
    * Remove o prefixo "webchat-" do número e retorna apenas o ID
    */
   const formatWebchatId = (numero: string) => {
@@ -128,12 +150,12 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
           <div className="flex items-center gap-3">
             <Avatar className="h-11 w-11">
               <AvatarFallback className="bg-primary/10 text-primary font-medium">
-                {getInitials(conversa.contato_nome)}
+                {getInitials(getDisplayName())}
               </AvatarFallback>
             </Avatar>
             <div>
               <h2 className="font-semibold text-foreground">
-                {conversa.contato_nome || 'Sem nome'}
+                {getDisplayName()}
               </h2>
               {/* Mostrar ID para conversas do n8n-webhook-cinemkt, telefone para outras */}
               {isN8nCinemktConversa() ? (
@@ -152,17 +174,27 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <StatusBadge status={conversa.status} />
-            {canRespond && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setShowEncerrar(true)}
-              >
-                <XCircle className="w-4 h-4 mr-1" />
-                Encerrar
-              </Button>
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center gap-3">
+              <StatusBadge status={conversa.status} />
+              {canRespond && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setShowEncerrar(true)}
+                >
+                  <XCircle className="w-4 h-4 mr-1" />
+                  Encerrar
+                </Button>
+              )}
+            </div>
+            {/* Exibir protocolo abaixo do status quando há nome válido */}
+            {conversa.contato_nome && 
+             conversa.contato_nome !== 'Sem nome' && 
+             conversa.nr_protocolo && (
+              <span className="text-xs text-muted-foreground">
+                Protocolo: {conversa.nr_protocolo}
+              </span>
             )}
           </div>
         </div>
