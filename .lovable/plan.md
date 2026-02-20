@@ -1,82 +1,92 @@
 
-## Mudanças na Tela de Operadores (FilaPanel + FiltrosFila)
+## Diagnóstico Completo
 
-### Problema atual
+### Problema 1: Edge Function ignora o campo `chat_name`
 
-**1. Layout dos filtros:** Para operadores, os 3 filtros (Todos, Na Fila, Atendimento) aparecem em linha junto com os indicadores discretos de Bot/Triagem, tudo na mesma linha. O pedido é que os filtros fiquem em uma linha e os indicadores de Bot/Triagem fiquem em uma linha separada embaixo.
+O arquivo atual em disco (`supabase/functions/n8n-webhook-cinemkt/index.ts`) está na **versão antiga** (v3). A interface `N8nCinemktPayload` não declara `chat_name`, e a extração do source está na linha 97 como:
 
-**2. Lógica do filtro "Todos":** Atualmente, o filtro "Todos" para operadores exibe TODAS as conversas visíveis, incluindo as de `esperando_tria` (triagem). O pedido é que "Todos" mostre apenas as conversas do próprio atendente: `fila_humano` + `em_atendimento_humano` atribuídas a ele.
-
----
-
-### Solução
-
-#### Arquivo: `src/components/FilaPanel.tsx`
-
-**Mudança na `conversasVisiveis`:**
-
-Atualmente, operadores veem:
-- Conversas onde `agente_responsavel_id === currentUser.id` (qualquer status)
-- OU conversas com `status === 'esperando_tria'`
-
-Isso faz com que o filtro "Todos" inclua conversas de triagem.
-
-**Nova lógica proposta:**
-
-Separar em dois conjuntos:
-- `conversasDoOperador`: apenas conversas com `agente_responsavel_id === currentUser.id` E status `fila_humano` ou `em_atendimento_humano` — estas aparecem nos filtros e na lista do operador
-- `conversasTriagem`: conversas com `status === 'esperando_tria'` — existem na fila mas NÃO entram no "Todos" nem nos contadores dos filtros visíveis
-
-**O `filteredConversas` para operadores no filtro "todos"** deve retornar apenas as conversas do operador (fila_humano + em_atendimento_humano dele), não as de triagem.
-
-**Os contadores de statusCounts para operadores:**
-- `todos` = `fila_humano` dele + `em_atendimento_humano` dele
-- `fila_humano` = conversas `fila_humano` dele
-- `em_atendimento_humano` = conversas `em_atendimento_humano` dele
-
-**O `allStatusCounts`** continua com as contagens globais de bot e triagem para exibição discreta.
-
-A visibilidade das conversas na lista ainda inclui triagem (para operadores navegarem até elas quando clicam no indicador, se aplicável), mas o filtro "todos" exclui triagem.
-
-**Mudança na lógica de filtragem:**
-
-Quando `selectedStatus === 'todos'` e `tipoUsuario === 'opr'`, filtrar apenas `fila_humano` e `em_atendimento_humano` do operador.
-
-#### Arquivo: `src/components/FiltrosFila.tsx`
-
-**Mudança no layout:**
-
-Separar os chips de filtro e os indicadores discretos em dois blocos distintos:
-
-```
-[Todos] [Na Fila] [Atendimento]   ← linha 1: flex com os 3 chips
-Bot: 3   Triagem: 2               ← linha 2: indicadores separados abaixo
+```typescript
+const source = body.source || null
 ```
 
-Remover o `ml-2` inline e colocar os indicadores em um `div` separado abaixo do `div` dos chips, com `flex items-center gap-3 text-xs text-muted-foreground mt-1` (ou similar).
+Isso ignora completamente `chat_name`. O webhook do n8n envia `chat_name: "web-chat"`, mas a função nunca o lê — então `source` sempre fica `null` no banco.
 
-**Mudança no cálculo do `totalCount` para operadores:**
+### Problema 2: Componente ConversaTags perdeu a lógica de cor
 
-O `totalCount` passado como `count` quando `key === 'todos'` deve ser apenas `fila_humano + em_atendimento_humano` para operadores. Isso será corrigido na origem (`FilaPanel.tsx` passando os `statusCounts` já corretos), então `FiltrosFila` simplesmente usa `statusCounts.fila_humano + statusCounts.em_atendimento_humano` para o total no caso do operador — ou mais simples: o `FilaPanel` já passará o `statusCounts` correto, com `bot` e `esperando_tria` zerados para operadores, e o `totalCount` interno de `FiltrosFila` calculará corretamente.
-
----
-
-### Resumo das mudanças
-
-**`FilaPanel.tsx`:**
-1. `conversasVisiveis` para operadores: manter a lógica atual de inclusão de triagem na lista (para aparecer se filtrarem por triagem via indicador — mas como não há filtro de triagem para opr, pode remover da lista)
-   - Na verdade, simplificar: `conversasVisiveis` para opr = conversas com `agente_responsavel_id === currentUser.id` (qualquer status) + `esperando_tria` (para info discreta mas sem incluir no "todos")
-   - O filtro "todos" deve excluir `esperando_tria` para operadores
-2. `statusCounts` para operadores: calcular apenas com conversas `agente_responsavel_id === currentUser.id` com status `fila_humano`/`em_atendimento_humano`, zerando bot e esperando_tria
-3. `filteredConversas`: quando `selectedStatus === 'todos'` e operador, excluir `esperando_tria`
-
-**`FiltrosFila.tsx`:**
-1. Mover os indicadores de Bot/Triagem para fora do `div` dos chips, em um bloco separado abaixo
-2. O layout fica: busca → chips em linha → indicadores em linha separada
+O `ConversaTags.tsx` atual usa `<Badge>` sem distinção de cor azul/verde. A lógica de "círculo azul para web-chat" foi removida numa refatoração anterior. Como `source` é `null` no banco, mesmo que a lógica existisse, não funcionaria.
 
 ---
 
-### Arquivos a modificar
+## Solução — dois arquivos
 
-- `src/components/FiltrosFila.tsx`
-- `src/components/FilaPanel.tsx`
+### 1. `supabase/functions/n8n-webhook-cinemkt/index.ts`
+
+**a) Adicionar `chat_name` na interface:**
+```typescript
+interface N8nCinemktPayload {
+  to: string
+  body: string
+  source?: string
+  chat_name?: string   // ← NOVO: campo enviado pelo webhook n8n
+  channel?: string
+  human_mode?: boolean
+  resposta?: string
+}
+```
+
+**b) Corrigir a extração do source (linha 97):**
+```typescript
+// Priorizar chat_name sobre source; normalizar para "web-chat"
+const rawSource = body.chat_name ?? body.source ?? null
+const source = rawSource
+  ? rawSource.trim().toLowerCase() === 'web-chat'
+    ? 'web-chat'
+    : rawSource.trim().toLowerCase()
+  : null
+```
+
+**c) Atualizar o log para mostrar o chat_name recebido:**
+```typescript
+console.log(`[${requestId}] chat_name: ${body.chat_name}, source (original): ${body.source}, source (normalizado): ${source}, ...`)
+```
+
+Isso garante que quando o n8n envia `chat_name: "web-chat"`, o valor `"web-chat"` seja salvo na coluna `source` da conversa.
+
+---
+
+### 2. `src/components/ConversaTags.tsx`
+
+Restaurar o design de **círculo + texto** com a lógica de cor correta:
+
+**Lógica de cor:**
+- **Círculo azul escuro** → quando `source === 'web-chat'` **OU** `channel` for `Marketing`/`Comercial`
+- **Círculo verde escuro** → quando não há indicação de canal digital (WhatsApp puro)
+
+**Tabela de rótulos:**
+
+| source | channel | Rótulo exibido | Cor |
+|---|---|---|---|
+| `web-chat` | `Marketing` | Marketing | Azul |
+| `web-chat` | `Comercial` | Comercial | Azul |
+| `web-chat` | nulo | Chat-Web | Azul |
+| nulo | `Marketing` | Marketing | Azul |
+| nulo | `Comercial` | Comercial | Azul |
+| nulo | `WhatsApp` | WhatsApp | Verde |
+| nulo | nulo | WhatsApp | Verde |
+
+O componente retorna:
+```tsx
+<div className="flex items-center gap-1.5 ...">
+  <span className={cn('rounded-full w-2 h-2', isWebChat ? 'bg-blue-700' : 'bg-green-700')} />
+  <span className="truncate">{label}</span>
+</div>
+```
+
+---
+
+## Arquivos modificados
+
+1. **`supabase/functions/n8n-webhook-cinemkt/index.ts`** — adicionar `chat_name` na interface e corrigir extração do `source`
+2. **`src/components/ConversaTags.tsx`** — restaurar design círculo + texto com lógica azul/verde correta
+
+Após o deploy da edge function, novas mensagens receberão `source = "web-chat"` corretamente. Conversas existentes no banco que têm `channel = "Marketing"` ou `"Comercial"` mas `source = null` já serão exibidas corretamente porque o componente usa `channel` como critério de cor quando `source` está ausente.
