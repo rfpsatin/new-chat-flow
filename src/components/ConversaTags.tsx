@@ -14,9 +14,13 @@ interface ConversaTagsProps {
  */
 export function ConversaTags({ source, channel, className }: ConversaTagsProps) {
   const normalizedSource = (source ?? '').trim().toLowerCase();
-  const isWebChat = normalizedSource === 'web-chat';
-
   const normalizedChannel = (channel ?? '').trim().toLowerCase();
+
+  // Círculo azul: source='web-chat' OU channel for mkt/marketing/comercial
+  const isWebChat =
+    normalizedSource === 'web-chat' ||
+    ['mkt', 'marketing', 'comercial'].includes(normalizedChannel);
+
   let label: string;
   if (isWebChat) {
     if (normalizedChannel === 'mkt' || normalizedChannel === 'marketing') {
