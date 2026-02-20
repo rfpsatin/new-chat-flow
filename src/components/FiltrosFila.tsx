@@ -80,22 +80,11 @@ export function FiltrosFila({
               <Info className="w-4 h-4" />
             </button>
           </TooltipTrigger>
-          <TooltipContent side="bottom" align="end" className="max-w-[220px] p-2.5 text-xs">
-            <div className="space-y-2">
-              <p className="font-medium text-foreground">Legenda</p>
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="rounded-full w-2 h-2 bg-blue-700 shrink-0" aria-hidden />
-                  <span>Chat-Web (Marketing, Comercial)</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="rounded-full w-2 h-2 bg-green-700 shrink-0" aria-hidden />
-                  <span>WhatsApp</span>
-                </div>
-              </div>
-              <p className="text-muted-foreground pt-0.5 border-t border-border/50">
-                Cada conversa mostra o círculo e o canal no canto inferior direito do card.
-              </p>
+          <TooltipContent side="bottom" align="end" className="p-2.5 text-xs">
+            <p className="font-medium text-foreground mb-1.5">Legenda</p>
+            <div className="flex flex-col gap-1">
+              <span>🔵 Chat Web</span>
+              <span>🟢 WhatsApp</span>
             </div>
           </TooltipContent>
         </Tooltip>
