@@ -76,6 +76,10 @@ export function ConversaItem({ conversa, isSelected, onClick, showBadge = true, 
     locale: ptBR,
   });
 
+  const showAgentNameInStatus =
+    (conversa.status === 'fila_humano' || conversa.status === 'em_atendimento_humano') &&
+    !!conversa.agente_nome;
+
   return (
     <button
       onClick={onClick}
@@ -91,7 +95,7 @@ export function ConversaItem({ conversa, isSelected, onClick, showBadge = true, 
             {getInitials(getDisplayName())}
           </AvatarFallback>
         </Avatar>
-        
+
         <div className="flex-1 min-w-0 space-y-1">
           <div className="flex items-center justify-between gap-2">
             <span className="font-semibold text-foreground truncate">
@@ -101,62 +105,35 @@ export function ConversaItem({ conversa, isSelected, onClick, showBadge = true, 
               {timeAgo}
             </span>
           </div>
-          
-          {/* Layout diferente para admin/supervisor vs operador */}
-          {showAgentName ? (
-            <>
-              {/* Linha do telefone/id com tag de canal à direita */}
-              {isN8nCinemktConversa() ? (
-                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                  <span>id: {formatWebchatId(conversa.whatsapp_numero)}</span>
-                  <ConversaTags source={conversa.source} channel={conversa.channel} />
-                </div>
-              ) : (
-                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-1.5">
-                    <Phone className="w-3 h-3" />
-                    <span>{formatPhone(conversa.whatsapp_numero)}</span>
-                  </div>
-                  <ConversaTags source={conversa.source} channel={conversa.channel} />
-                </div>
-              )}
-              
-              {/* Linha abaixo: Atendente à esquerda, Status à direita (alinhado com tag de canal) */}
-              <div className="flex items-center justify-between gap-2 pt-1.5">
-                {conversa.agente_nome ? (
-                  <span className="text-xs text-muted-foreground truncate">
-                    Atendente: {conversa.agente_nome}
-                  </span>
-                ) : (
-                  <span></span>
-                )}
-                {showBadge && (
-                  <StatusBadge status={conversa.status} />
-                )}
-              </div>
-            </>
+
+          {/* Telefone ou id (sempre à esquerda) */}
+          {isN8nCinemktConversa() ? (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span>id: {formatWebchatId(conversa.whatsapp_numero)}</span>
+            </div>
           ) : (
-            <>
-              {/* Layout para operador: manter como estava */}
-              {isN8nCinemktConversa() ? (
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <span>id: {formatWebchatId(conversa.whatsapp_numero)}</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Phone className="w-3 h-3" />
-                  <span>{formatPhone(conversa.whatsapp_numero)}</span>
-                </div>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Phone className="w-3 h-3" />
+              <span>{formatPhone(conversa.whatsapp_numero)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Coluna direita: tag (círculo + label) e abaixo status | atendente */}
+        <div className="flex flex-col items-end gap-0.5 shrink-0">
+          <ConversaTags source={conversa.source} channel={conversa.channel} />
+          {showBadge && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <StatusBadge status={conversa.status} />
+              {showAgentNameInStatus && (
+                <>
+                  <span>|</span>
+                  <span className="truncate max-w-[80px]" title={conversa.agente_nome ?? undefined}>
+                    {conversa.agente_nome}
+                  </span>
+                </>
               )}
-              
-              {/* Tag de channel abaixo do telefone e status na mesma linha alinhado à direita */}
-              <div className="flex items-center justify-between gap-2">
-                <ConversaTags source={conversa.source} channel={conversa.channel} />
-                {showBadge && (
-                  <StatusBadge status={conversa.status} />
-                )}
-              </div>
-            </>
+            </div>
           )}
         </div>
       </div>

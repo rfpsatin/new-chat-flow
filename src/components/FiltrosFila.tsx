@@ -1,5 +1,6 @@
-import { Search, Bot, Clock, Users, Headphones, LayoutGrid } from 'lucide-react';
+import { Search, Bot, Clock, Users, Headphones, LayoutGrid, Info } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 interface StatusCount {
@@ -58,15 +59,46 @@ export function FiltrosFila({
 
   return (
     <div className="space-y-3">
-      {/* Search input */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por nome ou telefone..."
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="pl-9 h-9 text-sm"
-        />
+      {/* Search input + ícone de legenda */}
+      <div className="flex items-center gap-1.5">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nome ou telefone..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="pl-9 h-9 text-sm"
+          />
+        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors focus:outline-none focus:ring-1 focus:ring-ring"
+              aria-label="Legenda das cores"
+            >
+              <Info className="w-4 h-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" align="end" className="max-w-[220px] p-2.5 text-xs">
+            <div className="space-y-2">
+              <p className="font-medium text-foreground">Legenda</p>
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="rounded-full w-2 h-2 bg-blue-500 shrink-0" aria-hidden />
+                  <span>Chat-Web (ex.: Marketing, Comercial)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="rounded-full w-2 h-2 bg-green-500 shrink-0" aria-hidden />
+                  <span>WhatsApp (direto ou Automação)</span>
+                </div>
+              </div>
+              <p className="text-muted-foreground pt-0.5 border-t border-border/50">
+                Cada conversa mostra o círculo e o canal no card.
+              </p>
+            </div>
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Status chips - single select */}

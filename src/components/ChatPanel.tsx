@@ -188,10 +188,8 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
                 </Button>
               )}
             </div>
-            {/* Exibir protocolo abaixo do status quando há nome válido */}
-            {conversa.contato_nome && 
-             conversa.contato_nome !== 'Sem nome' && 
-             conversa.nr_protocolo && (
+            {/* Exibir protocolo abaixo do status em todas as conversas que tiverem nr_protocolo */}
+            {conversa.nr_protocolo && (
               <span className="text-xs text-muted-foreground">
                 Protocolo: {conversa.nr_protocolo}
               </span>
