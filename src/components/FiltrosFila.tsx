@@ -71,13 +71,9 @@ export function FiltrosFila({
 
       {/* Status chips - single select */}
       <div className="flex flex-col gap-4">
-        {/* Primeira linha - justificada quando há 3 filtros */}
-        <div className={cn(
-          'flex items-center w-full',
-          isOperador ? 'flex-nowrap' : 'flex-wrap',
-          shouldJustify ? 'justify-between' : 'gap-2'
-        )}>
-          {firstRowFilters.map(({ key, label, icon: Icon }) => {
+        {/* Primeira linha - sempre 3 filtros, justificados, com margem igual ao campo de pesquisa */}
+        <div className="flex items-center w-full justify-between pl-3">
+          {firstRowFilters.slice(0, 3).map(({ key, label, icon: Icon }) => {
             const isActive = selectedStatus === key;
             const count = key === 'todos' ? totalCount : (statusCounts[key as keyof StatusCount] || 0);
 
@@ -87,12 +83,7 @@ export function FiltrosFila({
                 onClick={() => onSelectStatus(key)}
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-full text-xs font-medium transition-all',
-                  'border shrink-0',
-                  isOperador 
-                    ? 'px-2.5 py-1.5' 
-                    : numFilters > 3 
-                      ? 'px-4 py-1.5' 
-                      : 'px-3 py-1.5',
+                  'border shrink-0 px-2.5 py-1.5',
                   isActive
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted'
@@ -113,11 +104,15 @@ export function FiltrosFila({
               </button>
             );
           })}
+          {/* Preencher com espaços vazios se houver menos de 3 filtros */}
+          {firstRowFilters.length < 3 && Array.from({ length: 3 - firstRowFilters.length }).map((_, i) => (
+            <div key={`empty-${i}`} className="flex-1" />
+          ))}
         </div>
 
-        {/* Segunda linha - sem justificação, com gap pequeno */}
+        {/* Segunda linha - sem justificação, com gap pequeno, margem igual ao campo de pesquisa */}
         {secondRowFilters.length > 0 && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pl-3">
             {secondRowFilters.map(({ key, label, icon: Icon }) => {
               const isActive = selectedStatus === key;
               const count = key === 'todos' ? totalCount : (statusCounts[key as keyof StatusCount] || 0);
