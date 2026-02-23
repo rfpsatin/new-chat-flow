@@ -2,48 +2,52 @@
 
 ## Problema
 
-Todas as conversas ativas no banco de dados estao com `origem = null` e `channel = null`. O componente `ConversaTags` so exibe o texto do canal quando `channel` e exatamente "Comercial", "Marketing" ou "Fluxo" -- como os valores estao nulos, exibe "---" (traco).
+Todas as 30 conversas ativas tem `origem = null` no banco. O componente `ConversaTags` depende desse campo para decidir a cor da bolinha (verde = whatsapp, azul = web-chat), mas como esta null, tudo aparece como verde por padrao.
 
-Dados atuais (amostra de 20 conversas ativas):
-- 18 conversas: `origem = null`, `channel = null`
-- 2 conversas: `origem = null`, `channel = "mkt"` (valor cru, nao normalizado)
+## Diagnostico (dados reais do banco)
+
+Analisando os payloads das mensagens, identifiquei a origem real de cada conversa:
+
+**Conversas web-chat** (bolinha azul):
+- `7cccf981` - payload tem `origem: "web-chat"`
+- `240a7a41` - payload tem `chat_name: "web-chat"` 
+- `cba76267` - payload tem `chat_name: "web-chat"`
+- `ee999dd4` - payload tem `chat_name: "web-chat"`
+
+**Todas as demais** - sao WhatsApp (bolinha verde), vindas do fluxo n8n sem indicacao de web-chat ou diretamente do whapi-webhook.
 
 ## Correcoes
 
-### 1. Deploy da edge function atualizada
+### 1. Backfill dos dados existentes (SQL)
 
-A edge function `n8n-webhook-cinemkt` foi editada mas pode nao estar deployada. Sera feito o deploy para garantir que novas mensagens processem `origem` e `channel` corretamente.
-
-### 2. Correcao dos dados existentes no banco
-
-Executar SQL para normalizar os dados das conversas ativas:
+Atualizar a coluna `origem` de todas as conversas ativas com base nos payloads das mensagens:
 
 ```sql
--- Normalizar channel "mkt" para "Marketing"
-UPDATE conversas SET channel = 'Marketing' WHERE channel = 'mkt';
+-- Conversas que tem pelo menos uma mensagem com origem ou chat_name = 'web-chat'
+UPDATE conversas SET origem = 'web-chat'
+WHERE id IN (
+  SELECT DISTINCT conversa_id FROM mensagens_ativas
+  WHERE payload->>'origem' = 'web-chat' OR payload->>'chat_name' = 'web-chat'
+);
 
--- Normalizar channel "comercial" para "Comercial"
-UPDATE conversas SET channel = 'Comercial' WHERE lower(channel) = 'comercial';
-
--- Normalizar channel "fluxo" para "Fluxo"
-UPDATE conversas SET channel = 'Fluxo' WHERE lower(channel) = 'fluxo';
+-- Todas as outras conversas ativas sem origem definida = whatsapp
+UPDATE conversas SET origem = 'whatsapp'
+WHERE origem IS NULL AND status != 'encerrado';
 ```
 
-### 3. Tornar o ConversaTags mais resiliente
+### 2. Corrigir a edge function `n8n-webhook-cinemkt`
 
-Atualizar `ConversaTags.tsx` para aceitar valores de `channel` em qualquer case (minusculo, maiusculo), normalizando internamente. Isso evita que o problema se repita caso algum dado entre sem normalizacao.
+A edge function ja normaliza `origem` corretamente, mas quando o payload nao envia o campo `origem`, o valor fica `null`. Como o usuario afirmou que o campo `origem` **sempre** vem no payload, nao ha necessidade de fallback -- mas vou garantir que o log indique quando `origem` esta ausente para facilitar debug futuro.
 
-Logica atualizada:
-- `channel` normalizado: "comercial" -> "Comercial", "mkt"/"marketing" -> "Marketing", "fluxo" -> "Fluxo"
-- Se `channel` nao bate com nenhum conhecido e `origem` e "web-chat" -> "Chat-Web"
-- Senao -> "---"
+Nenhuma alteracao de codigo necessaria na edge function -- ela ja processa `body.origem` corretamente apos a edicao anterior.
 
-### Arquivo: `src/components/ConversaTags.tsx`
+### 3. Frontend - sem alteracoes
 
-Adicionar normalizacao interna do `channel` antes de determinar o label, em vez de comparar apenas com valores exatos.
+O `ConversaTags.tsx` ja esta correto: normaliza `origem` e `channel` internamente e exibe a cor/texto adequados. O problema era exclusivamente dados nulos no banco.
 
-### Resultado esperado
+## Resultado esperado
 
-- Conversas existentes com `channel = "mkt"` passam a exibir "Marketing"
-- Novas conversas recebem `origem` e `channel` corretamente via edge function
-- Frontend resiliente a variantes de case/abreviacao
+Apos o backfill:
+- 4 conversas exibirao bolinha azul (web-chat) com seus respectivos canais
+- Todas as demais exibirao bolinha verde (whatsapp) com seus canais (Marketing, Comercial, etc.) ou "---" quando sem channel
+
