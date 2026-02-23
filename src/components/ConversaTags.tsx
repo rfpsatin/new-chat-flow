@@ -30,7 +30,7 @@ export function ConversaTags({ origem, channel, className }: ConversaTagsProps) 
   } else if (isWebChat) {
     label = 'Chat-Web';
   } else {
-    label = '—';
+    label = 'WhatsApp';
   }
 
   return (
