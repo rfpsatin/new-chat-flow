@@ -18,10 +18,15 @@ export function ConversaTags({ origem, channel, className }: ConversaTagsProps) 
   // Cor da bolinha apenas por origem
   const isWebChat = normalizedOrigem === 'web-chat';
 
-  // Label: channel normalizado (Comercial, Marketing, Fluxo); ou Chat-Web se web-chat; senão "—" (nunca fallback WhatsApp)
+  // Normaliza channel internamente para ser resiliente a variantes de case/abreviação
+  const normalizedChannel = (channel ?? '').trim().toLowerCase();
   let label: string;
-  if (channel === 'Comercial' || channel === 'Marketing' || channel === 'Fluxo') {
-    label = channel;
+  if (normalizedChannel === 'comercial') {
+    label = 'Comercial';
+  } else if (normalizedChannel === 'mkt' || normalizedChannel === 'marketing') {
+    label = 'Marketing';
+  } else if (normalizedChannel === 'fluxo') {
+    label = 'Fluxo';
   } else if (isWebChat) {
     label = 'Chat-Web';
   } else {
