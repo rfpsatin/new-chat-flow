@@ -9,8 +9,7 @@ const corsHeaders = {
 interface N8nCinemktPayload {
   to: string
   body: string
-  source?: string
-  /** Origem da mensagem enviada pelo n8n (ex.: "web-chat") */
+  /** Origem da mensagem: "web-chat" ou "whatsapp" */
   origem?: string
   channel?: string
   human_mode?: boolean
@@ -102,7 +101,7 @@ Deno.serve(async (req) => {
     const n8nWebhookId = body.to
     const mensagemUsuario = body.body
     // Priorizar origem no payload; normalizar "web-chat" e "whatsapp"; vazio/null permanece null (sem fallback)
-    const rawOrigem = body.origem ?? body.source ?? null
+    const rawOrigem = body.origem ?? null
     const normalized = rawOrigem ? rawOrigem.trim().toLowerCase() : ''
     const origem = normalized === 'web-chat' ? 'web-chat' : normalized === 'whatsapp' ? 'whatsapp' : normalized === '' ? null : normalized
     const rawChannel = body.channel || null
