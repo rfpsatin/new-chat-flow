@@ -1,92 +1,68 @@
 
-## Diagnóstico Completo
 
-### Problema 1: Edge Function ignora o campo `chat_name`
+## Diagnóstico
 
-O arquivo atual em disco (`supabase/functions/n8n-webhook-cinemkt/index.ts`) está na **versão antiga** (v3). A interface `N8nCinemktPayload` não declara `chat_name`, e a extração do source está na linha 97 como:
+A migração `20260223120000_rename_conversas_source_to_origem.sql` existe no repositório mas **ainda nao foi aplicada no banco de dados**. Confirmei que:
 
-```typescript
-const source = body.source || null
-```
+- A coluna na tabela `conversas` ainda se chama `source` (query direta ao banco confirmou)
+- O `types.ts` (auto-gerado) já mostra `origem` -- ou seja, está dessincronizado com o banco real
+- A edge function `n8n-webhook-cinemkt` já usa `origem` nos inserts/updates -- o que pode estar falhando silenciosamente
+- A view `vw_fila_atendimento` ainda expoe `source` (nao `origem`)
+- A view `vw_mensagens_consolidado` ja tem uma coluna `origem` (possivelmente de outra refatoracao)
 
-Isso ignora completamente `chat_name`. O webhook do n8n envia `chat_name: "web-chat"`, mas a função nunca o lê — então `source` sempre fica `null` no banco.
+## Plano
 
-### Problema 2: Componente ConversaTags perdeu a lógica de cor
+### Passo 1: Aplicar a migracao pendente
 
-O `ConversaTags.tsx` atual usa `<Badge>` sem distinção de cor azul/verde. A lógica de "círculo azul para web-chat" foi removida numa refatoração anterior. Como `source` é `null` no banco, mesmo que a lógica existisse, não funcionaria.
+A migracao `20260223120000_rename_conversas_source_to_origem.sql` precisa ser executada. Ela faz:
 
----
+1. Renomeia `conversas.source` para `conversas.origem`
+2. Recria a view `vw_fila_atendimento` usando `c.origem`
 
-## Solução — dois arquivos
+### Passo 2: Verificar se as views dependentes tambem precisam de atualizacao
 
-### 1. `supabase/functions/n8n-webhook-cinemkt/index.ts`
+A view `vw_historico_conversas` nao expoe a coluna `source`/`origem`, entao nao precisa de alteracao. A view `vw_mensagens_consolidado` ja tem `origem`.
 
-**a) Adicionar `chat_name` na interface:**
-```typescript
-interface N8nCinemktPayload {
-  to: string
-  body: string
-  source?: string
-  chat_name?: string   // ← NOVO: campo enviado pelo webhook n8n
-  channel?: string
-  human_mode?: boolean
-  resposta?: string
-}
-```
+### Passo 3: Nao alterar edge functions
 
-**b) Corrigir a extração do source (linha 97):**
-```typescript
-// Priorizar chat_name sobre source; normalizar para "web-chat"
-const rawSource = body.chat_name ?? body.source ?? null
-const source = rawSource
-  ? rawSource.trim().toLowerCase() === 'web-chat'
-    ? 'web-chat'
-    : rawSource.trim().toLowerCase()
-  : null
-```
-
-**c) Atualizar o log para mostrar o chat_name recebido:**
-```typescript
-console.log(`[${requestId}] chat_name: ${body.chat_name}, source (original): ${body.source}, source (normalizado): ${source}, ...`)
-```
-
-Isso garante que quando o n8n envia `chat_name: "web-chat"`, o valor `"web-chat"` seja salvo na coluna `source` da conversa.
+As edge functions `n8n-webhook-cinemkt` ja usam `origem` nos inserts (o que esta correto apos a migracao). A edge function `whapi-webhook` nao grava nessa coluna, entao nao precisa de alteracao imediata.
 
 ---
 
-### 2. `src/components/ConversaTags.tsx`
+## Detalhes tecnicos
 
-Restaurar o design de **círculo + texto** com a lógica de cor correta:
+### Migracao a ser executada
 
-**Lógica de cor:**
-- **Círculo azul escuro** → quando `source === 'web-chat'` **OU** `channel` for `Marketing`/`Comercial`
-- **Círculo verde escuro** → quando não há indicação de canal digital (WhatsApp puro)
+```sql
+ALTER TABLE public.conversas RENAME COLUMN source TO origem;
 
-**Tabela de rótulos:**
+COMMENT ON COLUMN public.conversas.origem IS 'Origem da mensagem (ex: web-chat, whatsapp)';
 
-| source | channel | Rótulo exibido | Cor |
-|---|---|---|---|
-| `web-chat` | `Marketing` | Marketing | Azul |
-| `web-chat` | `Comercial` | Comercial | Azul |
-| `web-chat` | nulo | Chat-Web | Azul |
-| nulo | `Marketing` | Marketing | Azul |
-| nulo | `Comercial` | Comercial | Azul |
-| nulo | `WhatsApp` | WhatsApp | Verde |
-| nulo | nulo | WhatsApp | Verde |
+DROP VIEW IF EXISTS public.vw_fila_atendimento;
 
-O componente retorna:
-```tsx
-<div className="flex items-center gap-1.5 ...">
-  <span className={cn('rounded-full w-2 h-2', isWebChat ? 'bg-blue-700' : 'bg-green-700')} />
-  <span className="truncate">{label}</span>
-</div>
+CREATE VIEW public.vw_fila_atendimento AS
+SELECT
+  c.id AS conversa_id,
+  c.empresa_id,
+  co.id AS contato_id,
+  co.nome AS contato_nome,
+  co.whatsapp_numero,
+  c.status,
+  c.last_message_at,
+  c.created_at,
+  c.agente_responsavel_id,
+  u.nome AS agente_nome,
+  c.resumo,
+  c.origem,
+  c.channel,
+  c.nr_protocolo
+FROM public.conversas c
+JOIN public.contatos co ON co.id = c.contato_id
+LEFT JOIN public.usuarios u ON u.id = c.agente_responsavel_id
+WHERE c.status = ANY (ARRAY['bot','esperando_tria','fila_humano','em_atendimento_humano'])
+ORDER BY c.last_message_at DESC;
 ```
 
----
+### Arquivos afetados
 
-## Arquivos modificados
-
-1. **`supabase/functions/n8n-webhook-cinemkt/index.ts`** — adicionar `chat_name` na interface e corrigir extração do `source`
-2. **`src/components/ConversaTags.tsx`** — restaurar design círculo + texto com lógica azul/verde correta
-
-Após o deploy da edge function, novas mensagens receberão `source = "web-chat"` corretamente. Conversas existentes no banco que têm `channel = "Marketing"` ou `"Comercial"` mas `source = null` já serão exibidas corretamente porque o componente usa `channel` como critério de cor quando `source` está ausente.
+Nenhum arquivo de codigo precisa ser alterado -- o frontend e as edge functions ja usam `origem`. A unica acao necessaria e aplicar a migracao SQL no banco.
