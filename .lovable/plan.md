@@ -2,52 +2,51 @@
 
 ## Problema
 
-Todas as 30 conversas ativas tem `origem = null` no banco. O componente `ConversaTags` depende desse campo para decidir a cor da bolinha (verde = whatsapp, azul = web-chat), mas como esta null, tudo aparece como verde por padrao.
-
-## Diagnostico (dados reais do banco)
-
-Analisando os payloads das mensagens, identifiquei a origem real de cada conversa:
-
-**Conversas web-chat** (bolinha azul):
-- `7cccf981` - payload tem `origem: "web-chat"`
-- `240a7a41` - payload tem `chat_name: "web-chat"` 
-- `cba76267` - payload tem `chat_name: "web-chat"`
-- `ee999dd4` - payload tem `chat_name: "web-chat"`
-
-**Todas as demais** - sao WhatsApp (bolinha verde), vindas do fluxo n8n sem indicacao de web-chat ou diretamente do whapi-webhook.
+1. **43 conversas com `origem = NULL`** -- o backfill anterior so atualizou conversas ativas (`status != 'encerrado'`), deixando as encerradas sem origem.
+2. **Label incorreto** -- quando `origem = "whatsapp"` e nao ha channel, o componente exibe "---" em vez de "WhatsApp".
 
 ## Correcoes
 
-### 1. Backfill dos dados existentes (SQL)
+### 1. Backfill completo de todas as conversas
 
-Atualizar a coluna `origem` de todas as conversas ativas com base nos payloads das mensagens:
+Atualizar TODAS as conversas (ativas e encerradas) que ainda tem `origem = NULL`:
 
+- Conversas com mensagens contendo `payload->>'origem' = 'web-chat'` ou `payload->>'chat_name' = 'web-chat'` -> `origem = 'web-chat'`
+- Todas as demais com `origem IS NULL` -> `origem = 'whatsapp'`
+
+Isso sera feito consultando tanto `mensagens_ativas` quanto `mensagens_historico` (onde ficam as mensagens de conversas encerradas).
+
+### 2. Atualizar `ConversaTags.tsx`
+
+Ajustar a logica de label para que, quando `origem = "whatsapp"` e nao ha channel reconhecido, exiba "WhatsApp" em vez de "---":
+
+- channel reconhecido (Comercial, Marketing, Fluxo) -> exibe o channel
+- sem channel + origem web-chat -> "Chat-Web"
+- sem channel + origem whatsapp (ou qualquer outro) -> "WhatsApp"
+
+### Resultado esperado
+
+- Todas as 43 conversas sem origem passam a ter `origem = 'whatsapp'` (ou `'web-chat'` se identificadas nos payloads)
+- Conversas whatsapp sem channel exibem "🟢 WhatsApp"
+- Conversas web-chat sem channel exibem "🔵 Chat-Web"
+- Conversas com channel exibem a bolinha colorida + nome do channel
+
+### Detalhes tecnicos
+
+**Arquivo**: `src/components/ConversaTags.tsx`
+- Linha 33: trocar `label = '—'` por `label = 'WhatsApp'`
+
+**SQL** (via insert tool):
 ```sql
--- Conversas que tem pelo menos uma mensagem com origem ou chat_name = 'web-chat'
+-- Identificar web-chat em mensagens historicas
 UPDATE conversas SET origem = 'web-chat'
-WHERE id IN (
-  SELECT DISTINCT conversa_id FROM mensagens_ativas
+WHERE origem IS NULL AND id IN (
+  SELECT DISTINCT conversa_id FROM mensagens_historico
   WHERE payload->>'origem' = 'web-chat' OR payload->>'chat_name' = 'web-chat'
 );
 
--- Todas as outras conversas ativas sem origem definida = whatsapp
+-- Todas as restantes sem origem -> whatsapp
 UPDATE conversas SET origem = 'whatsapp'
-WHERE origem IS NULL AND status != 'encerrado';
+WHERE origem IS NULL;
 ```
-
-### 2. Corrigir a edge function `n8n-webhook-cinemkt`
-
-A edge function ja normaliza `origem` corretamente, mas quando o payload nao envia o campo `origem`, o valor fica `null`. Como o usuario afirmou que o campo `origem` **sempre** vem no payload, nao ha necessidade de fallback -- mas vou garantir que o log indique quando `origem` esta ausente para facilitar debug futuro.
-
-Nenhuma alteracao de codigo necessaria na edge function -- ela ja processa `body.origem` corretamente apos a edicao anterior.
-
-### 3. Frontend - sem alteracoes
-
-O `ConversaTags.tsx` ja esta correto: normaliza `origem` e `channel` internamente e exibe a cor/texto adequados. O problema era exclusivamente dados nulos no banco.
-
-## Resultado esperado
-
-Apos o backfill:
-- 4 conversas exibirao bolinha azul (web-chat) com seus respectivos canais
-- Todas as demais exibirao bolinha verde (whatsapp) com seus canais (Marketing, Comercial, etc.) ou "---" quando sem channel
 
