@@ -1,88 +1,49 @@
 
 
-## Objetivo
+## Problema
 
-Garantir que a edge function `n8n-webhook-cinemkt` use exclusivamente o campo `origem` (sem fallback para `source`) e que o processamento dos campos `origem` e `channel` resulte corretamente na exibicao visual (cor da bolinha e texto).
+Todas as conversas ativas no banco de dados estao com `origem = null` e `channel = null`. O componente `ConversaTags` so exibe o texto do canal quando `channel` e exatamente "Comercial", "Marketing" ou "Fluxo" -- como os valores estao nulos, exibe "---" (traco).
 
-## Estado atual
+Dados atuais (amostra de 20 conversas ativas):
+- 18 conversas: `origem = null`, `channel = null`
+- 2 conversas: `origem = null`, `channel = "mkt"` (valor cru, nao normalizado)
 
-### O que ja funciona corretamente
-- **`ConversaTags.tsx`**: Logica de cor e texto ja esta correta:
-  - `origem = "web-chat"` → bolinha azul
-  - `origem = "whatsapp"` (ou qualquer outro) → bolinha verde
-  - `channel = "Comercial" / "Marketing" / "Fluxo"` → texto correspondente
-- **Normalizacao de channel**: `comercial` → `Comercial`, `mkt` → `Marketing`, `fluxo` → `Fluxo`
-- **Banco de dados**: Coluna ja se chama `origem` (migracao aplicada)
+## Correcoes
 
-### O que precisa ser ajustado
-Na edge function `n8n-webhook-cinemkt/index.ts`:
-1. A interface `N8nCinemktPayload` ainda declara o campo `source` (linha 12) — deve ser removido
-2. A linha 105 faz fallback para `body.source`: `body.origem ?? body.source ?? null` — deve usar apenas `body.origem`
+### 1. Deploy da edge function atualizada
 
-## Alteracoes
+A edge function `n8n-webhook-cinemkt` foi editada mas pode nao estar deployada. Sera feito o deploy para garantir que novas mensagens processem `origem` e `channel` corretamente.
 
-### Arquivo: `supabase/functions/n8n-webhook-cinemkt/index.ts`
+### 2. Correcao dos dados existentes no banco
 
-**1. Remover `source` da interface (linha 12)**
+Executar SQL para normalizar os dados das conversas ativas:
 
-Antes:
-```typescript
-interface N8nCinemktPayload {
-  to: string
-  body: string
-  source?: string
-  origem?: string
-  channel?: string
-  human_mode?: boolean
-  resposta?: string
-}
+```sql
+-- Normalizar channel "mkt" para "Marketing"
+UPDATE conversas SET channel = 'Marketing' WHERE channel = 'mkt';
+
+-- Normalizar channel "comercial" para "Comercial"
+UPDATE conversas SET channel = 'Comercial' WHERE lower(channel) = 'comercial';
+
+-- Normalizar channel "fluxo" para "Fluxo"
+UPDATE conversas SET channel = 'Fluxo' WHERE lower(channel) = 'fluxo';
 ```
 
-Depois:
-```typescript
-interface N8nCinemktPayload {
-  to: string
-  body: string
-  /** Origem da mensagem: "web-chat" ou "whatsapp" */
-  origem?: string
-  channel?: string
-  human_mode?: boolean
-  resposta?: string
-}
-```
+### 3. Tornar o ConversaTags mais resiliente
 
-**2. Remover fallback para `source` (linha 105)**
+Atualizar `ConversaTags.tsx` para aceitar valores de `channel` em qualquer case (minusculo, maiusculo), normalizando internamente. Isso evita que o problema se repita caso algum dado entre sem normalizacao.
 
-Antes:
-```typescript
-const rawOrigem = body.origem ?? body.source ?? null
-```
+Logica atualizada:
+- `channel` normalizado: "comercial" -> "Comercial", "mkt"/"marketing" -> "Marketing", "fluxo" -> "Fluxo"
+- Se `channel` nao bate com nenhum conhecido e `origem` e "web-chat" -> "Chat-Web"
+- Senao -> "---"
 
-Depois:
-```typescript
-const rawOrigem = body.origem ?? null
-```
+### Arquivo: `src/components/ConversaTags.tsx`
 
-## Nenhuma alteracao necessaria em outros arquivos
+Adicionar normalizacao interna do `channel` antes de determinar o label, em vez de comparar apenas com valores exatos.
 
-- `ConversaTags.tsx` — ja processa corretamente `origem` e `channel`
-- Banco de dados — coluna ja se chama `origem`
-- `types.ts` — ja reflete `origem`
+### Resultado esperado
 
-## Resumo do fluxo completo apos a alteracao
-
-```text
-n8n envia POST para n8n-webhook-cinemkt:
-  { to: "...", body: "...", origem: "whatsapp", channel: "mkt" }
-
-Edge function processa:
-  origem = "whatsapp"  (salvo na coluna conversas.origem)
-  channel = "Marketing" (normalizado, salvo em conversas.channel)
-
-Frontend ConversaTags exibe:
-  🟢 Marketing    (bolinha verde porque origem != "web-chat", texto "Marketing" do channel)
-
-Outro exemplo:
-  { origem: "web-chat", channel: "comercial" }
-  🔵 Comercial    (bolinha azul porque origem == "web-chat", texto "Comercial")
-```
+- Conversas existentes com `channel = "mkt"` passam a exibir "Marketing"
+- Novas conversas recebem `origem` e `channel` corretamente via edge function
+- Frontend resiliente a variantes de case/abreviacao
