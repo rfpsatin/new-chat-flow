@@ -112,10 +112,10 @@ export type Database = {
           n8n_webhook_id: string | null
           nota_satisfacao: number | null
           nr_protocolo: string | null
+          origem: string | null
           pesquisa_enviada_em: string | null
           pesquisa_respondida_em: string | null
           resumo: string | null
-          source: string | null
           status: string
           updated_at: string
         }
@@ -136,10 +136,10 @@ export type Database = {
           n8n_webhook_id?: string | null
           nota_satisfacao?: number | null
           nr_protocolo?: string | null
+          origem?: string | null
           pesquisa_enviada_em?: string | null
           pesquisa_respondida_em?: string | null
           resumo?: string | null
-          source?: string | null
           status: string
           updated_at?: string
         }
@@ -160,10 +160,10 @@ export type Database = {
           n8n_webhook_id?: string | null
           nota_satisfacao?: number | null
           nr_protocolo?: string | null
+          origem?: string | null
           pesquisa_enviada_em?: string | null
           pesquisa_respondida_em?: string | null
           resumo?: string | null
-          source?: string | null
           status?: string
           updated_at?: string
         }
@@ -587,8 +587,8 @@ export type Database = {
           empresa_id: string | null
           last_message_at: string | null
           nr_protocolo: string | null
+          origem: string | null
           resumo: string | null
-          source: string | null
           status: string | null
           whatsapp_numero: string | null
         }
