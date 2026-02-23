@@ -1,68 +1,88 @@
 
 
-## Diagnóstico
+## Objetivo
 
-A migração `20260223120000_rename_conversas_source_to_origem.sql` existe no repositório mas **ainda nao foi aplicada no banco de dados**. Confirmei que:
+Garantir que a edge function `n8n-webhook-cinemkt` use exclusivamente o campo `origem` (sem fallback para `source`) e que o processamento dos campos `origem` e `channel` resulte corretamente na exibicao visual (cor da bolinha e texto).
 
-- A coluna na tabela `conversas` ainda se chama `source` (query direta ao banco confirmou)
-- O `types.ts` (auto-gerado) já mostra `origem` -- ou seja, está dessincronizado com o banco real
-- A edge function `n8n-webhook-cinemkt` já usa `origem` nos inserts/updates -- o que pode estar falhando silenciosamente
-- A view `vw_fila_atendimento` ainda expoe `source` (nao `origem`)
-- A view `vw_mensagens_consolidado` ja tem uma coluna `origem` (possivelmente de outra refatoracao)
+## Estado atual
 
-## Plano
+### O que ja funciona corretamente
+- **`ConversaTags.tsx`**: Logica de cor e texto ja esta correta:
+  - `origem = "web-chat"` → bolinha azul
+  - `origem = "whatsapp"` (ou qualquer outro) → bolinha verde
+  - `channel = "Comercial" / "Marketing" / "Fluxo"` → texto correspondente
+- **Normalizacao de channel**: `comercial` → `Comercial`, `mkt` → `Marketing`, `fluxo` → `Fluxo`
+- **Banco de dados**: Coluna ja se chama `origem` (migracao aplicada)
 
-### Passo 1: Aplicar a migracao pendente
+### O que precisa ser ajustado
+Na edge function `n8n-webhook-cinemkt/index.ts`:
+1. A interface `N8nCinemktPayload` ainda declara o campo `source` (linha 12) — deve ser removido
+2. A linha 105 faz fallback para `body.source`: `body.origem ?? body.source ?? null` — deve usar apenas `body.origem`
 
-A migracao `20260223120000_rename_conversas_source_to_origem.sql` precisa ser executada. Ela faz:
+## Alteracoes
 
-1. Renomeia `conversas.source` para `conversas.origem`
-2. Recria a view `vw_fila_atendimento` usando `c.origem`
+### Arquivo: `supabase/functions/n8n-webhook-cinemkt/index.ts`
 
-### Passo 2: Verificar se as views dependentes tambem precisam de atualizacao
+**1. Remover `source` da interface (linha 12)**
 
-A view `vw_historico_conversas` nao expoe a coluna `source`/`origem`, entao nao precisa de alteracao. A view `vw_mensagens_consolidado` ja tem `origem`.
-
-### Passo 3: Nao alterar edge functions
-
-As edge functions `n8n-webhook-cinemkt` ja usam `origem` nos inserts (o que esta correto apos a migracao). A edge function `whapi-webhook` nao grava nessa coluna, entao nao precisa de alteracao imediata.
-
----
-
-## Detalhes tecnicos
-
-### Migracao a ser executada
-
-```sql
-ALTER TABLE public.conversas RENAME COLUMN source TO origem;
-
-COMMENT ON COLUMN public.conversas.origem IS 'Origem da mensagem (ex: web-chat, whatsapp)';
-
-DROP VIEW IF EXISTS public.vw_fila_atendimento;
-
-CREATE VIEW public.vw_fila_atendimento AS
-SELECT
-  c.id AS conversa_id,
-  c.empresa_id,
-  co.id AS contato_id,
-  co.nome AS contato_nome,
-  co.whatsapp_numero,
-  c.status,
-  c.last_message_at,
-  c.created_at,
-  c.agente_responsavel_id,
-  u.nome AS agente_nome,
-  c.resumo,
-  c.origem,
-  c.channel,
-  c.nr_protocolo
-FROM public.conversas c
-JOIN public.contatos co ON co.id = c.contato_id
-LEFT JOIN public.usuarios u ON u.id = c.agente_responsavel_id
-WHERE c.status = ANY (ARRAY['bot','esperando_tria','fila_humano','em_atendimento_humano'])
-ORDER BY c.last_message_at DESC;
+Antes:
+```typescript
+interface N8nCinemktPayload {
+  to: string
+  body: string
+  source?: string
+  origem?: string
+  channel?: string
+  human_mode?: boolean
+  resposta?: string
+}
 ```
 
-### Arquivos afetados
+Depois:
+```typescript
+interface N8nCinemktPayload {
+  to: string
+  body: string
+  /** Origem da mensagem: "web-chat" ou "whatsapp" */
+  origem?: string
+  channel?: string
+  human_mode?: boolean
+  resposta?: string
+}
+```
 
-Nenhum arquivo de codigo precisa ser alterado -- o frontend e as edge functions ja usam `origem`. A unica acao necessaria e aplicar a migracao SQL no banco.
+**2. Remover fallback para `source` (linha 105)**
+
+Antes:
+```typescript
+const rawOrigem = body.origem ?? body.source ?? null
+```
+
+Depois:
+```typescript
+const rawOrigem = body.origem ?? null
+```
+
+## Nenhuma alteracao necessaria em outros arquivos
+
+- `ConversaTags.tsx` — ja processa corretamente `origem` e `channel`
+- Banco de dados — coluna ja se chama `origem`
+- `types.ts` — ja reflete `origem`
+
+## Resumo do fluxo completo apos a alteracao
+
+```text
+n8n envia POST para n8n-webhook-cinemkt:
+  { to: "...", body: "...", origem: "whatsapp", channel: "mkt" }
+
+Edge function processa:
+  origem = "whatsapp"  (salvo na coluna conversas.origem)
+  channel = "Marketing" (normalizado, salvo em conversas.channel)
+
+Frontend ConversaTags exibe:
+  🟢 Marketing    (bolinha verde porque origem != "web-chat", texto "Marketing" do channel)
+
+Outro exemplo:
+  { origem: "web-chat", channel: "comercial" }
+  🔵 Comercial    (bolinha azul porque origem == "web-chat", texto "Comercial")
+```
