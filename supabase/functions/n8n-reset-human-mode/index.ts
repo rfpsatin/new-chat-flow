@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
     // Get conversation details to check if it's from n8n webhook and get n8n_webhook_id
     const { data: conversa, error: convError } = await supabase
       .from('conversas')
-      .select('n8n_webhook_id, source, channel')
+      .select('n8n_webhook_id, origem, channel')
       .eq('id', conversa_id)
       .single()
 
@@ -45,8 +45,8 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Only proceed if this is a conversation from n8n webhook (has source/channel or n8n_webhook_id)
-    if (!conversa.n8n_webhook_id && !conversa.source && !conversa.channel) {
+    // Only proceed if this is a conversation from n8n webhook (has origem/channel or n8n_webhook_id)
+    if (!conversa.n8n_webhook_id && !conversa.origem && !conversa.channel) {
       console.log(`[n8n-reset-human-mode] Not an n8n webhook conversation, skipping reset`)
       return new Response(JSON.stringify({ success: true, skipped: true, reason: 'Not an n8n webhook conversation' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

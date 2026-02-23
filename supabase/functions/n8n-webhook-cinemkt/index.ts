@@ -10,8 +10,8 @@ interface N8nCinemktPayload {
   to: string
   body: string
   source?: string
-  /** Alternativa a source: alguns fluxos n8n enviam chat_name (ex.: "web-chat") */
-  chat_name?: string
+  /** Origem da mensagem enviada pelo n8n (ex.: "web-chat") */
+  origem?: string
   channel?: string
   human_mode?: boolean
   resposta?: string
@@ -21,11 +21,12 @@ interface N8nCinemktPayload {
  * Normaliza o campo channel:
  * - "comercial" → "Comercial"
  * - "mkt" → "Marketing"
- * - null/undefined/vazio → "WhatsApp" (quando não há channel, significa que veio do fluxo maia-beach-tennis-demo)
+ * - "fluxo" → "Fluxo"
+ * - null/undefined/vazio ou valor desconhecido → null (sem fallback)
  */
 function normalizeChannel(channel: string | null | undefined): string | null {
   if (!channel || channel.trim() === '') {
-    return 'WhatsApp'
+    return null
   }
   
   const normalized = channel.toLowerCase().trim()
@@ -38,8 +39,12 @@ function normalizeChannel(channel: string | null | undefined): string | null {
     return 'Marketing'
   }
   
-  // Se não for nenhum dos valores esperados, retorna WhatsApp como padrão
-  return 'WhatsApp'
+  if (normalized === 'fluxo') {
+    return 'Fluxo'
+  }
+  
+  // Valor desconhecido: não usar fallback
+  return null
 }
 
 Deno.serve(async (req) => {
@@ -96,22 +101,23 @@ Deno.serve(async (req) => {
 
     const n8nWebhookId = body.to
     const mensagemUsuario = body.body
-    // Priorizar chat_name sobre source; normalizar para "web-chat" em minúsculas se for web-chat
-    const rawSource = body.chat_name ?? body.source ?? null
-    const source = rawSource ? rawSource.trim().toLowerCase() === 'web-chat' ? 'web-chat' : rawSource.trim().toLowerCase() : null
+    // Priorizar origem no payload; normalizar "web-chat" e "whatsapp"; vazio/null permanece null (sem fallback)
+    const rawOrigem = body.origem ?? body.source ?? null
+    const normalized = rawOrigem ? rawOrigem.trim().toLowerCase() : ''
+    const origem = normalized === 'web-chat' ? 'web-chat' : normalized === 'whatsapp' ? 'whatsapp' : normalized === '' ? null : normalized
     const rawChannel = body.channel || null
     const channel = normalizeChannel(rawChannel) // Normaliza o channel antes de usar
     const humanMode = body.human_mode === true
     const respostaBot = body.resposta || null
 
-    console.log(`[${requestId}] n8n_webhook_id: ${n8nWebhookId}, chat_name: ${body.chat_name}, source (original): ${body.source}, source (normalized): ${source}, channel (raw): ${rawChannel}, channel (normalized): ${channel}, human_mode: ${humanMode}`)
+    console.log(`[${requestId}] n8n_webhook_id: ${n8nWebhookId}, origem (payload): ${body.origem}, origem (normalized): ${origem}, channel (raw): ${rawChannel}, channel (normalized): ${channel}, human_mode: ${humanMode}`)
 
     // Find or create contact
     const contato = await findOrCreateContato(supabase, empresaId, n8nWebhookId, requestId)
     if (!contato) throw new Error('Failed to find or create contact')
 
     // Find or create conversation
-    const conversa = await findOrCreateConversa(supabase, empresaId, contato.id, mensagemUsuario, n8nWebhookId, source, channel, humanMode, requestId)
+    const conversa = await findOrCreateConversa(supabase, empresaId, contato.id, mensagemUsuario, n8nWebhookId, origem, channel, humanMode, requestId)
     if (!conversa) throw new Error('Failed to find or create conversation')
 
     // Insert user message
@@ -215,7 +221,7 @@ async function findOrCreateContato(supabase: any, empresaId: string, n8nWebhookI
 
 async function findOrCreateConversa(
   supabase: any, empresaId: string, contatoId: string, conteudo: string,
-  n8nWebhookId: string, source: string | null, channel: string | null,
+  n8nWebhookId: string, origem: string | null, channel: string | null,
   humanMode: boolean, requestId: string
 ) {
   const { data: active, error: findError } = await supabase
@@ -233,12 +239,12 @@ async function findOrCreateConversa(
   if (active) {
     console.log(`[${requestId}] Found active conversa: ${active.id} (${active.status})`)
     const updateData: any = { updated_at: new Date().toISOString() }
-    if (source !== null) {
-      updateData.source = source
-      console.log(`[${requestId}] Updating conversa source to: ${source}`)
+    if (origem !== null) {
+      updateData.origem = origem
+      console.log(`[${requestId}] Updating conversa origem to: ${origem}`)
     }
-    // Sempre atualiza o channel quando fornecido (já vem normalizado)
-    if (channel !== null) updateData.channel = channel
+    // Atualiza o channel (pode ser null quando não informado ou desconhecido)
+    updateData.channel = channel
     if (humanMode !== undefined) updateData.human_mode = humanMode
     if (n8nWebhookId) updateData.n8n_webhook_id = n8nWebhookId
 
@@ -254,7 +260,7 @@ async function findOrCreateConversa(
       status: 'bot',
       canal: 'whatsapp',
       iniciado_por: 'cliente',
-      source, channel, human_mode: humanMode, n8n_webhook_id: n8nWebhookId,
+      origem, channel, human_mode: humanMode, n8n_webhook_id: n8nWebhookId,
     })
     .select()
     .single()

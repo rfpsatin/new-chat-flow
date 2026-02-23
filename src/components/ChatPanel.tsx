@@ -59,15 +59,15 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
 
   /**
    * Verifica se a conversa vem do n8n-webhook-cinemkt
-   * Retorna true se tem source OU (channel existe E channel !== "WhatsApp")
+   * Retorna true se tem origem OU (channel existe E channel !== "WhatsApp")
    */
   const isN8nCinemktConversa = () => {
     if (!conversa) return false;
-    const hasSource = !!conversa.source;
+    const hasOrigem = !!conversa.origem;
     const hasChannel = !!conversa.channel;
     const isWhatsAppChannel = conversa.channel === 'WhatsApp';
     
-    return hasSource || (hasChannel && !isWhatsAppChannel);
+    return hasOrigem || (hasChannel && !isWhatsAppChannel);
   };
 
   /**
@@ -168,9 +168,9 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
                   <span>{formatPhone(conversa.whatsapp_numero)}</span>
                 </div>
               )}
-              {/* Etiquetas source e channel */}
+              {/* Etiquetas origem e channel */}
               <div className="mt-1.5">
-                <ConversaTags source={conversa.source} channel={conversa.channel} />
+                <ConversaTags origem={conversa.origem} channel={conversa.channel} />
               </div>
             </div>
           </div>

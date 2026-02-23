@@ -115,7 +115,7 @@ export type Database = {
           pesquisa_enviada_em: string | null
           pesquisa_respondida_em: string | null
           resumo: string | null
-          source: string | null
+          origem: string | null
           status: string
           updated_at: string
         }
@@ -139,7 +139,7 @@ export type Database = {
           pesquisa_enviada_em?: string | null
           pesquisa_respondida_em?: string | null
           resumo?: string | null
-          source?: string | null
+          origem?: string | null
           status: string
           updated_at?: string
         }
@@ -163,7 +163,7 @@ export type Database = {
           pesquisa_enviada_em?: string | null
           pesquisa_respondida_em?: string | null
           resumo?: string | null
-          source?: string | null
+          origem?: string | null
           status?: string
           updated_at?: string
         }
@@ -588,7 +588,7 @@ export type Database = {
           last_message_at: string | null
           nr_protocolo: string | null
           resumo: string | null
-          source: string | null
+          origem: string | null
           status: string | null
           whatsapp_numero: string | null
         }

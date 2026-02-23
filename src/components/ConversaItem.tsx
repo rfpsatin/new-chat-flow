@@ -22,14 +22,14 @@ export function ConversaItem({ conversa, isSelected, onClick, showBadge = true, 
 
   /**
    * Verifica se a conversa vem do n8n-webhook-cinemkt
-   * Retorna true se tem source OU (channel existe E channel !== "WhatsApp")
+   * Retorna true se tem origem OU (channel existe E channel !== "WhatsApp")
    */
   const isN8nCinemktConversa = () => {
-    const hasSource = !!conversa.source;
+    const hasOrigem = !!conversa.origem;
     const hasChannel = !!conversa.channel;
     const isWhatsAppChannel = conversa.channel === 'WhatsApp';
     
-    return hasSource || (hasChannel && !isWhatsAppChannel);
+    return hasOrigem || (hasChannel && !isWhatsAppChannel);
   };
 
   /**
@@ -129,7 +129,7 @@ export function ConversaItem({ conversa, isSelected, onClick, showBadge = true, 
             {timeAgo}
           </span>
           <div className="flex flex-col items-end gap-0.5">
-            <ConversaTags source={conversa.source} channel={conversa.channel} />
+            <ConversaTags origem={conversa.origem} channel={conversa.channel} />
             {showBadge && (
               <div className="flex items-center gap-1 text-xs text-muted-foreground flex-wrap justify-end">
                 <span>| {statusLabel[conversa.status]} |</span>

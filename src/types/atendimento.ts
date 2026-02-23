@@ -56,7 +56,7 @@ export interface Conversa {
   updated_at: string;
   last_message_at: string;
   // Campos específicos do webhook n8n whatsapp_cinemkt (opcionais)
-  source?: string | null;
+  origem?: string | null;
   channel?: string | null;
   human_mode?: boolean | null;
   n8n_webhook_id?: string | null;
@@ -95,7 +95,7 @@ export interface FilaAtendimento {
   agente_nome: string | null;
   resumo: string | null;
   // Campos específicos do webhook n8n whatsapp_cinemkt (opcionais)
-  source?: string | null;
+  origem?: string | null;
   channel?: string | null;
   /** Número de protocolo (ex: 20260218-0000002). Gerado automaticamente; reinicia a cada dia. */
   nr_protocolo?: string | null;

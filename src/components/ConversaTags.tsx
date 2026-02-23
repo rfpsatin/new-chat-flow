@@ -1,37 +1,31 @@
 import { cn } from '@/lib/utils';
 
 interface ConversaTagsProps {
-  /** Origem (webhook envia source ou chat_name); "web-chat" = Chat-Web (círculo azul) */
-  source?: string | null;
+  /** Origem (webhook envia origem: "web-chat" = bolinha azul, "whatsapp" = bolinha verde) */
+  origem?: string | null;
   channel?: string | null;
   className?: string;
 }
 
 /**
  * Tag do canal: círculo + texto.
- * - source/chat_name = "web-chat" → círculo azul escuro; texto = Marketing ou Comercial (conforme channel).
- * - Sem source → círculo verde escuro; texto = WhatsApp.
+ * - Cor da bolinha: origem = "web-chat" → azul escuro; caso contrário → verde.
+ * - Texto: channel (Comercial, Marketing, Fluxo) ou Chat-Web quando origem é web-chat; senão "—" (sem fallback).
  */
-export function ConversaTags({ source, channel, className }: ConversaTagsProps) {
-  const normalizedSource = (source ?? '').trim().toLowerCase();
-  const normalizedChannel = (channel ?? '').trim().toLowerCase();
+export function ConversaTags({ origem, channel, className }: ConversaTagsProps) {
+  const normalizedOrigem = (origem ?? '').trim().toLowerCase();
 
-  // Círculo azul: source='web-chat' OU channel for mkt/marketing/comercial
-  const isWebChat =
-    normalizedSource === 'web-chat' ||
-    ['mkt', 'marketing', 'comercial'].includes(normalizedChannel);
+  // Cor da bolinha apenas por origem
+  const isWebChat = normalizedOrigem === 'web-chat';
 
+  // Label: channel normalizado (Comercial, Marketing, Fluxo); ou Chat-Web se web-chat; senão "—" (nunca fallback WhatsApp)
   let label: string;
-  if (isWebChat) {
-    if (normalizedChannel === 'mkt' || normalizedChannel === 'marketing') {
-      label = 'Marketing';
-    } else if (normalizedChannel === 'comercial') {
-      label = 'Comercial';
-    } else {
-      label = 'Chat-Web';
-    }
+  if (channel === 'Comercial' || channel === 'Marketing' || channel === 'Fluxo') {
+    label = channel;
+  } else if (isWebChat) {
+    label = 'Chat-Web';
   } else {
-    label = 'WhatsApp';
+    label = '—';
   }
 
   return (

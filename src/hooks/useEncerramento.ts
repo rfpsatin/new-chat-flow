@@ -106,14 +106,14 @@ export function useEncerrarConversa() {
       if (updateError) throw updateError;
 
       // 5. Verificar se é conversa do novo webhook n8n (whatsapp_cinemkt) ou do webhook antigo
-      // Buscar dados da conversa para verificar source/channel
+      // Buscar dados da conversa para verificar origem/channel
       const { data: conversaData, error: conversaDataError } = await supabase
         .from('conversas')
-        .select('source, channel, n8n_webhook_id')
+        .select('origem, channel, n8n_webhook_id')
         .eq('id', conversaId)
         .single();
 
-      const isN8nCinemktConversa = conversaData && (conversaData.source || conversaData.channel || conversaData.n8n_webhook_id);
+      const isN8nCinemktConversa = conversaData && (conversaData.origem || conversaData.channel || conversaData.n8n_webhook_id);
 
       // 5a. Se for conversa do novo webhook n8n, resetar human_mode
       if (isN8nCinemktConversa) {
