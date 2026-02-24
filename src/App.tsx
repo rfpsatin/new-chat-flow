@@ -9,6 +9,7 @@ import ContatosPage from "./pages/ContatosPage";
 import HistoricoPage from "./pages/HistoricoPage";
 import DashboardAtendimentosPage from "./pages/DashboardAtendimentosPage";
 import ConexaoPage from "./pages/ConexaoPage";
+import CampanhasPage from "./pages/CampanhasPage";
 import UsuariosPage from "./pages/admin/UsuariosPage";
 import MotivosPage from "./pages/admin/MotivosPage";
 import NotFound from "./pages/NotFound";
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/historico" element={<HistoricoPage />} />
             <Route path="/dashboard" element={<DashboardAtendimentosPage />} />
             <Route path="/conexao" element={<ConexaoPage />} />
+            <Route path="/campanhas" element={<CampanhasPage />} />
             <Route path="/atendentes" element={<UsuariosPage />} />
             <Route path="/admin/usuarios" element={<UsuariosPage />} />
             <Route path="/admin/motivos" element={<MotivosPage />} />

@@ -1,18 +1,22 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/contexts/AppContext';
 import { useContatos, useHistoricoContato } from '@/hooks/useContatos';
+import { useStartConversation } from '@/hooks/useStartConversation';
 import { MainLayout } from '@/components/MainLayout';
 import { Contato, HistoricoConversa } from '@/types/atendimento';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Search, Phone, Calendar, MessageSquare, User, Clock } from 'lucide-react';
+import { Search, Phone, Calendar, MessageSquare, User, Clock, Send, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMensagensHistorico } from '@/hooks/useHistorico';
+import { toast } from 'sonner';
 
 function MensagensDialog({ conversa, onClose }: { conversa: HistoricoConversa; onClose: () => void }) {
   const { data: mensagens, isLoading } = useMensagensHistorico(conversa.conversa_id);
@@ -62,13 +66,92 @@ function MensagensDialog({ conversa, onClose }: { conversa: HistoricoConversa; o
   );
 }
 
+function IniciarConversaDialog({
+  contato,
+  onClose,
+  onSuccess,
+}: {
+  contato: Contato;
+  onClose: () => void;
+  onSuccess: (conversaId: string) => void;
+}) {
+  const { empresaId, currentUser } = useApp();
+  const startConv = useStartConversation();
+  const [mensagem, setMensagem] = useState('');
+  const [link, setLink] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mensagem.trim()) return;
+    try {
+      const data = await startConv.mutateAsync({
+        empresa_id: empresaId,
+        contato_id: contato.id,
+        mensagem_inicial: mensagem.trim(),
+        link: link.trim() || undefined,
+        remetente_id: currentUser?.id,
+      });
+      toast.success('Conversa iniciada. Redirecionando para a fila.');
+      onSuccess(data.conversa_id);
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao iniciar conversa');
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={() => onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Iniciar conversa</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Enviar primeira mensagem para {contato.nome || contato.whatsapp_numero}
+        </p>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="text-sm font-medium">Mensagem *</label>
+            <textarea
+              value={mensagem}
+              onChange={(e) => setMensagem(e.target.value)}
+              className="mt-1 w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+              placeholder="Digite a mensagem inicial..."
+              required
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Link (opcional)</label>
+            <Input
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              placeholder="https://..."
+              className="mt-1"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={!mensagem.trim() || startConv.isPending}>
+              {startConv.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              Enviar e abrir conversa
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function ContatosPage() {
+  const navigate = useNavigate();
   const { empresaId } = useApp();
   const { data: contatos, isLoading } = useContatos(empresaId);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedContato, setSelectedContato] = useState<Contato | null>(null);
   const { data: historico } = useHistoricoContato(selectedContato?.id || null);
   const [selectedHistorico, setSelectedHistorico] = useState<HistoricoConversa | null>(null);
+  const [contatoParaIniciar, setContatoParaIniciar] = useState<Contato | null>(null);
 
   const filteredContatos = contatos?.filter(contato =>
     contato.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -153,7 +236,7 @@ export default function ContatosPage() {
                         {getInitials(selectedContato.nome)}
                       </AvatarFallback>
                     </Avatar>
-                    <div>
+                    <div className="flex-1">
                       <h2 className="text-xl font-bold text-foreground">
                         {selectedContato.nome || 'Sem nome'}
                       </h2>
@@ -168,6 +251,13 @@ export default function ContatosPage() {
                         </span>
                       </div>
                     </div>
+                    <Button
+                      onClick={() => setContatoParaIniciar(selectedContato)}
+                      className="gap-2"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      Iniciar conversa
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -239,6 +329,17 @@ export default function ContatosPage() {
         <MensagensDialog
           conversa={selectedHistorico}
           onClose={() => setSelectedHistorico(null)}
+        />
+      )}
+
+      {contatoParaIniciar && (
+        <IniciarConversaDialog
+          contato={contatoParaIniciar}
+          onClose={() => setContatoParaIniciar(null)}
+          onSuccess={(conversaId) => {
+            setContatoParaIniciar(null);
+            navigate(`/?conversa_id=${conversaId}`);
+          }}
         />
       )}
     </MainLayout>

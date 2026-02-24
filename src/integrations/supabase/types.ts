@@ -94,10 +94,113 @@ export type Database = {
           },
         ]
       }
+      campanha_destinatarios: {
+        Row: {
+          id: string
+          campanha_id: string
+          contato_id: string
+          whatsapp_numero: string
+          status_envio: string
+          tentativas: number
+          ultima_tentativa_em: string | null
+          mensagem_id_whatsapp: string | null
+          conversa_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          campanha_id: string
+          contato_id: string
+          whatsapp_numero: string
+          status_envio?: string
+          tentativas?: number
+          ultima_tentativa_em?: string | null
+          mensagem_id_whatsapp?: string | null
+          conversa_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          campanha_id?: string
+          contato_id?: string
+          whatsapp_numero?: string
+          status_envio?: string
+          tentativas?: number
+          ultima_tentativa_em?: string | null
+          mensagem_id_whatsapp?: string | null
+          conversa_id?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          { foreignKeyName: "campanha_destinatarios_campanha_id_fkey", columns: ["campanha_id"], referencedRelation: "campanhas", referencedColumns: ["id"] },
+          { foreignKeyName: "campanha_destinatarios_contato_id_fkey", columns: ["contato_id"], referencedRelation: "contatos", referencedColumns: ["id"] },
+          { foreignKeyName: "campanha_destinatarios_conversa_id_fkey", columns: ["conversa_id"], referencedRelation: "conversas", referencedColumns: ["id"] },
+        ]
+      }
+      campanhas: {
+        Row: {
+          id: string
+          empresa_id: string
+          nome: string
+          descricao: string | null
+          tags: string[]
+          mensagem_texto: string
+          midia_url: string | null
+          link: string | null
+          status: string
+          agendado_para: string | null
+          iniciada_em: string | null
+          finalizada_em: string | null
+          envios_por_minuto: number | null
+          envios_por_hora: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          empresa_id: string
+          nome: string
+          descricao?: string | null
+          tags?: string[]
+          mensagem_texto: string
+          midia_url?: string | null
+          link?: string | null
+          status?: string
+          agendado_para?: string | null
+          iniciada_em?: string | null
+          finalizada_em?: string | null
+          envios_por_minuto?: number | null
+          envios_por_hora?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          empresa_id?: string
+          nome?: string
+          descricao?: string | null
+          tags?: string[]
+          mensagem_texto?: string
+          midia_url?: string | null
+          link?: string | null
+          status?: string
+          agendado_para?: string | null
+          iniciada_em?: string | null
+          finalizada_em?: string | null
+          envios_por_minuto?: number | null
+          envios_por_hora?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          { foreignKeyName: "campanhas_empresa_id_fkey", columns: ["empresa_id"], referencedRelation: "empresas", referencedColumns: ["id"] },
+        ]
+      }
       conversas: {
         Row: {
           agente_responsavel_id: string | null
           canal: string
+          campanha_id: string | null
           channel: string | null
           contato_id: string
           created_at: string
@@ -113,6 +216,7 @@ export type Database = {
           nota_satisfacao: number | null
           nr_protocolo: string | null
           origem: string | null
+          origem_inicial: string | null
           pesquisa_enviada_em: string | null
           pesquisa_respondida_em: string | null
           resumo: string | null
@@ -122,6 +226,7 @@ export type Database = {
         Insert: {
           agente_responsavel_id?: string | null
           canal?: string
+          campanha_id?: string | null
           channel?: string | null
           contato_id: string
           created_at?: string
@@ -137,6 +242,7 @@ export type Database = {
           nota_satisfacao?: number | null
           nr_protocolo?: string | null
           origem?: string | null
+          origem_inicial?: string | null
           pesquisa_enviada_em?: string | null
           pesquisa_respondida_em?: string | null
           resumo?: string | null
@@ -146,6 +252,7 @@ export type Database = {
         Update: {
           agente_responsavel_id?: string | null
           canal?: string
+          campanha_id?: string | null
           channel?: string | null
           contato_id?: string
           created_at?: string
@@ -161,6 +268,7 @@ export type Database = {
           nota_satisfacao?: number | null
           nr_protocolo?: string | null
           origem?: string | null
+          origem_inicial?: string | null
           pesquisa_enviada_em?: string | null
           pesquisa_respondida_em?: string | null
           resumo?: string | null
@@ -208,6 +316,13 @@ export type Database = {
             columns: ["motivo_encerramento_id"]
             isOneToOne: false
             referencedRelation: "motivos_encerramento"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversas_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "campanhas"
             referencedColumns: ["id"]
           },
         ]
@@ -575,6 +690,24 @@ export type Database = {
       }
     }
     Views: {
+      vw_campanha_stats: {
+        Row: {
+          campanha_id: string
+          empresa_id: string
+          nome: string
+          status: string
+          agendado_para: string | null
+          iniciada_em: string | null
+          finalizada_em: string | null
+          total_destinatarios: number
+          pendentes: number
+          enviados: number
+          erros: number
+          entregues: number
+          conversas_abertas: number
+        }
+        Relationships: []
+      }
       vw_fila_atendimento: {
         Row: {
           agente_nome: string | null

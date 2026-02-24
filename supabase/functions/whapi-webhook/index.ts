@@ -209,6 +209,29 @@ Deno.serve(async (req) => {
           if (!conversa) {
             throw new Error('Failed to find or create conversation')
           }
+
+          // Vincular conversa à campanha se o contato respondeu após receber disparo
+          const { data: destCampanha } = await supabase
+            .from('campanha_destinatarios')
+            .select('id, campanha_id')
+            .eq('contato_id', contato.id)
+            .in('status_envio', ['enviado', 'entregue', 'lido'])
+            .is('conversa_id', null)
+            .order('ultima_tentativa_em', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+          if (destCampanha) {
+            await supabase
+              .from('campanha_destinatarios')
+              .update({ conversa_id: conversa.id })
+              .eq('id', destCampanha.id)
+            await supabase
+              .from('conversas')
+              .update({ campanha_id: destCampanha.campanha_id, updated_at: new Date().toISOString() })
+              .eq('id', conversa.id)
+            console.log(`[${requestId}] Linked conversation to campaign: ${destCampanha.campanha_id}`)
+          }
         }
 
         // Insert message with correct direction

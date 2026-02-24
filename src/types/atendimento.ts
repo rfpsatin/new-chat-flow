@@ -139,3 +139,67 @@ export interface FiltrosHistorico {
   dataInicio: Date | null;
   dataFim: Date | null;
 }
+
+export type StatusCampanha =
+  | 'draft'
+  | 'agendada'
+  | 'em_execucao'
+  | 'concluida'
+  | 'pausada'
+  | 'erro';
+
+export type StatusEnvioCampanha =
+  | 'pendente'
+  | 'enviando'
+  | 'enviado'
+  | 'erro_envio'
+  | 'entregue'
+  | 'lido';
+
+export interface Campanha {
+  id: string;
+  empresa_id: string;
+  nome: string;
+  descricao: string | null;
+  tags: string[];
+  mensagem_texto: string;
+  midia_url: string | null;
+  link: string | null;
+  status: StatusCampanha;
+  agendado_para: string | null;
+  iniciada_em: string | null;
+  finalizada_em: string | null;
+  envios_por_minuto: number | null;
+  envios_por_hora: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CampanhaDestinatario {
+  id: string;
+  campanha_id: string;
+  contato_id: string;
+  whatsapp_numero: string;
+  status_envio: StatusEnvioCampanha;
+  tentativas: number;
+  ultima_tentativa_em: string | null;
+  mensagem_id_whatsapp: string | null;
+  conversa_id: string | null;
+  created_at: string;
+}
+
+export interface CampanhaStats {
+  campanha_id: string;
+  empresa_id: string;
+  nome: string;
+  status: StatusCampanha;
+  agendado_para: string | null;
+  iniciada_em: string | null;
+  finalizada_em: string | null;
+  total_destinatarios: number;
+  pendentes: number;
+  enviados: number;
+  erros: number;
+  entregues: number;
+  conversas_abertas: number;
+}

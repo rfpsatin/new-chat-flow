@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { useFila, useAssumirConversa } from '@/hooks/useFila';
 import { ConversaItem } from '@/components/ConversaItem';
@@ -12,12 +12,19 @@ import { toast } from 'sonner';
 interface FilaPanelProps {
   onSelectConversa: (conversa: FilaAtendimento) => void;
   selectedConversaId: string | null;
+  openConversaId?: string | null;
 }
 
-export function FilaPanel({ onSelectConversa, selectedConversaId }: FilaPanelProps) {
+export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId }: FilaPanelProps) {
   const { empresaId, currentUser } = useApp();
   const { data: fila, isLoading } = useFila(empresaId);
   const assumirConversa = useAssumirConversa();
+
+  useEffect(() => {
+    if (!openConversaId || !fila?.length) return;
+    const c = fila.find((f) => f.conversa_id === openConversaId);
+    if (c) onSelectConversa(c);
+  }, [openConversaId, fila, onSelectConversa]);
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');

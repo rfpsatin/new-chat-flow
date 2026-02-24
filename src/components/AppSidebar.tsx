@@ -27,11 +27,13 @@ import {
   FileText,
   BarChart3,
   Wifi,
+  Megaphone,
 } from "lucide-react";
 
 const menuItems = [
   { title: "Fila de Atendimento", url: "/", icon: LayoutDashboard },
   { title: "Contatos", url: "/contatos", icon: Users },
+  { title: "Campanhas", url: "/campanhas", icon: Megaphone },
   { title: "Atendentes", url: "/atendentes", icon: Headphones },
   { title: "Histórico", url: "/historico", icon: Clock },
   { title: "Dashboard", url: "/dashboard", icon: BarChart3 },
