@@ -225,6 +225,7 @@ export type Database = {
           nota_satisfacao: number | null
           nr_protocolo: string | null
           origem: string | null
+          origem_inicial: string | null
           pesquisa_enviada_em: string | null
           pesquisa_respondida_em: string | null
           resumo: string | null
@@ -250,6 +251,7 @@ export type Database = {
           nota_satisfacao?: number | null
           nr_protocolo?: string | null
           origem?: string | null
+          origem_inicial?: string | null
           pesquisa_enviada_em?: string | null
           pesquisa_respondida_em?: string | null
           resumo?: string | null
@@ -275,6 +277,7 @@ export type Database = {
           nota_satisfacao?: number | null
           nr_protocolo?: string | null
           origem?: string | null
+          origem_inicial?: string | null
           pesquisa_enviada_em?: string | null
           pesquisa_respondida_em?: string | null
           resumo?: string | null
