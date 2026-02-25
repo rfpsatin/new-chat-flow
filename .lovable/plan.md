@@ -1,38 +1,86 @@
 
 
-## Build Error Fix: `useCriarCampanha` in `useCampanhas.ts`
+## Criar tabelas de Campanhas no banco de dados
 
-### Problem
+As tabelas `campanhas`, `campanha_destinatarios` e a view `vw_campanha_stats` referenciadas no codigo nao existem no banco. Precisam ser criadas via migracao.
 
-The TypeScript error at line 80 of `src/hooks/useCampanhas.ts` occurs because `.insert(payload)` receives `Partial<Campanha>` (the app's custom type), but Supabase's generated types expect `Database['public']['Tables']['campanhas']['Insert']` or an array of it. The types differ slightly (e.g., `status` is `StatusCampanha` in our type vs `string` in the DB type).
+### Migracao SQL
 
-### Fix
+Uma unica migracao criara:
 
-In `src/hooks/useCampanhas.ts`, change the mutation function signature to accept the DB Insert type and cast accordingly:
+1. **Tabela `campanhas`** -- armazena cada campanha com nome, mensagem, status, agendamento, etc.
+2. **Tabela `campanha_destinatarios`** -- lista de contatos vinculados a cada campanha, com status de envio individual.
+3. **View `vw_campanha_stats`** -- agregacao que conta destinatarios por status para exibicao na listagem.
+4. **RLS policies** -- permissivas para usuarios autenticados (mesmo padrao das demais tabelas do projeto).
 
-**File: `src/hooks/useCampanhas.ts`** (line ~78-86)
+### Detalhes tecnicos
 
-Replace:
-```typescript
-mutationFn: async (payload: Partial<Campanha>) => {
-  const { data, error } = await supabase
-    .from('campanhas')
-    .insert(payload)
-    .select()
-    .single();
+```sql
+-- 1. campanhas
+CREATE TABLE public.campanhas (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  empresa_id uuid NOT NULL,
+  nome text NOT NULL,
+  descricao text,
+  tags text[] DEFAULT '{}',
+  mensagem_texto text NOT NULL,
+  midia_url text,
+  link text,
+  status text NOT NULL DEFAULT 'draft',
+  agendado_para timestamptz,
+  iniciada_em timestamptz,
+  finalizada_em timestamptz,
+  envios_por_minuto int,
+  envios_por_hora int,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.campanhas ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Usuarios podem gerenciar campanhas"
+  ON public.campanhas FOR ALL USING (true) WITH CHECK (true);
+
+-- 2. campanha_destinatarios
+CREATE TABLE public.campanha_destinatarios (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  campanha_id uuid NOT NULL REFERENCES public.campanhas(id) ON DELETE CASCADE,
+  contato_id uuid NOT NULL,
+  whatsapp_numero text NOT NULL,
+  status_envio text NOT NULL DEFAULT 'pendente',
+  tentativas int NOT NULL DEFAULT 0,
+  ultima_tentativa_em timestamptz,
+  mensagem_id_whatsapp text,
+  conversa_id uuid,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(campanha_id, contato_id)
+);
+
+ALTER TABLE public.campanha_destinatarios ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Usuarios podem gerenciar destinatarios"
+  ON public.campanha_destinatarios FOR ALL USING (true) WITH CHECK (true);
+
+-- 3. view de stats
+CREATE OR REPLACE VIEW public.vw_campanha_stats AS
+SELECT
+  c.id AS campanha_id,
+  c.empresa_id,
+  c.nome,
+  c.status,
+  c.agendado_para,
+  c.iniciada_em,
+  c.finalizada_em,
+  COUNT(d.id)::int AS total_destinatarios,
+  COUNT(d.id) FILTER (WHERE d.status_envio = 'pendente')::int AS pendentes,
+  COUNT(d.id) FILTER (WHERE d.status_envio = 'enviado')::int AS enviados,
+  COUNT(d.id) FILTER (WHERE d.status_envio = 'erro_envio')::int AS erros,
+  COUNT(d.id) FILTER (WHERE d.status_envio = 'entregue')::int AS entregues,
+  COUNT(d.id) FILTER (WHERE d.conversa_id IS NOT NULL)::int AS conversas_abertas
+FROM public.campanhas c
+LEFT JOIN public.campanha_destinatarios d ON d.campanha_id = c.id
+GROUP BY c.id;
 ```
 
-With:
-```typescript
-mutationFn: async (payload: Partial<Campanha>) => {
-  const { data, error } = await supabase
-    .from('campanhas')
-    .insert(payload as any)
-    .select()
-    .single();
-```
+### Nenhuma alteracao de codigo necessaria
 
-This is a minimal cast to resolve the type mismatch between the app's `Campanha` interface and the auto-generated Supabase Insert type. The actual data shape is correct -- both types have the same fields, the mismatch is purely in the `status` field type narrowing (`StatusCampanha` enum vs `string`).
-
-No other changes needed. The table already exists in the database, the wizard logic is correct, and the hooks are properly wired.
+Os hooks em `useCampanhas.ts` e a pagina `CampanhasPage.tsx` ja estao implementados e compatíveis com essa estrutura. Apos criar as tabelas, o fluxo de criar/listar/agendar campanhas funcionara.
 
