@@ -59,6 +59,117 @@ export type Database = {
           },
         ]
       }
+      campanha_destinatarios: {
+        Row: {
+          campanha_id: string
+          contato_id: string
+          conversa_id: string | null
+          created_at: string
+          id: string
+          mensagem_id_whatsapp: string | null
+          status_envio: string
+          tentativas: number
+          ultima_tentativa_em: string | null
+          whatsapp_numero: string
+        }
+        Insert: {
+          campanha_id: string
+          contato_id: string
+          conversa_id?: string | null
+          created_at?: string
+          id?: string
+          mensagem_id_whatsapp?: string | null
+          status_envio?: string
+          tentativas?: number
+          ultima_tentativa_em?: string | null
+          whatsapp_numero: string
+        }
+        Update: {
+          campanha_id?: string
+          contato_id?: string
+          conversa_id?: string | null
+          created_at?: string
+          id?: string
+          mensagem_id_whatsapp?: string | null
+          status_envio?: string
+          tentativas?: number
+          ultima_tentativa_em?: string | null
+          whatsapp_numero?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campanha_destinatarios_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "campanhas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campanha_destinatarios_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "vw_campanha_stats"
+            referencedColumns: ["campanha_id"]
+          },
+        ]
+      }
+      campanhas: {
+        Row: {
+          agendado_para: string | null
+          created_at: string
+          descricao: string | null
+          empresa_id: string
+          envios_por_hora: number | null
+          envios_por_minuto: number | null
+          finalizada_em: string | null
+          id: string
+          iniciada_em: string | null
+          link: string | null
+          mensagem_texto: string
+          midia_url: string | null
+          nome: string
+          status: string
+          tags: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          agendado_para?: string | null
+          created_at?: string
+          descricao?: string | null
+          empresa_id: string
+          envios_por_hora?: number | null
+          envios_por_minuto?: number | null
+          finalizada_em?: string | null
+          id?: string
+          iniciada_em?: string | null
+          link?: string | null
+          mensagem_texto: string
+          midia_url?: string | null
+          nome: string
+          status?: string
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          agendado_para?: string | null
+          created_at?: string
+          descricao?: string | null
+          empresa_id?: string
+          envios_por_hora?: number | null
+          envios_por_minuto?: number | null
+          finalizada_em?: string | null
+          id?: string
+          iniciada_em?: string | null
+          link?: string | null
+          mensagem_texto?: string
+          midia_url?: string | null
+          nome?: string
+          status?: string
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       contatos: {
         Row: {
           created_at: string
@@ -575,6 +686,24 @@ export type Database = {
       }
     }
     Views: {
+      vw_campanha_stats: {
+        Row: {
+          agendado_para: string | null
+          campanha_id: string | null
+          conversas_abertas: number | null
+          empresa_id: string | null
+          entregues: number | null
+          enviados: number | null
+          erros: number | null
+          finalizada_em: string | null
+          iniciada_em: string | null
+          nome: string | null
+          pendentes: number | null
+          status: string | null
+          total_destinatarios: number | null
+        }
+        Relationships: []
+      }
       vw_fila_atendimento: {
         Row: {
           agente_nome: string | null
