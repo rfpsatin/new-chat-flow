@@ -127,6 +127,7 @@ export type Database = {
           link: string | null
           mensagem_texto: string
           midia_url: string | null
+          modo_resposta: string | null
           nome: string
           status: string
           tags: string[] | null
@@ -145,6 +146,7 @@ export type Database = {
           link?: string | null
           mensagem_texto: string
           midia_url?: string | null
+          modo_resposta?: string | null
           nome: string
           status?: string
           tags?: string[] | null
@@ -163,6 +165,7 @@ export type Database = {
           link?: string | null
           mensagem_texto?: string
           midia_url?: string | null
+          modo_resposta?: string | null
           nome?: string
           status?: string
           tags?: string[] | null
