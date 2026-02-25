@@ -1,59 +1,75 @@
 
 
-## Corrigir duplicação de mensagens no webhook `whapi-webhook`
+## Plano: Configurar agendamento automático para `run-campaigns`
 
 ### Problema
 
-Quando o agente inicia uma conversa ou envia mensagem, ela é gravada no banco por `start-conversation`, `whapi-send-message` ou `useEnviarMensagem`. Depois, a Whapi envia o webhook de volta com `from_me: true` e o webhook insere a **mesma mensagem novamente**, causando duplicação na interface.
+A edge function `run-campaigns` existe e funciona, mas nada a invoca automaticamente. Sem um cron job, campanhas agendadas nunca são processadas. Além disso, a função não está registrada no `config.toml` com `verify_jwt = false`, o que pode bloquear chamadas do cron.
 
-### Correção
+Há também um problema de timezone no `CampanhaDetailDialog`: o valor do `datetime-local` é enviado "cru" (sem conversão para ISO/UTC), podendo causar disparos em horário errado.
 
-No loop de processamento de mensagens em `supabase/functions/whapi-webhook/index.ts`, adicionar um `continue` imediato quando `from_me === true`, logo após detectar `isFromBot`. Isso elimina todo o processamento de mensagens de saída, que já são registradas na origem.
+### Etapas
 
-Também remover o bloco morto (linhas 149-193) que tenta buscar contato/conversa para mensagens de bot — esse código nunca será alcançado após o `continue`.
+#### 1. Registrar `run-campaigns` no `config.toml`
 
-#### Alteração (linha 137-193 → simplificado)
+Adicionar a entrada para que a função aceite chamadas sem JWT (necessário para o cron via `pg_net`):
 
-```typescript
-const isFromBot = message.from_me === true
-
-// Mensagens de saída (from_me=true) já são registradas por
-// start-conversation, whapi-send-message, n8n-webhook, etc.
-// Inserir aqui causaria duplicação.
-if (isFromBot) {
-  console.log(`[${requestId}] Outgoing message (from_me=true), skipping to avoid duplicate`)
-  continue
-}
-
-// Daqui para baixo, apenas mensagens de entrada (cliente)
-const whatsappNumero = message.from
-  .replace('@s.whatsapp.net', '')
-  .replace('@c.us', '')
-
-console.log(`[${requestId}] WhatsApp number: ${whatsappNumero}`)
-
-let contato: any
-let conversa: any
-
-// Client messages: find or create contact and conversation
-contato = await findOrCreateContato(
-  supabase,
-  empresaId,
-  whatsappNumero,
-  message.from_name,
-  requestId
-)
-
-if (!contato) {
-  throw new Error('Failed to find or create contact')
-}
+```toml
+[functions.run-campaigns]
+verify_jwt = false
 ```
 
-E nas linhas seguintes, remover os `if (!isFromBot)` que envolviam a criação de conversa e a detecção de pedido de atendimento humano, já que agora **todas** as mensagens que chegam a esse ponto são de entrada. Simplifica leitura e elimina código morto.
+#### 2. Criar cron job via SQL (pg_cron + pg_net)
 
-### Impacto
+Habilitar as extensões `pg_cron` e `pg_net` (se ainda não estiverem) e criar um schedule que chama `run-campaigns` a cada minuto:
 
-- Nenhuma alteração de frontend necessária
-- A inserção de mensagem em `mensagens_ativas` continua normalmente para mensagens de entrada (`in/cliente`)
-- Mensagens de saída continuam sendo registradas apenas uma vez, na origem
+```sql
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+CREATE EXTENSION IF NOT EXISTS pg_net;
+
+SELECT cron.schedule(
+  'run-campaigns-every-minute',
+  '* * * * *',
+  $$
+  SELECT net.http_post(
+    url := 'https://hyizldxjiwjeruxqrqbv.supabase.co/functions/v1/run-campaigns',
+    headers := '{"Content-Type":"application/json","Authorization":"Bearer <ANON_KEY>"}'::jsonb,
+    body := '{}'::jsonb
+  ) AS request_id;
+  $$
+);
+```
+
+Isso será executado via ferramenta de insert SQL (não migração), pois contém dados específicos do projeto (URL e anon key).
+
+#### 3. Corrigir timezone no `CampanhaDetailDialog`
+
+No `handleAgendar` do `CampanhaDetailDialog`, converter o valor do `datetime-local` para ISO antes de enviar:
+
+```typescript
+// Antes (cru):
+await agendar.mutateAsync({ campanhaId, agendado_para: agendadoPara });
+
+// Depois (convertido para UTC):
+await agendar.mutateAsync({
+  campanhaId,
+  agendado_para: new Date(agendadoPara).toISOString(),
+});
+```
+
+O wizard (`NovaCampanhaWizard`) já faz essa conversão corretamente.
+
+### Resumo das alterações
+
+| Arquivo / Recurso | Alteração |
+|---|---|
+| `supabase/config.toml` | Adicionar `[functions.run-campaigns] verify_jwt = false` |
+| SQL (insert, não migração) | Criar cron job `run-campaigns-every-minute` com pg_cron + pg_net |
+| `src/pages/CampanhasPage.tsx` | Converter `agendadoPara` para ISO no `CampanhaDetailDialog` |
+
+### Detalhes técnicos
+
+- As variáveis `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` já estão disponíveis automaticamente em todas as edge functions — não precisam de configuração adicional.
+- O cron roda a cada minuto. A função já tem lógica de batch e rate limit internos.
+- A conversão de timezone garante que o horário selecionado pelo usuário (horário local do navegador) seja armazenado corretamente em UTC.
 
