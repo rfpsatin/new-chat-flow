@@ -1,24 +1,23 @@
 
 
-## Migração: Adicionar coluna `campanha_id` na tabela `conversas`
+## Migração: Adicionar coluna `origem_inicial` na tabela `conversas`
 
-### Verificação
+### Problema
 
-Confirmei que a coluna `campanha_id` **não existe** na tabela `conversas`. Precisa ser criada.
+A edge function `start-conversation` já insere o campo `origem_inicial` ao criar conversas, mas a coluna não existe na tabela. Isso causa erro silencioso no insert.
 
 ### SQL da migração
 
 ```sql
 ALTER TABLE public.conversas
-ADD COLUMN campanha_id uuid REFERENCES public.campanhas(id) ON DELETE SET NULL;
+ADD COLUMN origem_inicial text;
 ```
 
-A coluna será:
-- **Tipo**: `uuid`, nullable (nem toda conversa vem de uma campanha)
-- **Foreign key**: referencia `campanhas(id)` com `ON DELETE SET NULL` -- se a campanha for removida, a conversa mantém-se mas perde a referência
-- **Sem valor default**: conversas existentes ficam com `NULL`
+- **Tipo**: `text`, nullable
+- **Sem default**: conversas existentes ficam com `NULL`
+- Valores esperados: `'agente'`, `'sistema'`, `'campanha'`
 
 ### Impacto no código
 
-Nenhuma alteração de código é necessária imediatamente. A interface `Conversa` em `src/types/atendimento.ts` já pode receber campos opcionais, e o Supabase client aceita a nova coluna automaticamente. Se quiser usar o campo no frontend futuramente, basta adicionar `campanha_id?: string | null` à interface.
+Nenhuma alteração necessária. A edge function `start-conversation` já envia esse campo no insert. O tipo `Conversa` em `src/types/atendimento.ts` já aceita campos opcionais extras via o client Supabase.
 
