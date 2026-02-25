@@ -1,0 +1,1 @@
+ALTER TABLE public.campanhas ADD COLUMN IF NOT EXISTS modo_resposta text DEFAULT NULL;
