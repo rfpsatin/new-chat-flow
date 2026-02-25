@@ -1,52 +1,38 @@
 
 
-## Problema
+## Build Error Fix: `useCriarCampanha` in `useCampanhas.ts`
 
-1. **43 conversas com `origem = NULL`** -- o backfill anterior so atualizou conversas ativas (`status != 'encerrado'`), deixando as encerradas sem origem.
-2. **Label incorreto** -- quando `origem = "whatsapp"` e nao ha channel, o componente exibe "---" em vez de "WhatsApp".
+### Problem
 
-## Correcoes
+The TypeScript error at line 80 of `src/hooks/useCampanhas.ts` occurs because `.insert(payload)` receives `Partial<Campanha>` (the app's custom type), but Supabase's generated types expect `Database['public']['Tables']['campanhas']['Insert']` or an array of it. The types differ slightly (e.g., `status` is `StatusCampanha` in our type vs `string` in the DB type).
 
-### 1. Backfill completo de todas as conversas
+### Fix
 
-Atualizar TODAS as conversas (ativas e encerradas) que ainda tem `origem = NULL`:
+In `src/hooks/useCampanhas.ts`, change the mutation function signature to accept the DB Insert type and cast accordingly:
 
-- Conversas com mensagens contendo `payload->>'origem' = 'web-chat'` ou `payload->>'chat_name' = 'web-chat'` -> `origem = 'web-chat'`
-- Todas as demais com `origem IS NULL` -> `origem = 'whatsapp'`
+**File: `src/hooks/useCampanhas.ts`** (line ~78-86)
 
-Isso sera feito consultando tanto `mensagens_ativas` quanto `mensagens_historico` (onde ficam as mensagens de conversas encerradas).
-
-### 2. Atualizar `ConversaTags.tsx`
-
-Ajustar a logica de label para que, quando `origem = "whatsapp"` e nao ha channel reconhecido, exiba "WhatsApp" em vez de "---":
-
-- channel reconhecido (Comercial, Marketing, Fluxo) -> exibe o channel
-- sem channel + origem web-chat -> "Chat-Web"
-- sem channel + origem whatsapp (ou qualquer outro) -> "WhatsApp"
-
-### Resultado esperado
-
-- Todas as 43 conversas sem origem passam a ter `origem = 'whatsapp'` (ou `'web-chat'` se identificadas nos payloads)
-- Conversas whatsapp sem channel exibem "🟢 WhatsApp"
-- Conversas web-chat sem channel exibem "🔵 Chat-Web"
-- Conversas com channel exibem a bolinha colorida + nome do channel
-
-### Detalhes tecnicos
-
-**Arquivo**: `src/components/ConversaTags.tsx`
-- Linha 33: trocar `label = '—'` por `label = 'WhatsApp'`
-
-**SQL** (via insert tool):
-```sql
--- Identificar web-chat em mensagens historicas
-UPDATE conversas SET origem = 'web-chat'
-WHERE origem IS NULL AND id IN (
-  SELECT DISTINCT conversa_id FROM mensagens_historico
-  WHERE payload->>'origem' = 'web-chat' OR payload->>'chat_name' = 'web-chat'
-);
-
--- Todas as restantes sem origem -> whatsapp
-UPDATE conversas SET origem = 'whatsapp'
-WHERE origem IS NULL;
+Replace:
+```typescript
+mutationFn: async (payload: Partial<Campanha>) => {
+  const { data, error } = await supabase
+    .from('campanhas')
+    .insert(payload)
+    .select()
+    .single();
 ```
+
+With:
+```typescript
+mutationFn: async (payload: Partial<Campanha>) => {
+  const { data, error } = await supabase
+    .from('campanhas')
+    .insert(payload as any)
+    .select()
+    .single();
+```
+
+This is a minimal cast to resolve the type mismatch between the app's `Campanha` interface and the auto-generated Supabase Insert type. The actual data shape is correct -- both types have the same fields, the mismatch is purely in the `status` field type narrowing (`StatusCampanha` enum vs `string`).
+
+No other changes needed. The table already exists in the database, the wizard logic is correct, and the hooks are properly wired.
 
