@@ -6,11 +6,13 @@ import {
   CampanhaStats,
 } from '@/types/atendimento';
 
+const sb = supabase as any;
+
 export function useCampanhas(empresaId: string) {
   return useQuery({
     queryKey: ['campanhas', empresaId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await sb
         .from('campanhas')
         .select('*')
         .eq('empresa_id', empresaId)
@@ -26,7 +28,7 @@ export function useCampanhasStats(empresaId: string) {
   return useQuery({
     queryKey: ['campanhas-stats', empresaId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await sb
         .from('vw_campanha_stats')
         .select('*')
         .eq('empresa_id', empresaId);
@@ -42,7 +44,7 @@ export function useCampanha(campanhaId: string | null) {
     queryKey: ['campanha', campanhaId],
     queryFn: async () => {
       if (!campanhaId) return null;
-      const { data, error } = await supabase
+      const { data, error } = await sb
         .from('campanhas')
         .select('*')
         .eq('id', campanhaId)
@@ -59,7 +61,7 @@ export function useCampanhaDestinatarios(campanhaId: string | null) {
     queryKey: ['campanha-destinatarios', campanhaId],
     queryFn: async () => {
       if (!campanhaId) return [];
-      const { data, error } = await supabase
+      const { data, error } = await sb
         .from('campanha_destinatarios')
         .select('*')
         .eq('campanha_id', campanhaId)
@@ -73,9 +75,9 @@ export function useCampanhaDestinatarios(campanhaId: string | null) {
 
 export function useCriarCampanha() {
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (payload: Partial<Campanha>) => {
-      const { data, error } = await supabase
+  return useMutation<Campanha, Error, Partial<Campanha>>({
+    mutationFn: async (payload) => {
+      const { data, error } = await sb
         .from('campanhas')
         .insert(payload)
         .select()
@@ -92,15 +94,9 @@ export function useCriarCampanha() {
 
 export function useAtualizarCampanha() {
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({
-      id,
-      payload,
-    }: {
-      id: string;
-      payload: Partial<Campanha>;
-    }) => {
-      const { data, error } = await supabase
+  return useMutation<Campanha, Error, { id: string; payload: Partial<Campanha> }>({
+    mutationFn: async ({ id, payload }) => {
+      const { data, error } = await sb
         .from('campanhas')
         .update({ ...payload, updated_at: new Date().toISOString() })
         .eq('id', id)
@@ -119,15 +115,9 @@ export function useAtualizarCampanha() {
 
 export function useAgendarCampanha() {
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({
-      campanhaId,
-      agendado_para,
-    }: {
-      campanhaId: string;
-      agendado_para: string;
-    }) => {
-      const { data, error } = await supabase
+  return useMutation<Campanha, Error, { campanhaId: string; agendado_para: string }>({
+    mutationFn: async ({ campanhaId, agendado_para }) => {
+      const { data, error } = await sb
         .from('campanhas')
         .update({
           status: 'agendada',
@@ -150,16 +140,8 @@ export function useAgendarCampanha() {
 
 export function useAdicionarDestinatarios() {
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({
-      campanha_id,
-      contato_ids,
-      empresa_id,
-    }: {
-      campanha_id: string;
-      contato_ids: string[];
-      empresa_id: string;
-    }) => {
+  return useMutation<{ added: number }, Error, { campanha_id: string; contato_ids: string[]; empresa_id: string }>({
+    mutationFn: async ({ campanha_id, contato_ids, empresa_id }) => {
       const contatos = await supabase
         .from('contatos')
         .select('id, whatsapp_numero')
@@ -173,7 +155,7 @@ export function useAdicionarDestinatarios() {
         whatsapp_numero: c.whatsapp_numero,
       }));
 
-      const { error } = await supabase.from('campanha_destinatarios').upsert(rows, {
+      const { error } = await sb.from('campanha_destinatarios').upsert(rows, {
         onConflict: 'campanha_id,contato_id',
         ignoreDuplicates: true,
       });
