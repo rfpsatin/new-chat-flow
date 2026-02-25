@@ -173,6 +173,22 @@ Deno.serve(async (req) => {
       .update({ last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })
       .eq('id', conversaId)
 
+    // Se a conversa foi criada agora e há um remetente (agente),
+    // já atribui a conversa para ele e coloca em atendimento humano.
+    if (isNewConversa && remetente_id) {
+      const { error: atribuirError } = await supabase.rpc('atribuir_agente', {
+        p_conversa_id: conversaId,
+        p_agente_id: remetente_id,
+      })
+
+      if (atribuirError) {
+        console.error(
+          `[${requestId}] Error atribuindo agente na criação da conversa:`,
+          atribuirError
+        )
+      }
+    }
+    
     console.log(`[${requestId}] Conversation started: ${conversaId}`)
 
     return new Response(JSON.stringify({

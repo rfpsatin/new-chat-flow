@@ -135,6 +135,16 @@ Deno.serve(async (req) => {
         console.log(`[${requestId}] Type: ${message.type}`)
         
         const isFromBot = message.from_me === true
+
+        // Outgoing messages (from_me = true) já são registradas no momento do envio
+        // pelas funções que chamam a Whapi (whapi-send-message, n8n, etc).
+        // Se inserirmos novamente aqui, teremos mensagens duplicadas no front.
+        if (isFromBot) {
+          console.log(
+            `[${requestId}] Outgoing message (from_me=true), skipping DB insert to avoid duplicate`
+          )
+          continue
+        }
         
         // For bot messages, contact number is in chat_id; for client messages, in from
         const whatsappNumero = (isFromBot ? message.chat_id : message.from)
