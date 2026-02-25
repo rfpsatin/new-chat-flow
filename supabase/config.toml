@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.n8n-reset-human-mode]
 verify_jwt = false
+
+[functions.start-conversation]
+verify_jwt = false
