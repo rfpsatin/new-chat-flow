@@ -1,41 +1,24 @@
 
 
-## Garantir deploy da edge function `start-conversation`
+## Migração: Adicionar coluna `campanha_id` na tabela `conversas`
 
-### Problema
+### Verificação
 
-A function `start-conversation` existe no codigo (`supabase/functions/start-conversation/index.ts`) mas **nao esta registrada no `supabase/config.toml`**. Sem a entrada no config, a function nao e deployada automaticamente e chamadas do frontend falham.
+Confirmei que a coluna `campanha_id` **não existe** na tabela `conversas`. Precisa ser criada.
 
-Alem disso, os CORS headers estao incompletos -- faltam headers que o cliente envia automaticamente (`x-supabase-client-platform`, etc.), o que pode causar falhas no preflight.
+### SQL da migração
 
-### Correcoes
-
-#### 1. Adicionar entrada no `supabase/config.toml`
-
-Adicionar:
-
-```toml
-[functions.start-conversation]
-verify_jwt = false
+```sql
+ALTER TABLE public.conversas
+ADD COLUMN campanha_id uuid REFERENCES public.campanhas(id) ON DELETE SET NULL;
 ```
 
-Isso registra a function para deploy automatico. `verify_jwt = false` e necessario porque o frontend chama com a anon key (mesmo padrao das demais functions do projeto).
+A coluna será:
+- **Tipo**: `uuid`, nullable (nem toda conversa vem de uma campanha)
+- **Foreign key**: referencia `campanhas(id)` com `ON DELETE SET NULL` -- se a campanha for removida, a conversa mantém-se mas perde a referência
+- **Sem valor default**: conversas existentes ficam com `NULL`
 
-#### 2. Atualizar CORS headers em `start-conversation/index.ts`
+### Impacto no código
 
-Trocar a linha 6:
-
-```typescript
-'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-```
-
-Por:
-
-```typescript
-'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-```
-
-### Nenhuma outra alteracao necessaria
-
-O codigo da function esta correto. O hook `useStartConversation` ja constroi a URL corretamente. Apos essas duas alteracoes, a function sera deployada e acessivel pelo frontend.
+Nenhuma alteração de código é necessária imediatamente. A interface `Conversa` em `src/types/atendimento.ts` já pode receber campos opcionais, e o Supabase client aceita a nova coluna automaticamente. Se quiser usar o campo no frontend futuramente, basta adicionar `campanha_id?: string | null` à interface.
 
