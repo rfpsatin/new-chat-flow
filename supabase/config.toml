@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.start-conversation]
 verify_jwt = false
+
+[functions.run-campaigns]
+verify_jwt = false
