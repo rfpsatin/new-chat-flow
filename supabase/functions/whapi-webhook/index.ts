@@ -53,15 +53,11 @@ Deno.serve(async (req) => {
   console.log(`[${requestId}] Method: ${req.method}`)
   console.log(`[${requestId}] URL: ${req.url}`)
 
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    console.log(`[${requestId}] CORS preflight request`)
     return new Response(null, { headers: corsHeaders })
   }
 
-  // Only accept POST
   if (req.method !== 'POST' && req.method !== 'PUT') {
-    console.log(`[${requestId}] Method not allowed: ${req.method}`)
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -69,14 +65,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Extract empresa_id from query params
     const url = new URL(req.url)
     const empresaId = url.searchParams.get('empresa_id')
-    
-    console.log(`[${requestId}] empresa_id from query: ${empresaId}`)
 
     if (!empresaId) {
-      console.error(`[${requestId}] ERROR: Missing empresa_id query parameter`)
       return new Response(JSON.stringify({ 
         error: 'Missing empresa_id query parameter',
         usage: 'Add ?empresa_id=YOUR_EMPRESA_UUID to the webhook URL'
@@ -86,16 +78,13 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Parse body
     const body: WhapiEvent = await req.json()
     console.log(`[${requestId}] Raw payload:`, JSON.stringify(body, null, 2))
 
-    // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Verify empresa exists
     const { data: empresa, error: empresaError } = await supabase
       .from('empresas')
       .select('id, nome_fantasia')
@@ -103,7 +92,6 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     if (empresaError || !empresa) {
-      console.error(`[${requestId}] ERROR: Invalid empresa_id:`, empresaError)
       return new Response(JSON.stringify({ error: 'Invalid empresa_id' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -112,11 +100,9 @@ Deno.serve(async (req) => {
 
     console.log(`[${requestId}] Empresa found: ${empresa.nome_fantasia || empresa.id}`)
 
-    // Extract messages - Whapi can send in different formats
     const messages = body.event?.messages || body.messages || []
-    
+
     if (messages.length === 0) {
-      console.log(`[${requestId}] No messages in payload, acknowledging`)
       return new Response(JSON.stringify({ success: true, processed: 0 }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -133,126 +119,81 @@ Deno.serve(async (req) => {
         console.log(`[${requestId}] ---- Processing message ${message.id} ----`)
         console.log(`[${requestId}] From: ${message.from}, from_me: ${message.from_me}`)
         console.log(`[${requestId}] Type: ${message.type}`)
-        
-        const isFromBot = message.from_me === true
 
-        // Outgoing messages (from_me = true) já são registradas no momento do envio
-        // pelas funções que chamam a Whapi (whapi-send-message, n8n, etc).
-        // Se inserirmos novamente aqui, teremos mensagens duplicadas no front.
-        if (isFromBot) {
-          console.log(
-            `[${requestId}] Outgoing message (from_me=true), skipping DB insert to avoid duplicate`
-          )
+        // Mensagens de saída (from_me=true) já são registradas por
+        // start-conversation, whapi-send-message, n8n-webhook, etc.
+        // Inserir aqui causaria duplicação.
+        if (message.from_me === true) {
+          console.log(`[${requestId}] Outgoing message (from_me=true), skipping to avoid duplicate`)
           continue
         }
-        
-        // For bot messages, contact number is in chat_id; for client messages, in from
-        const whatsappNumero = (isFromBot ? message.chat_id : message.from)
+
+        // Daqui para baixo, apenas mensagens de entrada (cliente)
+        const whatsappNumero = message.from
           .replace('@s.whatsapp.net', '')
           .replace('@c.us', '')
-        
-        console.log(`[${requestId}] WhatsApp number: ${whatsappNumero}, isFromBot: ${isFromBot}`)
 
-        let contato: any
-        let conversa: any
+        console.log(`[${requestId}] WhatsApp number: ${whatsappNumero}`)
 
-        if (isFromBot) {
-          // For bot messages: find existing contact and conversation, don't create new ones
-          const { data: existingContato, error: findContatoError } = await supabase
-            .from('contatos')
-            .select('*')
-            .eq('empresa_id', empresaId)
-            .eq('whatsapp_numero', whatsappNumero)
-            .maybeSingle()
+        const contato = await findOrCreateContato(
+          supabase,
+          empresaId,
+          whatsappNumero,
+          message.from_name,
+          requestId
+        )
 
-          if (findContatoError || !existingContato) {
-            console.log(`[${requestId}] Bot message: contact not found for ${whatsappNumero}, skipping`)
-            continue
-          }
-          contato = existingContato
-
-          // Find active conversation (not encerrado)
-          const { data: activeConversa, error: findConversaError } = await supabase
-            .from('conversas')
-            .select('*')
-            .eq('empresa_id', empresaId)
-            .eq('contato_id', contato.id)
-            .neq('status', 'encerrado')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-
-          if (findConversaError || !activeConversa) {
-            console.log(`[${requestId}] Bot message: no active conversation for contact ${contato.id}, skipping`)
-            continue
-          }
-          conversa = activeConversa
-        } else {
-          // Client messages: original flow - find or create contact and conversation
-          contato = await findOrCreateContato(
-            supabase, 
-            empresaId, 
-            whatsappNumero, 
-            message.from_name,
-            requestId
-          )
-
-          if (!contato) {
-            throw new Error('Failed to find or create contact')
-          }
+        if (!contato) {
+          throw new Error('Failed to find or create contact')
         }
 
-        // Extract message content
         const conteudo = extractMessageContent(message)
         console.log(`[${requestId}] Message content: ${conteudo.substring(0, 100)}...`)
 
-        if (!isFromBot) {
-          // Only client messages: find or create conversation
-          conversa = await findOrCreateConversa(
-            supabase,
-            empresaId,
-            contato.id,
-            conteudo,
-            requestId
-          )
+        const conversa = await findOrCreateConversa(
+          supabase,
+          empresaId,
+          contato.id,
+          conteudo,
+          requestId
+        )
 
-          if (!conversa) {
-            throw new Error('Failed to find or create conversation')
-          }
-
-          // Vincular conversa à campanha se o contato respondeu após receber disparo
-          const { data: destCampanha } = await supabase
-            .from('campanha_destinatarios')
-            .select('id, campanha_id')
-            .eq('contato_id', contato.id)
-            .in('status_envio', ['enviado', 'entregue', 'lido'])
-            .is('conversa_id', null)
-            .order('ultima_tentativa_em', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-
-          if (destCampanha) {
-            await supabase
-              .from('campanha_destinatarios')
-              .update({ conversa_id: conversa.id })
-              .eq('id', destCampanha.id)
-            await supabase
-              .from('conversas')
-              .update({ campanha_id: destCampanha.campanha_id, updated_at: new Date().toISOString() })
-              .eq('id', conversa.id)
-            console.log(`[${requestId}] Linked conversation to campaign: ${destCampanha.campanha_id}`)
-          }
+        if (!conversa) {
+          throw new Error('Failed to find or create conversation')
         }
 
-        // Insert message with correct direction
+        // Vincular conversa à campanha se o contato respondeu após receber disparo
+        const { data: destCampanha } = await supabase
+          .from('campanha_destinatarios')
+          .select('id, campanha_id')
+          .eq('contato_id', contato.id)
+          .in('status_envio', ['enviado', 'entregue', 'lido'])
+          .is('conversa_id', null)
+          .order('ultima_tentativa_em', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (destCampanha) {
+          await supabase
+            .from('campanha_destinatarios')
+            .update({ conversa_id: conversa.id })
+            .eq('id', destCampanha.id)
+          await supabase
+            .from('conversas')
+            .update({ campanha_id: destCampanha.campanha_id, updated_at: new Date().toISOString() })
+            .eq('id', conversa.id)
+          console.log(`[${requestId}] Linked conversation to campaign: ${destCampanha.campanha_id}`)
+        }
+
+        // Insert message (always in/cliente at this point)
         const { error: msgError } = await supabase
           .from('mensagens_ativas')
           .insert({
             empresa_id: empresaId,
             conversa_id: conversa.id,
             contato_id: contato.id,
-            direcao: isFromBot ? 'out' : 'in',
-            tipo_remetente: isFromBot ? 'bot' : 'cliente',
+            direcao: 'in',
+            tipo_remetente: 'cliente',
             conteudo: conteudo,
             payload: message,
           })
@@ -262,12 +203,12 @@ Deno.serve(async (req) => {
           throw msgError
         }
 
-        console.log(`[${requestId}] Message inserted successfully (direction: ${isFromBot ? 'out/bot' : 'in/cliente'})`)
+        console.log(`[${requestId}] Message inserted successfully (direction: in/cliente)`)
 
-        // 5. Update conversation last_message_at
+        // Update conversation last_message_at
         const { error: updateError } = await supabase
           .from('conversas')
-          .update({ 
+          .update({
             last_message_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
@@ -277,78 +218,48 @@ Deno.serve(async (req) => {
           console.error(`[${requestId}] ERROR updating conversation:`, updateError)
         }
 
-        // 6. Check if message contains "Falar com o atendente humano" and conversa is in bot status (only for client messages)
-        if (!isFromBot) {
+        // Check if message contains human attendance request
         const isHumanRequest = conteudo.toLowerCase().includes('falar com') && conteudo.toLowerCase().includes('atendente humano')
         const isHumanButtonId = (message as any).reply?.buttons_reply?.id === 'ButtonsV3:atendimento_humano'
         if (conversa.status === 'bot' && (isHumanRequest || isHumanButtonId)) {
           console.log(`[${requestId}] Detected human attendance request, checking n8n...`)
           try {
-            // Try GET with query params (same pattern that works for close-service)
             const n8nUrl = new URL('https://n8n.maringaai.com.br/webhook/maia-beach-tennis-demo')
             n8nUrl.searchParams.set('action', 'check')
             n8nUrl.searchParams.set('conversa_id', conversa.id)
             n8nUrl.searchParams.set('empresa_id', empresaId)
-            
-            const n8nResponse = await fetch(n8nUrl.toString(), { 
+
+            const n8nResponse = await fetch(n8nUrl.toString(), {
               method: 'GET',
               headers: { 'Accept': 'application/json' }
             })
-            
+
             console.log(`[${requestId}] n8n response status: ${n8nResponse.status}`)
             const contentType = n8nResponse.headers.get('content-type') || ''
             const responseText = await n8nResponse.text()
-            console.log(`[${requestId}] n8n response content-type: ${contentType}`)
             console.log(`[${requestId}] n8n response body: ${responseText.substring(0, 500)}`)
-            
+
             if (n8nResponse.ok && contentType.includes('application/json')) {
               const result = JSON.parse(responseText)
               const attendanceMode = result?.attendanceMode || result?.attendance_mode || 'automated'
-              console.log(`[${requestId}] n8n attendanceMode: ${attendanceMode}`)
               if (attendanceMode === 'human') {
-                const { error: modeError } = await supabase
+                await supabase
                   .from('conversas')
                   .update({ status: 'esperando_tria', updated_at: new Date().toISOString() })
                   .eq('id', conversa.id)
                   .eq('status', 'bot')
-                if (modeError) {
-                  console.error(`[${requestId}] ERROR updating to esperando_tria:`, modeError)
-                } else {
-                  console.log(`[${requestId}] Conversa moved to esperando_tria`)
-                }
-              }
-            } else if (n8nResponse.ok) {
-              // n8n returned 200 but not JSON - try to parse anyway or fallback to solicitar_atendimento_humano
-              console.warn(`[${requestId}] n8n returned non-JSON response, falling back to direct status update`)
-              const { error: modeError } = await supabase
-                .from('conversas')
-                .update({ status: 'esperando_tria', updated_at: new Date().toISOString() })
-                .eq('id', conversa.id)
-                .eq('status', 'bot')
-              if (modeError) {
-                console.error(`[${requestId}] ERROR updating to esperando_tria:`, modeError)
-              } else {
-                console.log(`[${requestId}] Conversa moved to esperando_tria (fallback)`)
+                console.log(`[${requestId}] Conversa moved to esperando_tria`)
               }
             } else {
-              console.error(`[${requestId}] n8n check failed: ${n8nResponse.status}`)
-              // Fallback: move to esperando_tria anyway so customer isn't stuck
-              console.log(`[${requestId}] Falling back to direct status update`)
-              const { error: modeError } = await supabase
+              await supabase
                 .from('conversas')
                 .update({ status: 'esperando_tria', updated_at: new Date().toISOString() })
                 .eq('id', conversa.id)
                 .eq('status', 'bot')
-              if (modeError) {
-                console.error(`[${requestId}] ERROR updating to esperando_tria:`, modeError)
-              } else {
-                console.log(`[${requestId}] Conversa moved to esperando_tria (fallback after error)`)
-              }
+              console.log(`[${requestId}] Conversa moved to esperando_tria (fallback)`)
             }
           } catch (n8nError) {
             console.error(`[${requestId}] Error checking n8n:`, n8nError)
-            // Fallback: move to esperando_tria so customer isn't stuck
-            console.log(`[${requestId}] Falling back to direct status update after exception`)
             try {
               await supabase
                 .from('conversas')
@@ -361,7 +272,6 @@ Deno.serve(async (req) => {
             }
           }
         }
-        } // end if (!isFromBot)
 
         processedCount++
         console.log(`[${requestId}] Message ${message.id} processed successfully`)
@@ -376,8 +286,8 @@ Deno.serve(async (req) => {
     console.log(`[${requestId}] ========== WEBHOOK COMPLETE ==========`)
     console.log(`[${requestId}] Processed: ${processedCount}/${messages.length}`)
 
-    return new Response(JSON.stringify({ 
-      success: true, 
+    return new Response(JSON.stringify({
+      success: true,
       processed: processedCount,
       total: messages.length,
       errors: errors.length > 0 ? errors : undefined
@@ -389,11 +299,10 @@ Deno.serve(async (req) => {
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error)
     console.error(`[${requestId}] FATAL ERROR:`, errorMsg)
-    
-    // Always return 200 to prevent Whapi retries
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: errorMsg 
+
+    return new Response(JSON.stringify({
+      success: false,
+      error: errorMsg
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -409,8 +318,7 @@ async function findOrCreateContato(
   requestId: string
 ) {
   console.log(`[${requestId}] Finding contact: ${whatsappNumero}`)
-  
-  // Try to find existing contact
+
   const { data: existingContato, error: findError } = await supabase
     .from('contatos')
     .select('*')
@@ -418,30 +326,17 @@ async function findOrCreateContato(
     .eq('whatsapp_numero', whatsappNumero)
     .maybeSingle()
 
-  if (findError) {
-    console.error(`[${requestId}] ERROR finding contact:`, findError)
-    throw findError
-  }
+  if (findError) throw findError
 
   if (existingContato) {
     console.log(`[${requestId}] Found existing contact: ${existingContato.id}`)
-    
-    // Update name if we have one and contact doesn't
     if (nome && !existingContato.nome) {
-      const { error: updateError } = await supabase
-        .from('contatos')
-        .update({ nome })
-        .eq('id', existingContato.id)
-      
-      if (!updateError) {
-        console.log(`[${requestId}] Updated contact name to: ${nome}`)
-      }
+      await supabase.from('contatos').update({ nome }).eq('id', existingContato.id)
+      console.log(`[${requestId}] Updated contact name to: ${nome}`)
     }
-    
     return existingContato
   }
 
-  // Create new contact
   console.log(`[${requestId}] Creating new contact`)
   const { data: newContato, error: createError } = await supabase
     .from('contatos')
@@ -453,10 +348,7 @@ async function findOrCreateContato(
     .select()
     .single()
 
-  if (createError) {
-    console.error(`[${requestId}] ERROR creating contact:`, createError)
-    throw createError
-  }
+  if (createError) throw createError
 
   console.log(`[${requestId}] Created new contact: ${newContato.id}`)
   return newContato
@@ -470,8 +362,7 @@ async function findOrCreateConversa(
   requestId: string
 ) {
   console.log(`[${requestId}] Finding conversation for contact: ${contatoId}`)
-  
-  // Find the most recent conversation for this contact (any status)
+
   const { data: ultimaConversa, error: findError } = await supabase
     .from('conversas')
     .select('*')
@@ -481,30 +372,22 @@ async function findOrCreateConversa(
     .limit(1)
     .maybeSingle()
 
-  if (findError) {
-    console.error(`[${requestId}] ERROR finding conversation:`, findError)
-    throw findError
-  }
+  if (findError) throw findError
 
   // Se conversa encerrada, verificar se é resposta de pesquisa de satisfação
   if (ultimaConversa && ultimaConversa.status === 'encerrado') {
-    // Verificar se pesquisa foi enviada e ainda não respondida
     if (ultimaConversa.pesquisa_enviada_em && !ultimaConversa.pesquisa_respondida_em) {
-      // Verificar se está dentro da janela de 24h
       const pesquisaEnviadaEm = new Date(ultimaConversa.pesquisa_enviada_em)
       const agora = new Date()
       const horasPassadas = (agora.getTime() - pesquisaEnviadaEm.getTime()) / (1000 * 60 * 60)
-      
+
       console.log(`[${requestId}] Checking satisfaction response - Hours since survey: ${horasPassadas.toFixed(2)}`)
-      
-      // Verificar se a mensagem é uma nota de 1 a 5
+
       const nota = parseInt(conteudo.trim())
       const isNotaValida = !isNaN(nota) && nota >= 1 && nota <= 5
-      
+
       if (horasPassadas <= 24 && isNotaValida) {
         console.log(`[${requestId}] Valid satisfaction rating received: ${nota}`)
-        
-        // Atualizar nota de satisfação sem reabrir conversa
         const { error: ratingError } = await supabase
           .from('conversas')
           .update({
@@ -513,23 +396,21 @@ async function findOrCreateConversa(
             updated_at: new Date().toISOString()
           })
           .eq('id', ultimaConversa.id)
-        
+
         if (ratingError) {
           console.error(`[${requestId}] ERROR updating satisfaction rating:`, ratingError)
         } else {
           console.log(`[${requestId}] Satisfaction rating saved successfully`)
         }
-        
-        // Retornar conversa mantendo status encerrado (não reabre)
+
         return { ...ultimaConversa, _skipMessageInsert: false }
       }
-      
+
       console.log(`[${requestId}] Not a valid satisfaction response (nota: ${conteudo}, isValid: ${isNotaValida}, withinWindow: ${horasPassadas <= 24})`)
     }
-    
-    // Se não for resposta de pesquisa válida, criar NOVA conversa (preserva histórico)
+
+    // Conversa encerrada e não é pesquisa válida → nova sessão
     console.log(`[${requestId}] Found closed conversation ${ultimaConversa.id}, creating new session...`)
-    
     const { data: newConversa, error: createError } = await supabase
       .from('conversas')
       .insert({
@@ -542,22 +423,16 @@ async function findOrCreateConversa(
       .select()
       .single()
 
-    if (createError) {
-      console.error(`[${requestId}] ERROR creating new conversation:`, createError)
-      throw createError
-    }
-
+    if (createError) throw createError
     console.log(`[${requestId}] Created new conversation session: ${newConversa.id}`)
     return newConversa
   }
 
-  // If conversation exists and is active, use it
   if (ultimaConversa) {
     console.log(`[${requestId}] Found active conversation: ${ultimaConversa.id} (status: ${ultimaConversa.status})`)
     return ultimaConversa
   }
 
-  // No conversation exists, create new one
   console.log(`[${requestId}] Creating new conversation`)
   const { data: newConversa, error: createError } = await supabase
     .from('conversas')
@@ -571,11 +446,7 @@ async function findOrCreateConversa(
     .select()
     .single()
 
-  if (createError) {
-    console.error(`[${requestId}] ERROR creating conversation:`, createError)
-    throw createError
-  }
-
+  if (createError) throw createError
   console.log(`[${requestId}] Created new conversation: ${newConversa.id}`)
   return newConversa
 }
@@ -600,12 +471,8 @@ function extractMessageContent(message: WhapiMessage): string {
       return '[contato]'
     case 'reply': {
       const reply = (message as any).reply
-      if (reply?.buttons_reply?.title) {
-        return reply.buttons_reply.title
-      }
-      if (reply?.list_reply?.title) {
-        return reply.list_reply.title
-      }
+      if (reply?.buttons_reply?.title) return reply.buttons_reply.title
+      if (reply?.list_reply?.title) return reply.list_reply.title
       return reply?.body || '[reply]'
     }
     case 'interactive': {
