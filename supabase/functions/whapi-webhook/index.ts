@@ -163,6 +163,7 @@ Deno.serve(async (req) => {
         }
 
         // Vincular conversa à campanha se o contato respondeu após receber disparo
+        let effectiveStatus = conversa.status
         const { data: destCampanha } = await supabase
           .from('campanha_destinatarios')
           .select('id, campanha_id')
@@ -178,9 +179,24 @@ Deno.serve(async (req) => {
             .from('campanha_destinatarios')
             .update({ conversa_id: conversa.id })
             .eq('id', destCampanha.id)
+          const updateConvPayload: Record<string, unknown> = {
+            campanha_id: destCampanha.campanha_id,
+            updated_at: new Date().toISOString(),
+          }
+          const { data: campanha } = await supabase
+            .from('campanhas')
+            .select('id, modo_resposta')
+            .eq('id', destCampanha.campanha_id)
+            .maybeSingle()
+          if (campanha?.modo_resposta === 'atendente' && conversa.status === 'bot') {
+            updateConvPayload.status = 'fila_humano'
+            updateConvPayload.origem_inicial = 'campanha'
+            effectiveStatus = 'fila_humano'
+            console.log(`[${requestId}] Campaign mode atendente: moving conversation to fila_humano`)
+          }
           await supabase
             .from('conversas')
-            .update({ campanha_id: destCampanha.campanha_id, updated_at: new Date().toISOString() })
+            .update(updateConvPayload)
             .eq('id', conversa.id)
           console.log(`[${requestId}] Linked conversation to campaign: ${destCampanha.campanha_id}`)
         }
@@ -218,10 +234,36 @@ Deno.serve(async (req) => {
           console.error(`[${requestId}] ERROR updating conversation:`, updateError)
         }
 
+        // Modo agente (status bot): chamar n8n para processar a mensagem e responder. Modo atendente: não chamar n8n.
+        if (effectiveStatus === 'bot') {
+          try {
+            const n8nMessageUrl = 'https://n8n.maringaai.com.br/webhook/maia-beach-tennis-demo'
+            const n8nMessageRes = await fetch(n8nMessageUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+              body: JSON.stringify({
+                to: whatsappNumero,
+                body: conteudo,
+                conversa_id: conversa.id,
+                empresa_id: empresaId,
+              }),
+            })
+            if (!n8nMessageRes.ok) {
+              console.error(`[${requestId}] n8n message webhook returned ${n8nMessageRes.status}:`, await n8nMessageRes.text())
+            } else {
+              console.log(`[${requestId}] n8n invoked for bot message (agente mode)`)
+            }
+          } catch (n8nErr) {
+            console.error(`[${requestId}] Error invoking n8n for message:`, n8nErr)
+          }
+        } else {
+          console.log(`[${requestId}] Skipping n8n (atendente mode or non-bot status: ${effectiveStatus})`)
+        }
+
         // Check if message contains human attendance request
         const isHumanRequest = conteudo.toLowerCase().includes('falar com') && conteudo.toLowerCase().includes('atendente humano')
         const isHumanButtonId = (message as any).reply?.buttons_reply?.id === 'ButtonsV3:atendimento_humano'
-        if (conversa.status === 'bot' && (isHumanRequest || isHumanButtonId)) {
+        if (effectiveStatus === 'bot' && (isHumanRequest || isHumanButtonId)) {
           console.log(`[${requestId}] Detected human attendance request, checking n8n...`)
           try {
             const n8nUrl = new URL('https://n8n.maringaai.com.br/webhook/maia-beach-tennis-demo')
