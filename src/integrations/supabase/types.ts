@@ -208,6 +208,7 @@ export type Database = {
       conversas: {
         Row: {
           agente_responsavel_id: string | null
+          campanha_id: string | null
           canal: string
           channel: string | null
           contato_id: string
@@ -232,6 +233,7 @@ export type Database = {
         }
         Insert: {
           agente_responsavel_id?: string | null
+          campanha_id?: string | null
           canal?: string
           channel?: string | null
           contato_id: string
@@ -256,6 +258,7 @@ export type Database = {
         }
         Update: {
           agente_responsavel_id?: string | null
+          campanha_id?: string | null
           canal?: string
           channel?: string | null
           contato_id?: string
@@ -285,6 +288,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "usuarios"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversas_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "campanhas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversas_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "vw_campanha_stats"
+            referencedColumns: ["campanha_id"]
           },
           {
             foreignKeyName: "conversas_contato_id_fkey"

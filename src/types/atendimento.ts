@@ -60,6 +60,7 @@ export interface Conversa {
   channel?: string | null;
   human_mode?: boolean | null;
   n8n_webhook_id?: string | null;
+  campanha_id?: string | null;
 }
 
 export interface MensagemAtiva {
