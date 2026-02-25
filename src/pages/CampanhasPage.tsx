@@ -153,7 +153,7 @@ function CampanhaDetailDialog({
   const handleAgendar = async () => {
     if (!agendadoPara.trim()) return;
     try {
-      await agendar.mutateAsync({ campanhaId, agendado_para: agendadoPara });
+      await agendar.mutateAsync({ campanhaId, agendado_para: new Date(agendadoPara).toISOString() });
       toast.success('Campanha agendada. O disparo será feito no horário definido.');
       onClose();
     } catch (e) {
