@@ -149,8 +149,16 @@ Deno.serve(async (req) => {
       })
     }
 
-    // A mensagem será registrada em mensagens_ativas quando o webhook
-    // do Whapi (whapi-webhook) receber o evento from_me=true.
+    // Inserir mensagem diretamente no banco (webhook ignora from_me=true)
+    await supabase.from('mensagens_ativas').insert({
+      empresa_id,
+      conversa_id: conversaId,
+      contato_id,
+      direcao: 'out',
+      tipo_remetente: remetente_id ? 'agente' : 'sistema',
+      remetente_id: remetente_id || null,
+      conteudo: messageText,
+    })
 
     // Se há um remetente (agente), atribui a conversa e coloca em atendimento humano.
     if (remetente_id) {

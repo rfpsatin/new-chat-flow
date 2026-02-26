@@ -127,6 +127,7 @@ export type Database = {
           link: string | null
           mensagem_texto: string
           midia_url: string | null
+          modo_resposta: string | null
           nome: string
           status: string
           tags: string[] | null
@@ -145,6 +146,7 @@ export type Database = {
           link?: string | null
           mensagem_texto: string
           midia_url?: string | null
+          modo_resposta?: string | null
           nome: string
           status?: string
           tags?: string[] | null
@@ -163,6 +165,7 @@ export type Database = {
           link?: string | null
           mensagem_texto?: string
           midia_url?: string | null
+          modo_resposta?: string | null
           nome?: string
           status?: string
           tags?: string[] | null
@@ -225,6 +228,7 @@ export type Database = {
           nota_satisfacao: number | null
           nr_protocolo: string | null
           origem: string | null
+          origem_final: string | null
           origem_inicial: string | null
           pesquisa_enviada_em: string | null
           pesquisa_respondida_em: string | null
@@ -251,6 +255,7 @@ export type Database = {
           nota_satisfacao?: number | null
           nr_protocolo?: string | null
           origem?: string | null
+          origem_final?: string | null
           origem_inicial?: string | null
           pesquisa_enviada_em?: string | null
           pesquisa_respondida_em?: string | null
@@ -277,6 +282,7 @@ export type Database = {
           nota_satisfacao?: number | null
           nr_protocolo?: string | null
           origem?: string | null
+          origem_final?: string | null
           origem_inicial?: string | null
           pesquisa_enviada_em?: string | null
           pesquisa_respondida_em?: string | null
@@ -728,6 +734,7 @@ export type Database = {
         Row: {
           agente_nome: string | null
           agente_responsavel_id: string | null
+          campanha_id: string | null
           channel: string | null
           contato_id: string | null
           contato_nome: string | null
@@ -737,6 +744,8 @@ export type Database = {
           last_message_at: string | null
           nr_protocolo: string | null
           origem: string | null
+          origem_final: string | null
+          origem_inicial: string | null
           resumo: string | null
           status: string | null
           whatsapp_numero: string | null
@@ -748,6 +757,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "usuarios"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversas_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "campanhas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversas_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "vw_campanha_stats"
+            referencedColumns: ["campanha_id"]
           },
           {
             foreignKeyName: "conversas_empresa_id_fkey"
@@ -762,6 +785,7 @@ export type Database = {
         Row: {
           agente_nome: string | null
           agente_responsavel_id: string | null
+          campanha_id: string | null
           canal: string | null
           contato_id: string | null
           contato_nome: string | null
@@ -772,6 +796,8 @@ export type Database = {
           motivo_encerramento: string | null
           nota_satisfacao: number | null
           nr_protocolo: string | null
+          origem_final: string | null
+          origem_inicial: string | null
           resumo: string | null
           status: string | null
           whatsapp_numero: string | null
@@ -783,6 +809,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "usuarios"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversas_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "campanhas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversas_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "vw_campanha_stats"
+            referencedColumns: ["campanha_id"]
           },
           {
             foreignKeyName: "conversas_contato_id_fkey"

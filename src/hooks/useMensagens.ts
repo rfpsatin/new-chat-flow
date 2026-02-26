@@ -103,8 +103,16 @@ export function useEnviarMensagem() {
         throw new Error(errorData.error || 'Erro ao enviar mensagem via Whapi');
       }
 
-      // A mensagem será registrada em mensagens_ativas quando o webhook
-      // do Whapi (whapi-webhook) receber o evento from_me=true.
+      // Inserir mensagem diretamente no banco (webhook ignora from_me=true)
+      await supabase.from('mensagens_ativas').insert({
+        empresa_id: empresaId,
+        conversa_id: conversaId,
+        contato_id: contato_id,
+        direcao: 'out',
+        tipo_remetente: 'agente',
+        remetente_id: remetenteId,
+        conteudo: conteudo,
+      });
     },
     onSuccess: (_, { conversaId }) => {
       queryClient.invalidateQueries({ queryKey: ['mensagens', conversaId] });
