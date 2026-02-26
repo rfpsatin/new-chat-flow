@@ -157,8 +157,6 @@ export type StatusEnvioCampanha =
   | 'entregue'
   | 'lido';
 
-export type ModoResposta = 'agente' | 'atendente';
-
 export interface Campanha {
   id: string;
   empresa_id: string;
@@ -174,7 +172,6 @@ export interface Campanha {
   finalizada_em: string | null;
   envios_por_minuto: number | null;
   envios_por_hora: number | null;
-  modo_resposta?: ModoResposta | null;
   created_at: string;
   updated_at: string;
 }

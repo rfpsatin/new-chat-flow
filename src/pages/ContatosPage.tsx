@@ -4,7 +4,7 @@ import { useApp } from '@/contexts/AppContext';
 import { useContatos, useHistoricoContato } from '@/hooks/useContatos';
 import { useStartConversation } from '@/hooks/useStartConversation';
 import { MainLayout } from '@/components/MainLayout';
-import { Contato, HistoricoConversa, ModoResposta } from '@/types/atendimento';
+import { Contato, HistoricoConversa } from '@/types/atendimento';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -13,8 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Search, Phone, Calendar, MessageSquare, User, Clock, Send, Loader2, Info, Bot, Headphones } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Search, Phone, Calendar, MessageSquare, User, Clock, Send, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMensagensHistorico } from '@/hooks/useHistorico';
 import { toast } from 'sonner';
@@ -80,15 +79,10 @@ function IniciarConversaDialog({
   const startConv = useStartConversation();
   const [mensagem, setMensagem] = useState('');
   const [link, setLink] = useState('');
-  const [modoResposta, setModoResposta] = useState<ModoResposta | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!mensagem.trim()) return;
-    if (!modoResposta) {
-      toast.error('Selecione se a resposta será pelo agente ou atendente.');
-      return;
-    }
     try {
       const data = await startConv.mutateAsync({
         empresa_id: empresaId,
@@ -96,7 +90,6 @@ function IniciarConversaDialog({
         mensagem_inicial: mensagem.trim(),
         link: link.trim() || undefined,
         remetente_id: currentUser?.id,
-        modo_resposta: modoResposta,
       });
       toast.success('Conversa iniciada. Redirecionando para a fila.');
       onSuccess(data.conversa_id);
@@ -135,61 +128,11 @@ function IniciarConversaDialog({
               className="mt-1"
             />
           </div>
-          <div>
-            <label className="text-sm font-medium flex items-center gap-1.5">
-              Quem deve responder após o cliente interagir? *
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    className="p-0.5 rounded-full text-muted-foreground hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                    aria-label="Informações"
-                  >
-                    <Info className="w-3.5 h-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-xs p-2.5 text-xs">
-                  <p className="font-medium mb-1">Agente (bot):</p>
-                  <p className="text-muted-foreground">A conversa aparece no filtro &quot;Bot&quot; e o n8n responde as próximas interações.</p>
-                  <p className="font-medium mt-2 mb-1">Atendente:</p>
-                  <p className="text-muted-foreground">A conversa vai diretamente para o filtro &quot;Atendimento&quot; no atendente que iniciou a conversa. Somente o atendente responde.</p>
-                </TooltipContent>
-              </Tooltip>
-            </label>
-            <div className="flex gap-3 mt-2">
-              <button
-                type="button"
-                onClick={() => setModoResposta('agente')}
-                className={cn(
-                  'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors',
-                  modoResposta === 'agente'
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-input hover:bg-muted/50'
-                )}
-              >
-                <Bot className="w-4 h-4" />
-                Agente
-              </button>
-              <button
-                type="button"
-                onClick={() => setModoResposta('atendente')}
-                className={cn(
-                  'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors',
-                  modoResposta === 'atendente'
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-input hover:bg-muted/50'
-                )}
-              >
-                <Headphones className="w-4 h-4" />
-                Atendente
-              </button>
-            </div>
-          </div>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={!mensagem.trim() || !modoResposta || startConv.isPending}>
+            <Button type="submit" disabled={!mensagem.trim() || startConv.isPending}>
               {startConv.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               Enviar e abrir conversa
             </Button>

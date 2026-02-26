@@ -27,12 +27,8 @@ import {
   Loader2,
   ChevronRight,
   Tag,
-  Info,
-  Bot,
-  Headphones,
 } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Campanha, CampanhaStats, StatusCampanha, ModoResposta } from '@/types/atendimento';
+import { Campanha, CampanhaStats, StatusCampanha } from '@/types/atendimento';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -171,14 +167,7 @@ function CampanhaDetailDialog({
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 flex-wrap">
-            {campanha.nome}
-            {campanha.modo_resposta && (
-              <Badge variant="secondary" className="font-normal">
-                {campanha.modo_resposta === 'agente' ? 'Agente (bot)' : 'Atendente'}
-              </Badge>
-            )}
-          </DialogTitle>
+          <DialogTitle>{campanha.nome}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="flex gap-4 flex-wrap">
@@ -265,7 +254,6 @@ function NovaCampanhaWizard({
   const [tagsStr, setTagsStr] = useState('');
   const [mensagemTexto, setMensagemTexto] = useState('');
   const [link, setLink] = useState('');
-  const [modoResposta, setModoResposta] = useState<ModoResposta | null>(null);
   const [contatoIds, setContatoIds] = useState<Set<string>>(new Set());
   const [agendadoPara, setAgendadoPara] = useState('');
 
@@ -283,10 +271,6 @@ function NovaCampanhaWizard({
       toast.error('Preencha nome e mensagem.');
       return;
     }
-    if (!modoResposta) {
-      toast.error('Selecione se a resposta será pelo agente ou atendente.');
-      return;
-    }
     try {
       const tags = tagsStr.split(/[\s,]+/).filter(Boolean);
       const campanha = await criar.mutateAsync({
@@ -297,7 +281,6 @@ function NovaCampanhaWizard({
         mensagem_texto: mensagemTexto.trim(),
         link: link.trim() || null,
         status: 'draft',
-        modo_resposta: modoResposta,
       });
       if (contatoIds.size > 0) {
         await adicionarDest.mutateAsync({
@@ -358,59 +341,9 @@ function NovaCampanhaWizard({
                 <label className="text-sm font-medium">Link (opcional)</label>
                 <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://..." className="mt-1" />
               </div>
-              <div>
-                <label className="text-sm font-medium flex items-center gap-1.5">
-                  Quem deve responder após o cliente interagir? *
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        className="p-0.5 rounded-full text-muted-foreground hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                        aria-label="Informações"
-                      >
-                        <Info className="w-3.5 h-3.5" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-xs p-2.5 text-xs">
-                      <p className="font-medium mb-1">Agente (bot):</p>
-                      <p className="text-muted-foreground">A mensagem da campanha é enviada e as respostas do cliente seguem pelo bot (n8n). A conversa aparece no filtro &quot;Bot&quot;.</p>
-                      <p className="font-medium mt-2 mb-1">Atendente:</p>
-                      <p className="text-muted-foreground">A conversa vai para a fila humana (&quot;Em fila&quot;). O n8n não responde durante essa interação. Ao encerrar, o sistema volta ao normal.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </label>
-                <div className="flex gap-3 mt-2">
-                  <button
-                    type="button"
-                    onClick={() => setModoResposta('agente')}
-                    className={cn(
-                      'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors',
-                      modoResposta === 'agente'
-                        ? 'border-primary bg-primary/10 text-primary'
-                        : 'border-input hover:bg-muted/50'
-                    )}
-                  >
-                    <Bot className="w-4 h-4" />
-                    Agente
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setModoResposta('atendente')}
-                    className={cn(
-                      'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors',
-                      modoResposta === 'atendente'
-                        ? 'border-primary bg-primary/10 text-primary'
-                        : 'border-input hover:bg-muted/50'
-                    )}
-                  >
-                    <Headphones className="w-4 h-4" />
-                    Atendente
-                  </button>
-                </div>
-              </div>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => setStep(1)}>Voltar</Button>
-                <Button onClick={() => setStep(3)} disabled={!mensagemTexto.trim() || !modoResposta}>Próximo</Button>
+                <Button onClick={() => setStep(3)} disabled={!mensagemTexto.trim()}>Próximo</Button>
               </div>
             </>
           )}

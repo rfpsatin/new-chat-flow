@@ -15,7 +15,6 @@ interface StartConversationRequest {
   origem_inicial?: 'agente' | 'sistema' | 'campanha'
   campanha_id?: string
   remetente_id?: string // usuario que iniciou (agente)
-  modo_resposta?: 'agente' | 'atendente'
 }
 
 Deno.serve(async (req) => {
@@ -35,8 +34,7 @@ Deno.serve(async (req) => {
 
   try {
     const body: StartConversationRequest = await req.json()
-    const { empresa_id, contato_id, mensagem_inicial, link, origem_inicial, campanha_id, remetente_id, modo_resposta } = body
-    const modo = modo_resposta || 'atendente'
+    const { empresa_id, contato_id, mensagem_inicial, link, origem_inicial, campanha_id, remetente_id } = body
 
     if (!empresa_id || !contato_id || !mensagem_inicial?.trim()) {
       return new Response(JSON.stringify({
@@ -95,14 +93,13 @@ Deno.serve(async (req) => {
       nrProtocolo = conversaAtiva.nr_protocolo
     } else {
       const origem = origem_inicial || 'agente'
-      const initialStatus = modo === 'agente' ? 'bot' : 'esperando_tria'
       const { data: newConv, error: createConvError } = await supabase
         .from('conversas')
         .insert({
           empresa_id,
           contato_id,
           canal: 'whatsapp',
-          status: initialStatus,
+          status: 'esperando_tria',
           iniciado_por: 'agente',
           origem_inicial: origem,
           campanha_id: campanha_id || null,
@@ -176,9 +173,8 @@ Deno.serve(async (req) => {
       .update({ last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })
       .eq('id', conversaId)
 
-    // Só atribui ao atendente e coloca em atendimento humano quando modo é "atendente".
-    // Com modo "agente", a conversa permanece em "bot" para o n8n responder.
-    if (modo === 'atendente' && remetente_id) {
+    // Se há um remetente (agente), atribui a conversa e coloca em atendimento humano.
+    if (remetente_id) {
       const { error: atribuirError } = await supabase
         .from('conversas')
         .update({
