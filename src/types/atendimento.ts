@@ -61,8 +61,6 @@ export interface Conversa {
   human_mode?: boolean | null;
   n8n_webhook_id?: string | null;
   campanha_id?: string | null;
-  origem_inicial?: string | null;
-  origem_final?: string | null;
 }
 
 export interface MensagemAtiva {
@@ -102,10 +100,6 @@ export interface FilaAtendimento {
   channel?: string | null;
   /** Número de protocolo (ex: 20260218-0000002). Gerado automaticamente; reinicia a cada dia. */
   nr_protocolo?: string | null;
-  /** Quem iniciou a sessão (cliente, atendente, agente, sistema, campanha). Zerado ao encerrar. */
-  origem_inicial?: string | null;
-  /** Quem continuará a conversa após resposta (agente/atendente). Zerado ao encerrar. */
-  origem_final?: string | null;
 }
 
 export interface HistoricoConversa {

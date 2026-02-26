@@ -170,7 +170,7 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
               )}
               {/* Etiquetas origem e channel */}
               <div className="mt-1.5">
-                <ConversaTags origem={conversa.origem} channel={conversa.channel} origem_inicial={conversa.origem_inicial} />
+                <ConversaTags origem={conversa.origem} channel={conversa.channel} />
               </div>
             </div>
           </div>

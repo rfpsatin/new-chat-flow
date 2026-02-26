@@ -12,7 +12,7 @@ interface StartConversationRequest {
   mensagem_inicial: string
   midia_url?: string
   link?: string
-  origem_inicial?: 'agente' | 'sistema' | 'campanha' | 'atendente'
+  origem_inicial?: 'agente' | 'sistema' | 'campanha'
   campanha_id?: string
   remetente_id?: string // usuario que iniciou (agente)
   modo_resposta?: 'agente' | 'atendente'
@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
       conversaId = conversaAtiva.id
       nrProtocolo = conversaAtiva.nr_protocolo
     } else {
-      const origem = remetente_id ? 'atendente' : (origem_inicial || 'agente')
+      const origem = origem_inicial || 'agente'
       const initialStatus = modo === 'agente' ? 'bot' : 'esperando_tria'
       const { data: newConv, error: createConvError } = await supabase
         .from('conversas')
@@ -105,7 +105,6 @@ Deno.serve(async (req) => {
           status: initialStatus,
           iniciado_por: 'agente',
           origem_inicial: origem,
-          origem_final: modo,
           campanha_id: campanha_id || null,
         })
         .select('id, nr_protocolo')
@@ -171,16 +170,10 @@ Deno.serve(async (req) => {
       console.error(`[${requestId}] Error inserting message:`, msgError)
     }
 
-    // Atualizar last_message_at, origem_inicial e origem_final (conversa existente ou reforço na nova)
-    const updatePayload: Record<string, unknown> = {
-      last_message_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      origem_final: modo,
-    }
-    if (remetente_id) updatePayload.origem_inicial = 'atendente'
+    // Atualizar last_message_at
     await supabase
       .from('conversas')
-      .update(updatePayload)
+      .update({ last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })
       .eq('id', conversaId)
 
     // Só atribui ao atendente e coloca em atendimento humano quando modo é "atendente".
@@ -199,32 +192,9 @@ Deno.serve(async (req) => {
         console.error(`[${requestId}] Error atribuindo agente:`, atribuirError)
       } else {
         console.log(`[${requestId}] Conversa atribuída ao agente ${remetente_id} em atendimento humano`)
-        // Comando ao n8n: não ativar o fluxo para este número até o atendente encerrar a conversa.
-        try {
-          const closeServiceUrl = `${supabaseUrl}/functions/v1/close-service`
-          const closeRes = await fetch(closeServiceUrl, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${supabaseServiceKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              conversa_id: conversaId,
-              empresa_id,
-              attendance_mode: 'manual',
-            }),
-          })
-          if (!closeRes.ok) {
-            console.error(`[${requestId}] close-service (manual) failed:`, await closeRes.text())
-          } else {
-            console.log(`[${requestId}] n8n notificado: attendance_mode manual para conversa ${conversaId}`)
-          }
-        } catch (closeErr) {
-          console.error(`[${requestId}] Error calling close-service (manual):`, closeErr)
-        }
       }
     }
-
+    
     console.log(`[${requestId}] Conversation started: ${conversaId}`)
 
     return new Response(JSON.stringify({

@@ -4,29 +4,24 @@ interface ConversaTagsProps {
   /** Origem (webhook envia origem: "web-chat" = bolinha azul, "whatsapp" = bolinha verde) */
   origem?: string | null;
   channel?: string | null;
-  /** Quem iniciou a sessão (atendente/campanha → tag "Marketing do WhatsApp") */
-  origem_inicial?: string | null;
   className?: string;
 }
 
 /**
  * Tag do canal: círculo + texto.
- * - origem_inicial atendente ou campanha → "Marketing do WhatsApp" (bolinha verde).
  * - Cor da bolinha: origem = "web-chat" → azul escuro; caso contrário → verde.
- * - Texto: channel (Comercial, Marketing, Fluxo) ou Chat-Web quando origem é web-chat; senão "WhatsApp".
+ * - Texto: channel (Comercial, Marketing, Fluxo) ou Chat-Web quando origem é web-chat; senão "—" (sem fallback).
  */
-export function ConversaTags({ origem, channel, origem_inicial, className }: ConversaTagsProps) {
+export function ConversaTags({ origem, channel, className }: ConversaTagsProps) {
   const normalizedOrigem = (origem ?? '').trim().toLowerCase();
-  const normalizedOrigemInicial = (origem_inicial ?? '').trim().toLowerCase();
 
+  // Cor da bolinha apenas por origem
   const isWebChat = normalizedOrigem === 'web-chat';
-  const isMarketingWhatsApp = normalizedOrigemInicial === 'atendente' || normalizedOrigemInicial === 'campanha';
 
+  // Normaliza channel internamente para ser resiliente a variantes de case/abreviação
   const normalizedChannel = (channel ?? '').trim().toLowerCase();
   let label: string;
-  if (isMarketingWhatsApp) {
-    label = 'Marketing do WhatsApp';
-  } else if (normalizedChannel === 'comercial') {
+  if (normalizedChannel === 'comercial') {
     label = 'Comercial';
   } else if (normalizedChannel === 'mkt' || normalizedChannel === 'marketing') {
     label = 'Marketing';

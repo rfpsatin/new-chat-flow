@@ -164,7 +164,6 @@ Deno.serve(async (req) => {
 
         // Vincular conversa à campanha se o contato respondeu após receber disparo
         let effectiveStatus = conversa.status
-        let effectiveOrigemFinal: string | null = conversa.origem_final ?? null
         const { data: destCampanha } = await supabase
           .from('campanha_destinatarios')
           .select('id, campanha_id')
@@ -180,20 +179,18 @@ Deno.serve(async (req) => {
             .from('campanha_destinatarios')
             .update({ conversa_id: conversa.id })
             .eq('id', destCampanha.id)
+          const updateConvPayload: Record<string, unknown> = {
+            campanha_id: destCampanha.campanha_id,
+            updated_at: new Date().toISOString(),
+          }
           const { data: campanha } = await supabase
             .from('campanhas')
             .select('id, modo_resposta')
             .eq('id', destCampanha.campanha_id)
             .maybeSingle()
-          const updateConvPayload: Record<string, unknown> = {
-            campanha_id: destCampanha.campanha_id,
-            origem_inicial: 'campanha',
-            origem_final: campanha?.modo_resposta ?? null,
-            updated_at: new Date().toISOString(),
-          }
-          effectiveOrigemFinal = campanha?.modo_resposta ?? null
           if (campanha?.modo_resposta === 'atendente' && conversa.status === 'bot') {
             updateConvPayload.status = 'fila_humano'
+            updateConvPayload.origem_inicial = 'campanha'
             effectiveStatus = 'fila_humano'
             console.log(`[${requestId}] Campaign mode atendente: moving conversation to fila_humano`)
           }
@@ -202,32 +199,6 @@ Deno.serve(async (req) => {
             .update(updateConvPayload)
             .eq('id', conversa.id)
           console.log(`[${requestId}] Linked conversation to campaign: ${destCampanha.campanha_id}`)
-
-          // Comando ao n8n: não ativar o fluxo para este número até o atendente encerrar (campanha modo atendente).
-          if (campanha?.modo_resposta === 'atendente') {
-            try {
-              const closeServiceUrl = `${supabaseUrl}/functions/v1/close-service`
-              const closeRes = await fetch(closeServiceUrl, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${supabaseServiceKey}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  conversa_id: conversa.id,
-                  empresa_id: empresaId,
-                  attendance_mode: 'manual',
-                }),
-              })
-              if (!closeRes.ok) {
-                console.error(`[${requestId}] close-service (manual) for campaign failed:`, await closeRes.text())
-              } else {
-                console.log(`[${requestId}] n8n notificado: attendance_mode manual para campanha atendente`)
-              }
-            } catch (closeErr) {
-              console.error(`[${requestId}] Error calling close-service (manual) for campaign:`, closeErr)
-            }
-          }
         }
 
         // Insert message (always in/cliente at this point)
@@ -263,8 +234,8 @@ Deno.serve(async (req) => {
           console.error(`[${requestId}] ERROR updating conversation:`, updateError)
         }
 
-        // Chamar n8n só quando status bot e origem_final não é atendente (null ou agente).
-        if (effectiveStatus === 'bot' && effectiveOrigemFinal !== 'atendente') {
+        // Modo agente (status bot): chamar n8n para processar a mensagem e responder. Modo atendente: não chamar n8n.
+        if (effectiveStatus === 'bot') {
           try {
             const n8nMessageUrl = 'https://n8n.maringaai.com.br/webhook/maia-beach-tennis-demo'
             const n8nMessageRes = await fetch(n8nMessageUrl, {
@@ -277,37 +248,16 @@ Deno.serve(async (req) => {
                 empresa_id: empresaId,
               }),
             })
-            const n8nBodyText = await n8nMessageRes.text()
             if (!n8nMessageRes.ok) {
-              console.error(`[${requestId}] n8n message webhook returned ${n8nMessageRes.status}:`, n8nBodyText)
+              console.error(`[${requestId}] n8n message webhook returned ${n8nMessageRes.status}:`, await n8nMessageRes.text())
             } else {
               console.log(`[${requestId}] n8n invoked for bot message (agente mode)`)
-              // Inserir resposta do bot em mensagens_ativas para aparecer no chat
-              const replyText = extractBotReplyFromN8nResponse(n8nBodyText)
-              if (replyText && replyText.trim()) {
-                const { error: botMsgError } = await supabase
-                  .from('mensagens_ativas')
-                  .insert({
-                    empresa_id: empresaId,
-                    conversa_id: conversa.id,
-                    contato_id: contato.id,
-                    direcao: 'out',
-                    tipo_remetente: 'bot',
-                    conteudo: replyText.trim(),
-                    payload: { source: 'n8n_webhook', raw: n8nBodyText?.substring?.(0, 500) },
-                  })
-                if (botMsgError) {
-                  console.error(`[${requestId}] Error inserting bot reply into mensagens_ativas:`, botMsgError)
-                } else {
-                  console.log(`[${requestId}] Bot reply inserted into mensagens_ativas`)
-                }
-              }
             }
           } catch (n8nErr) {
             console.error(`[${requestId}] Error invoking n8n for message:`, n8nErr)
           }
         } else {
-          console.log(`[${requestId}] Skipping n8n (origem_final=atendente or non-bot status: ${effectiveStatus})`)
+          console.log(`[${requestId}] Skipping n8n (atendente mode or non-bot status: ${effectiveStatus})`)
         }
 
         // Check if message contains human attendance request
@@ -511,8 +461,6 @@ async function findOrCreateConversa(
         status: 'bot',
         canal: 'whatsapp',
         iniciado_por: 'cliente',
-        origem_inicial: 'cliente',
-        origem_final: null,
       })
       .select()
       .single()
@@ -536,8 +484,6 @@ async function findOrCreateConversa(
       status: 'bot',
       canal: 'whatsapp',
       iniciado_por: 'cliente',
-      origem_inicial: 'cliente',
-      origem_final: null,
     })
     .select()
     .single()
@@ -545,54 +491,6 @@ async function findOrCreateConversa(
   if (createError) throw createError
   console.log(`[${requestId}] Created new conversation: ${newConversa.id}`)
   return newConversa
-}
-
-/**
- * Extrai o texto da resposta do bot a partir do body retornado pelo webhook n8n.
- * Suporta formatos comuns: body, reply, text, message, resposta, output, data.body, e array de itens.
- */
-function extractBotReplyFromN8nResponse(bodyText: string): string | null {
-  if (!bodyText?.trim()) return null
-  const getStr = (v: unknown): string | null => {
-    if (typeof v === 'string') return v
-    if (v && typeof v === 'object' && 'body' in v && typeof (v as any).body === 'string') return (v as any).body
-    if (v && typeof v === 'object' && 'text' in v && typeof (v as any).text === 'string') return (v as any).text
-    return null
-  }
-  const keys = ['body', 'reply', 'text', 'message', 'resposta', 'output']
-  const tryObj = (data: Record<string, unknown>): string | null => {
-    for (const k of keys) {
-      const val = data?.[k]
-      const s = getStr(val)
-      if (s?.trim()) return s
-    }
-    const dataNested = data?.data as Record<string, unknown> | undefined
-    if (dataNested) {
-      for (const k of keys) {
-        const s = getStr(dataNested[k])
-        if (s?.trim()) return s
-      }
-    }
-    const json = data?.json as Record<string, unknown> | undefined
-    if (json && typeof json.body === 'string' && json.body.trim()) return json.body
-    return null
-  }
-  try {
-    const parsed = JSON.parse(bodyText)
-    const data = parsed as Record<string, unknown>
-    const fromObj = tryObj(data)
-    if (fromObj) return fromObj
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      const first = parsed[0]
-      if (first && typeof first === 'object') {
-        const s = tryObj(first as Record<string, unknown>) ?? getStr(first)
-        if (s?.trim()) return s
-      }
-    }
-    return null
-  } catch {
-    return null
-  }
 }
 
 function extractMessageContent(message: WhapiMessage): string {
