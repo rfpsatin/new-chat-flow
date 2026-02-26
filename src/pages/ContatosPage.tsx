@@ -11,9 +11,12 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Search, Phone, Calendar, MessageSquare, User, Clock, Send, Loader2 } from 'lucide-react';
+import { Search, Phone, Calendar, MessageSquare, User, Clock, Send, Loader2, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMensagensHistorico } from '@/hooks/useHistorico';
 import { toast } from 'sonner';
@@ -79,10 +82,11 @@ function IniciarConversaDialog({
   const startConv = useStartConversation();
   const [mensagem, setMensagem] = useState('');
   const [link, setLink] = useState('');
+  const [origemFinal, setOrigemFinal] = useState<'agente' | 'atendente' | ''>('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!mensagem.trim()) return;
+    if (!mensagem.trim() || !origemFinal) return;
     try {
       const data = await startConv.mutateAsync({
         empresa_id: empresaId,
@@ -90,6 +94,7 @@ function IniciarConversaDialog({
         mensagem_inicial: mensagem.trim(),
         link: link.trim() || undefined,
         remetente_id: currentUser?.id,
+        origem_final: origemFinal,
       });
       toast.success('Conversa iniciada. Redirecionando para a fila.');
       onSuccess(data.conversa_id);
@@ -128,11 +133,36 @@ function IniciarConversaDialog({
               className="mt-1"
             />
           </div>
+          <div>
+            <div className="flex items-center gap-1.5 mb-2">
+              <label className="text-sm font-medium">Quem irá tratar a resposta *</label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[260px]">
+                    <p>Define quem continuará a conversa. Ao receber uma resposta do cliente, o atendimento seguirá com Agente ou Atendente, conforme selecionado.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <RadioGroup value={origemFinal} onValueChange={(v) => setOrigemFinal(v as 'agente' | 'atendente')} className="flex gap-4">
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="agente" id="origem-agente" />
+                <Label htmlFor="origem-agente">Agente</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="atendente" id="origem-atendente" />
+                <Label htmlFor="origem-atendente">Atendente</Label>
+              </div>
+            </RadioGroup>
+          </div>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={!mensagem.trim() || startConv.isPending}>
+            <Button type="submit" disabled={!mensagem.trim() || !origemFinal || startConv.isPending}>
               {startConv.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               Enviar e abrir conversa
             </Button>

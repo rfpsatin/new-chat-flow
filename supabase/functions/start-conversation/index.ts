@@ -13,6 +13,7 @@ interface StartConversationRequest {
   midia_url?: string
   link?: string
   origem_inicial?: 'agente' | 'sistema' | 'campanha'
+  origem_final?: 'agente' | 'atendente'
   campanha_id?: string
   remetente_id?: string // usuario que iniciou (agente)
 }
@@ -34,7 +35,7 @@ Deno.serve(async (req) => {
 
   try {
     const body: StartConversationRequest = await req.json()
-    const { empresa_id, contato_id, mensagem_inicial, link, origem_inicial, campanha_id, remetente_id } = body
+    const { empresa_id, contato_id, mensagem_inicial, link, origem_inicial, origem_final, campanha_id, remetente_id } = body
 
     if (!empresa_id || !contato_id || !mensagem_inicial?.trim()) {
       return new Response(JSON.stringify({
@@ -92,16 +93,19 @@ Deno.serve(async (req) => {
       conversaId = conversaAtiva.id
       nrProtocolo = conversaAtiva.nr_protocolo
     } else {
-      const origem = origem_inicial || 'agente'
+      const origem = origem_inicial || 'atendente'
+      // Determine initial status based on origem_final
+      const initialStatus = origem_final === 'agente' ? 'bot' : 'esperando_tria'
       const { data: newConv, error: createConvError } = await supabase
         .from('conversas')
         .insert({
           empresa_id,
           contato_id,
           canal: 'whatsapp',
-          status: 'esperando_tria',
+          status: initialStatus,
           iniciado_por: 'agente',
           origem_inicial: origem,
+          origem_final: origem_final || null,
           campanha_id: campanha_id || null,
         })
         .select('id, nr_protocolo')
@@ -160,8 +164,9 @@ Deno.serve(async (req) => {
       conteudo: messageText,
     })
 
-    // Se há um remetente (agente), atribui a conversa e coloca em atendimento humano.
-    if (remetente_id) {
+    // Se origem_final === 'atendente' e há remetente: atribui agente e coloca em atendimento humano
+    // Se origem_final === 'agente': status já é 'bot', não atribui agente
+    if (remetente_id && origem_final !== 'agente') {
       const { error: atribuirError } = await supabase
         .from('conversas')
         .update({

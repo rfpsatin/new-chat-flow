@@ -9,6 +9,7 @@ interface StartConversationParams {
   mensagem_inicial: string;
   link?: string;
   remetente_id?: string;
+  origem_final?: 'agente' | 'atendente';
 }
 
 interface StartConversationResult {

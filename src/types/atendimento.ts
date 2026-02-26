@@ -172,6 +172,7 @@ export interface Campanha {
   finalizada_em: string | null;
   envios_por_minuto: number | null;
   envios_por_hora: number | null;
+  modo_resposta: string | null;
   created_at: string;
   updated_at: string;
 }

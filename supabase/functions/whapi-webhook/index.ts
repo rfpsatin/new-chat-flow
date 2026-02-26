@@ -278,7 +278,11 @@ Deno.serve(async (req) => {
         // Check if message contains human attendance request
         const isHumanRequest = conteudo.toLowerCase().includes('falar com') && conteudo.toLowerCase().includes('atendente humano')
         const isHumanButtonId = (message as any).reply?.buttons_reply?.id === 'ButtonsV3:atendimento_humano'
-        if (conversa.status === 'bot' && (isHumanRequest || isHumanButtonId)) {
+
+        // Check origem_final - if 'atendente', skip n8n entirely
+        if (conversa.origem_final === 'atendente') {
+          console.log(`[${requestId}] Conversa has origem_final=atendente, skipping n8n check`)
+        } else if (conversa.status === 'bot' && (isHumanRequest || isHumanButtonId)) {
           console.log(`[${requestId}] Detected human attendance request, checking n8n...`)
           try {
             const n8nUrl = new URL('https://n8n.maringaai.com.br/webhook/maia-beach-tennis-demo')

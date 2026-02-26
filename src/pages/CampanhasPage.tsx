@@ -16,6 +16,9 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -27,6 +30,7 @@ import {
   Loader2,
   ChevronRight,
   Tag,
+  Info,
 } from 'lucide-react';
 import { Campanha, CampanhaStats, StatusCampanha } from '@/types/atendimento';
 import { toast } from 'sonner';
@@ -254,6 +258,7 @@ function NovaCampanhaWizard({
   const [tagsStr, setTagsStr] = useState('');
   const [mensagemTexto, setMensagemTexto] = useState('');
   const [link, setLink] = useState('');
+  const [modoResposta, setModoResposta] = useState<'agente' | 'atendente' | ''>('');
   const [contatoIds, setContatoIds] = useState<Set<string>>(new Set());
   const [agendadoPara, setAgendadoPara] = useState('');
 
@@ -267,8 +272,8 @@ function NovaCampanhaWizard({
   };
 
   const handleCreate = async () => {
-    if (!nome.trim() || !mensagemTexto.trim()) {
-      toast.error('Preencha nome e mensagem.');
+    if (!nome.trim() || !mensagemTexto.trim() || !modoResposta) {
+      toast.error('Preencha nome, mensagem e modo de resposta.');
       return;
     }
     try {
@@ -280,6 +285,7 @@ function NovaCampanhaWizard({
         tags,
         mensagem_texto: mensagemTexto.trim(),
         link: link.trim() || null,
+        modo_resposta: modoResposta,
         status: 'draft',
       });
       if (contatoIds.size > 0) {
@@ -341,9 +347,34 @@ function NovaCampanhaWizard({
                 <label className="text-sm font-medium">Link (opcional)</label>
                 <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://..." className="mt-1" />
               </div>
+              <div>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <label className="text-sm font-medium">Quem irá tratar a resposta *</label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-[260px]">
+                        <p>Define quem continuará a conversa. Ao receber uma resposta do cliente, o atendimento seguirá com Agente ou Atendente, conforme selecionado.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <RadioGroup value={modoResposta} onValueChange={(v) => setModoResposta(v as 'agente' | 'atendente')} className="flex gap-4">
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="agente" id="camp-agente" />
+                    <Label htmlFor="camp-agente">Agente</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="atendente" id="camp-atendente" />
+                    <Label htmlFor="camp-atendente">Atendente</Label>
+                  </div>
+                </RadioGroup>
+              </div>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => setStep(1)}>Voltar</Button>
-                <Button onClick={() => setStep(3)} disabled={!mensagemTexto.trim()}>Próximo</Button>
+                <Button onClick={() => setStep(3)} disabled={!mensagemTexto.trim() || !modoResposta}>Próximo</Button>
               </div>
             </>
           )}
