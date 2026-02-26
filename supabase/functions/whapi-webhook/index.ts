@@ -279,9 +279,9 @@ Deno.serve(async (req) => {
         const isHumanRequest = conteudo.toLowerCase().includes('falar com') && conteudo.toLowerCase().includes('atendente humano')
         const isHumanButtonId = (message as any).reply?.buttons_reply?.id === 'ButtonsV3:atendimento_humano'
 
-        // Check origem_final - if 'atendente', skip n8n entirely
-        if (conversa.origem_final === 'atendente') {
-          console.log(`[${requestId}] Conversa has origem_final=atendente, skipping n8n check`)
+        // Check human_mode or origem_final - if true/'atendente', skip n8n entirely
+        if (conversa.human_mode === true || conversa.origem_final === 'atendente') {
+          console.log(`[${requestId}] Conversa has human_mode=true or origem_final=atendente, skipping n8n check`)
         } else if (conversa.status === 'bot' && (isHumanRequest || isHumanButtonId)) {
           console.log(`[${requestId}] Detected human attendance request, checking n8n...`)
           try {
