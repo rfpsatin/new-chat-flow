@@ -12,7 +12,7 @@ interface StartConversationRequest {
   mensagem_inicial: string
   midia_url?: string
   link?: string
-  origem_inicial?: 'agente' | 'sistema' | 'campanha'
+  origem_inicial?: 'agente' | 'sistema' | 'campanha' | 'atendente'
   campanha_id?: string
   remetente_id?: string // usuario que iniciou (agente)
   modo_resposta?: 'agente' | 'atendente'
@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
       conversaId = conversaAtiva.id
       nrProtocolo = conversaAtiva.nr_protocolo
     } else {
-      const origem = origem_inicial || 'agente'
+      const origem = remetente_id ? 'atendente' : (origem_inicial || 'agente')
       const initialStatus = modo === 'agente' ? 'bot' : 'esperando_tria'
       const { data: newConv, error: createConvError } = await supabase
         .from('conversas')
@@ -105,6 +105,7 @@ Deno.serve(async (req) => {
           status: initialStatus,
           iniciado_por: 'agente',
           origem_inicial: origem,
+          origem_final: modo,
           campanha_id: campanha_id || null,
         })
         .select('id, nr_protocolo')
@@ -170,10 +171,16 @@ Deno.serve(async (req) => {
       console.error(`[${requestId}] Error inserting message:`, msgError)
     }
 
-    // Atualizar last_message_at
+    // Atualizar last_message_at, origem_inicial e origem_final (conversa existente ou reforço na nova)
+    const updatePayload: Record<string, unknown> = {
+      last_message_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      origem_final: modo,
+    }
+    if (remetente_id) updatePayload.origem_inicial = 'atendente'
     await supabase
       .from('conversas')
-      .update({ last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .update(updatePayload)
       .eq('id', conversaId)
 
     // Só atribui ao atendente e coloca em atendimento humano quando modo é "atendente".

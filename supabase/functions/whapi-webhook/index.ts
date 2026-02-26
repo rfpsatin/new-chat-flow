@@ -164,6 +164,7 @@ Deno.serve(async (req) => {
 
         // Vincular conversa à campanha se o contato respondeu após receber disparo
         let effectiveStatus = conversa.status
+        let effectiveOrigemFinal: string | null = conversa.origem_final ?? null
         const { data: destCampanha } = await supabase
           .from('campanha_destinatarios')
           .select('id, campanha_id')
@@ -179,18 +180,20 @@ Deno.serve(async (req) => {
             .from('campanha_destinatarios')
             .update({ conversa_id: conversa.id })
             .eq('id', destCampanha.id)
-          const updateConvPayload: Record<string, unknown> = {
-            campanha_id: destCampanha.campanha_id,
-            updated_at: new Date().toISOString(),
-          }
           const { data: campanha } = await supabase
             .from('campanhas')
             .select('id, modo_resposta')
             .eq('id', destCampanha.campanha_id)
             .maybeSingle()
+          const updateConvPayload: Record<string, unknown> = {
+            campanha_id: destCampanha.campanha_id,
+            origem_inicial: 'campanha',
+            origem_final: campanha?.modo_resposta ?? null,
+            updated_at: new Date().toISOString(),
+          }
+          effectiveOrigemFinal = campanha?.modo_resposta ?? null
           if (campanha?.modo_resposta === 'atendente' && conversa.status === 'bot') {
             updateConvPayload.status = 'fila_humano'
-            updateConvPayload.origem_inicial = 'campanha'
             effectiveStatus = 'fila_humano'
             console.log(`[${requestId}] Campaign mode atendente: moving conversation to fila_humano`)
           }
@@ -260,8 +263,8 @@ Deno.serve(async (req) => {
           console.error(`[${requestId}] ERROR updating conversation:`, updateError)
         }
 
-        // Modo agente (status bot): chamar n8n para processar a mensagem e responder. Registrar resposta do bot em mensagens_ativas.
-        if (effectiveStatus === 'bot') {
+        // Chamar n8n só quando status bot e origem_final não é atendente (null ou agente).
+        if (effectiveStatus === 'bot' && effectiveOrigemFinal !== 'atendente') {
           try {
             const n8nMessageUrl = 'https://n8n.maringaai.com.br/webhook/maia-beach-tennis-demo'
             const n8nMessageRes = await fetch(n8nMessageUrl, {
@@ -304,7 +307,7 @@ Deno.serve(async (req) => {
             console.error(`[${requestId}] Error invoking n8n for message:`, n8nErr)
           }
         } else {
-          console.log(`[${requestId}] Skipping n8n (atendente mode or non-bot status: ${effectiveStatus})`)
+          console.log(`[${requestId}] Skipping n8n (origem_final=atendente or non-bot status: ${effectiveStatus})`)
         }
 
         // Check if message contains human attendance request
@@ -508,6 +511,8 @@ async function findOrCreateConversa(
         status: 'bot',
         canal: 'whatsapp',
         iniciado_por: 'cliente',
+        origem_inicial: 'cliente',
+        origem_final: null,
       })
       .select()
       .single()
@@ -531,6 +536,8 @@ async function findOrCreateConversa(
       status: 'bot',
       canal: 'whatsapp',
       iniciado_por: 'cliente',
+      origem_inicial: 'cliente',
+      origem_final: null,
     })
     .select()
     .single()

@@ -229,6 +229,7 @@ export type Database = {
           nr_protocolo: string | null
           origem: string | null
           origem_inicial: string | null
+          origem_final: string | null
           pesquisa_enviada_em: string | null
           pesquisa_respondida_em: string | null
           resumo: string | null
@@ -255,6 +256,7 @@ export type Database = {
           nr_protocolo?: string | null
           origem?: string | null
           origem_inicial?: string | null
+          origem_final?: string | null
           pesquisa_enviada_em?: string | null
           pesquisa_respondida_em?: string | null
           resumo?: string | null
@@ -281,6 +283,7 @@ export type Database = {
           nr_protocolo?: string | null
           origem?: string | null
           origem_inicial?: string | null
+          origem_final?: string | null
           pesquisa_enviada_em?: string | null
           pesquisa_respondida_em?: string | null
           resumo?: string | null
@@ -740,6 +743,9 @@ export type Database = {
           last_message_at: string | null
           nr_protocolo: string | null
           origem: string | null
+          origem_inicial: string | null
+          origem_final: string | null
+          campanha_id: string | null
           resumo: string | null
           status: string | null
           whatsapp_numero: string | null
@@ -775,6 +781,9 @@ export type Database = {
           motivo_encerramento: string | null
           nota_satisfacao: number | null
           nr_protocolo: string | null
+          origem_inicial: string | null
+          origem_final: string | null
+          campanha_id: string | null
           resumo: string | null
           status: string | null
           whatsapp_numero: string | null

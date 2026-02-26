@@ -129,7 +129,7 @@ export function ConversaItem({ conversa, isSelected, onClick, showBadge = true, 
             {timeAgo}
           </span>
           <div className="flex flex-col items-end gap-0.5">
-            <ConversaTags origem={conversa.origem} channel={conversa.channel} />
+            <ConversaTags origem={conversa.origem} channel={conversa.channel} origem_inicial={conversa.origem_inicial} />
             {showBadge && (
               <div className="flex items-center gap-1 text-xs text-muted-foreground flex-wrap justify-end">
                 <span>| {statusLabel[conversa.status]} |</span>
