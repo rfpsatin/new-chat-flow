@@ -7,11 +7,19 @@ const corsHeaders = {
 
 const N8N_WEBHOOK_URL = 'https://n8n.maringaai.com.br/webhook/maia-beach-tennis-demo'
 
-async function updateAttendanceMode(numeroParticipante: string, channelId: string, conversaId: string) {
-  console.log(`[close-service] Updating attendanceMode to automated for numero_participante ${numeroParticipante}, channel_ID ${channelId}`)
+type AttendanceMode = 'manual' | 'automated'
+
+async function updateAttendanceMode(
+  numeroParticipante: string,
+  channelId: string,
+  conversaId: string,
+  mode: AttendanceMode
+) {
+  const attendanceMode = mode === 'manual' ? 'manual' : 'automated'
+  console.log(`[close-service] Updating attendanceMode to ${attendanceMode} for numero_participante ${numeroParticipante}, channel_ID ${channelId}`)
 
   const payload = {
-    attendanceMode: 'automated',
+    attendanceMode,
     action: 'update',
     numero_participante: numeroParticipante,
     channel_ID: channelId,
@@ -54,7 +62,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { conversa_id, empresa_id, chat_id } = await req.json()
+    const body = await req.json()
+    const { conversa_id, empresa_id, chat_id, attendance_mode } = body
+    const mode: AttendanceMode = attendance_mode === 'manual' ? 'manual' : 'automated'
 
     if (!conversa_id || !empresa_id) {
       return new Response(JSON.stringify({ error: 'Missing conversa_id or empresa_id' }), {
@@ -125,7 +135,7 @@ Deno.serve(async (req) => {
 
     console.log(`[close-service] Resolved channel_ID (whapi_token) for empresa ${empresa_id}`)
 
-    const result = await updateAttendanceMode(resolvedChatId, empresa.whapi_token, conversa_id)
+    const result = await updateAttendanceMode(resolvedChatId, empresa.whapi_token, conversa_id, mode)
     console.log(`[close-service] Final result: ${result}`)
 
     return new Response(JSON.stringify({ success: result }), {

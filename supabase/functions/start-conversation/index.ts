@@ -192,9 +192,32 @@ Deno.serve(async (req) => {
         console.error(`[${requestId}] Error atribuindo agente:`, atribuirError)
       } else {
         console.log(`[${requestId}] Conversa atribuída ao agente ${remetente_id} em atendimento humano`)
+        // Comando ao n8n: não ativar o fluxo para este número até o atendente encerrar a conversa.
+        try {
+          const closeServiceUrl = `${supabaseUrl}/functions/v1/close-service`
+          const closeRes = await fetch(closeServiceUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              conversa_id: conversaId,
+              empresa_id,
+              attendance_mode: 'manual',
+            }),
+          })
+          if (!closeRes.ok) {
+            console.error(`[${requestId}] close-service (manual) failed:`, await closeRes.text())
+          } else {
+            console.log(`[${requestId}] n8n notificado: attendance_mode manual para conversa ${conversaId}`)
+          }
+        } catch (closeErr) {
+          console.error(`[${requestId}] Error calling close-service (manual):`, closeErr)
+        }
       }
     }
-    
+
     console.log(`[${requestId}] Conversation started: ${conversaId}`)
 
     return new Response(JSON.stringify({

@@ -13,8 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Search, Phone, Calendar, MessageSquare, User, Clock, Send, Loader2, Info, Bot, Headphones } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Search, Phone, Calendar, MessageSquare, User, Clock, Send, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMensagensHistorico } from '@/hooks/useHistorico';
 import { toast } from 'sonner';
@@ -136,53 +135,52 @@ function IniciarConversaDialog({
             />
           </div>
           <div>
-            <label className="text-sm font-medium flex items-center gap-1.5">
-              Quem deve responder após o cliente interagir? *
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    className="p-0.5 rounded-full text-muted-foreground hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                    aria-label="Informações"
-                  >
-                    <Info className="w-3.5 h-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-xs p-2.5 text-xs">
-                  <p className="font-medium mb-1">Agente (bot):</p>
-                  <p className="text-muted-foreground">A conversa aparece no filtro &quot;Bot&quot; e o n8n responde as próximas interações.</p>
-                  <p className="font-medium mt-2 mb-1">Atendente:</p>
-                  <p className="text-muted-foreground">A conversa vai diretamente para o filtro &quot;Atendimento&quot; no atendente que iniciou a conversa. Somente o atendente responde.</p>
-                </TooltipContent>
-              </Tooltip>
-            </label>
-            <div className="flex gap-3 mt-2">
-              <button
-                type="button"
-                onClick={() => setModoResposta('agente')}
-                className={cn(
-                  'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors',
-                  modoResposta === 'agente'
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-input hover:bg-muted/50'
-                )}
-              >
-                <Bot className="w-4 h-4" />
-                Agente
-              </button>
-              <button
-                type="button"
-                onClick={() => setModoResposta('atendente')}
-                className={cn(
-                  'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors',
-                  modoResposta === 'atendente'
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-input hover:bg-muted/50'
-                )}
-              >
-                <Headphones className="w-4 h-4" />
-                Atendente
-              </button>
+            <p className="text-sm text-muted-foreground">
+              Define quem continuará a conversa. Ao receber uma resposta do cliente, o atendimento seguirá com Bot ou Atendente, conforme selecionado.
+            </p>
+            <div className="flex items-center gap-4 mt-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <span
+                  role="radio"
+                  aria-checked={modoResposta === 'agente'}
+                  className={cn(
+                    'block h-4 w-4 shrink-0 rounded-full border-2 transition-colors',
+                    modoResposta === 'agente'
+                      ? 'border-primary bg-primary'
+                      : 'border-muted-foreground/50 bg-background'
+                  )}
+                />
+                <span className="text-sm">Bot</span>
+                <input
+                  type="radio"
+                  name="modoResposta"
+                  value="agente"
+                  checked={modoResposta === 'agente'}
+                  onChange={() => setModoResposta('agente')}
+                  className="sr-only"
+                />
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <span
+                  role="radio"
+                  aria-checked={modoResposta === 'atendente'}
+                  className={cn(
+                    'block h-4 w-4 shrink-0 rounded-full border-2 transition-colors',
+                    modoResposta === 'atendente'
+                      ? 'border-primary bg-primary'
+                      : 'border-muted-foreground/50 bg-background'
+                  )}
+                />
+                <span className="text-sm">Atendente</span>
+                <input
+                  type="radio"
+                  name="modoResposta"
+                  value="atendente"
+                  checked={modoResposta === 'atendente'}
+                  onChange={() => setModoResposta('atendente')}
+                  className="sr-only"
+                />
+              </label>
             </div>
           </div>
           <div className="flex justify-end gap-2">
