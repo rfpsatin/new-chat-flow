@@ -106,6 +106,7 @@ Deno.serve(async (req) => {
           iniciado_por: 'agente',
           origem_inicial: origem,
           origem_final: origem_final || null,
+          human_mode: origem_final === 'atendente' ? true : false,
           campanha_id: campanha_id || null,
         })
         .select('id, nr_protocolo')
