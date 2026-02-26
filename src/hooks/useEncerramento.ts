@@ -83,19 +83,8 @@ export function useEncerrarConversa() {
         // Continuar mesmo se falhar o envio - não bloquear encerramento
       }
 
-      // 3. Inserir mensagem de pesquisa no banco
-      const { error: msgError } = await supabase
-        .from('mensagens_ativas')
-        .insert({
-          empresa_id: empresaId,
-          conversa_id: conversaId,
-          contato_id: contatoId,
-          direcao: 'out',
-          tipo_remetente: 'sistema',
-          conteudo: MENSAGEM_PESQUISA,
-        });
-      
-      if (msgError) throw msgError;
+      // A mensagem de pesquisa será registrada em mensagens_ativas quando o webhook
+      // do Whapi (whapi-webhook) receber o evento from_me=true.
 
       // 4. Atualizar timestamp de pesquisa enviada
       const { error: updateError } = await supabase

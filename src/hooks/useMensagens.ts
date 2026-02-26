@@ -103,31 +103,8 @@ export function useEnviarMensagem() {
         throw new Error(errorData.error || 'Erro ao enviar mensagem via Whapi');
       }
 
-      const whapiData = await whapiResponse.json();
-
-      // 3. Insert message in database
-      const { error: msgError } = await supabase
-        .from('mensagens_ativas')
-        .insert({
-          empresa_id: empresaId,
-          conversa_id: conversaId,
-          contato_id: contato_id,
-          direcao: 'out',
-          tipo_remetente: 'agente',
-          remetente_id: remetenteId,
-          conteudo,
-          payload: whapiData.response || { message_id: whapiData.message_id },
-        });
-      
-      if (msgError) throw msgError;
-
-      // 4. Update conversation last_message_at
-      const { error: convError } = await supabase
-        .from('conversas')
-        .update({ last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-        .eq('id', conversaId);
-      
-      if (convError) throw convError;
+      // A mensagem será registrada em mensagens_ativas quando o webhook
+      // do Whapi (whapi-webhook) receber o evento from_me=true.
     },
     onSuccess: (_, { conversaId }) => {
       queryClient.invalidateQueries({ queryKey: ['mensagens', conversaId] });

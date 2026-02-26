@@ -120,15 +120,6 @@ Deno.serve(async (req) => {
         console.log(`[${requestId}] From: ${message.from}, from_me: ${message.from_me}`)
         console.log(`[${requestId}] Type: ${message.type}`)
 
-        // Mensagens de saída (from_me=true) já são registradas por
-        // start-conversation, whapi-send-message, n8n-webhook, etc.
-        // Inserir aqui causaria duplicação.
-        if (message.from_me === true) {
-          console.log(`[${requestId}] Outgoing message (from_me=true), skipping to avoid duplicate`)
-          continue
-        }
-
-        // Daqui para baixo, apenas mensagens de entrada (cliente)
         const whatsappNumero = message.from
           .replace('@s.whatsapp.net', '')
           .replace('@c.us', '')
@@ -149,6 +140,67 @@ Deno.serve(async (req) => {
 
         const conteudo = extractMessageContent(message)
         console.log(`[${requestId}] Message content: ${conteudo.substring(0, 100)}...`)
+
+        // Mensagens de saída (from_me=true) agora também são registradas aqui
+        // para garantir que respostas do bot/agente apareçam no Hub mesmo
+        // quando não foram originadas pelo próprio Hub.
+        if (message.from_me === true) {
+          console.log(`[${requestId}] Handling outgoing message (from_me=true)`)
+
+          const { data: ultimaConversa, error: convError } = await supabase
+            .from('conversas')
+            .select('*')
+            .eq('empresa_id', empresaId)
+            .eq('contato_id', contato.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+          if (convError) {
+            console.error(`[${requestId}] ERROR finding conversation for outgoing message:`, convError)
+            throw convError
+          }
+
+          if (!ultimaConversa) {
+            console.log(`[${requestId}] No conversation found for outgoing message, skipping insert`)
+            continue
+          }
+
+          const { error: outMsgError } = await supabase
+            .from('mensagens_ativas')
+            .insert({
+              empresa_id: empresaId,
+              conversa_id: ultimaConversa.id,
+              contato_id: contato.id,
+              direcao: 'out',
+              tipo_remetente: 'bot',
+              conteudo: conteudo,
+              payload: message,
+            })
+
+          if (outMsgError) {
+            console.error(`[${requestId}] ERROR inserting outgoing message:`, outMsgError)
+            throw outMsgError
+          }
+
+          const { error: outUpdateError } = await supabase
+            .from('conversas')
+            .update({
+              last_message_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', ultimaConversa.id)
+
+          if (outUpdateError) {
+            console.error(`[${requestId}] ERROR updating conversation for outgoing message:`, outUpdateError)
+          }
+
+          processedCount++
+          console.log(`[${requestId}] Outgoing message ${message.id} processed successfully`)
+          continue
+        }
+
+        // Daqui para baixo, apenas mensagens de entrada (cliente)
 
         const conversa = await findOrCreateConversa(
           supabase,
