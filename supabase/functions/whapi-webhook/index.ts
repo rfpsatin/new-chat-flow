@@ -120,7 +120,12 @@ Deno.serve(async (req) => {
         console.log(`[${requestId}] From: ${message.from}, from_me: ${message.from_me}`)
         console.log(`[${requestId}] Type: ${message.type}`)
 
-        const whatsappNumero = message.from
+        // Para mensagens de entrada (from_me=false), o número do cliente vem em `from`.
+        // Para mensagens de saída (from_me=true), o número do cliente vem em `chat_id`
+        // (o `from` passa a ser o número da empresa).
+        const rawNumber = message.from_me === true ? message.chat_id : message.from
+
+        const whatsappNumero = rawNumber
           .replace('@s.whatsapp.net', '')
           .replace('@c.us', '')
 
