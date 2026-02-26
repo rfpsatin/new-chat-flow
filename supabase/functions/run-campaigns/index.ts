@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
     // 1. Campanhas agendadas cujo horário já passou
     const { data: campanhas, error: campError } = await supabase
       .from('campanhas')
-      .select('id, empresa_id, nome, mensagem_texto, link, status, envios_por_minuto, iniciada_em')
+      .select('id, empresa_id, nome, mensagem_texto, link, status, envios_por_minuto, iniciada_em, modo_resposta')
       .eq('status', 'agendada')
       .lte('agendado_para', now)
 
@@ -136,6 +136,25 @@ Deno.serve(async (req) => {
         const messageId = data.message_id || data.response?.messages?.[0]?.id
 
         if (res.ok) {
+          // Create conversation via start-conversation to respect origem_final
+          const origemFinal = campanha.modo_resposta === 'atendente' ? 'atendente' : 'agente'
+          const startConvUrl = `${supabaseUrl}/functions/v1/start-conversation`
+          await fetch(startConvUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              empresa_id: campanha.empresa_id,
+              contato_id: dest.contato_id,
+              mensagem_inicial: messageText,
+              origem_inicial: 'campanha',
+              origem_final: origemFinal,
+              campanha_id: campanha.id,
+            }),
+          }).catch(err => console.error(`[${requestId}] Error creating conversation for dest ${dest.id}:`, err))
+
           await supabase
             .from('campanha_destinatarios')
             .update({
