@@ -275,49 +275,6 @@ Deno.serve(async (req) => {
           console.error(`[${requestId}] ERROR updating conversation:`, updateError)
         }
 
-        // Forward message to n8n bot webhook when conversation is still handled by bot
-        if (
-          conversa.status === 'bot' &&
-          conversa.human_mode !== true &&
-          conversa.origem_final !== 'atendente'
-        ) {
-          try {
-            const n8nBotPayload = {
-              to: contato.whatsapp_numero,
-              body: conteudo,
-              source: 'whatsapp',
-              channel: null,
-              empresa_id: empresaId,
-              conversa_id: conversa.id,
-            }
-
-            console.log(
-              `[${requestId}] Forwarding message to n8n bot webhook: ${JSON.stringify(
-                n8nBotPayload
-              ).substring(0, 500)}`
-            )
-
-            const n8nBotResponse = await fetch('https://n8n.maringaai.com.br/webhook/whatsapp_cinemkt', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-              },
-              body: JSON.stringify(n8nBotPayload),
-            })
-
-            const n8nBotText = await n8nBotResponse.text()
-            console.log(
-              `[${requestId}] n8n bot webhook status: ${n8nBotResponse.status}, body: ${n8nBotText.substring(
-                0,
-                500
-              )}`
-            )
-          } catch (n8nBotError) {
-            console.error(`[${requestId}] Error calling n8n bot webhook:`, n8nBotError)
-          }
-        }
-
         // Check if message contains human attendance request
         const isHumanRequest = conteudo.toLowerCase().includes('falar com') && conteudo.toLowerCase().includes('atendente humano')
         const isHumanButtonId = (message as any).reply?.buttons_reply?.id === 'ButtonsV3:atendimento_humano'
