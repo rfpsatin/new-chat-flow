@@ -80,7 +80,7 @@ export function UserSelector() {
             Entrar no Sistema
           </Button>
 
-          <p className="text-center text-xs text-muted-foreground">Protótipo MVP - Ambiente de demonstração</p>
+          <p className="text-center text-xs text-muted-foreground">by MaringaAI</p>
         </CardContent>
       </Card>
     </div>
