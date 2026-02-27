@@ -9,6 +9,8 @@ interface SendMessageRequest {
   empresa_id: string
   to: string // Número do WhatsApp (formato: 5511999999999)
   message: string
+  // Quando definido, indica se a conversa está em modo humano (true) ou não (false)
+  human_mode?: boolean
 }
 
 Deno.serve(async (req) => {
@@ -36,7 +38,7 @@ Deno.serve(async (req) => {
     const body: SendMessageRequest = await req.json()
     console.log(`[${requestId}] Request body:`, JSON.stringify(body, null, 2))
 
-    const { empresa_id, to, message } = body
+    const { empresa_id, to, message, human_mode } = body
 
     if (!empresa_id || !to || !message) {
       console.error(`[${requestId}] ERROR: Missing required fields`)
@@ -81,7 +83,7 @@ Deno.serve(async (req) => {
     }
 
     console.log(`[${requestId}] Empresa found: ${empresa.nome_fantasia || empresa.id}`)
-    console.log(`[${requestId}] Sending message to: ${to}`)
+    console.log(`[${requestId}] Sending message to: ${to}, human_mode: ${human_mode}`)
 
     // Format phone number for Whapi API
     // Remove any existing @s.whatsapp.net or @c.us suffix
@@ -105,16 +107,22 @@ Deno.serve(async (req) => {
 
     // Call Whapi.Cloud API to send message
     const whapiUrl = 'https://gate.whapi.cloud/messages/text'
+    const payload: Record<string, unknown> = {
+      to: phoneNumber,
+      body: message,
+    }
+    // Opcional: incluir human_mode para que o n8n/Whapi consigam enxergar o modo atual da conversa
+    if (typeof human_mode === 'boolean') {
+      payload.human_mode = human_mode
+    }
+
     const whapiResponse = await fetch(whapiUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${empresa.whapi_token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        to: phoneNumber,
-        body: message,
-      }),
+      body: JSON.stringify(payload),
     })
 
     const whapiData = await whapiResponse.json()

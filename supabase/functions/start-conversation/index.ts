@@ -139,6 +139,7 @@ Deno.serve(async (req) => {
         empresa_id,
         to: whatsappNumero,
         message: messageText,
+        human_mode: origem_final === 'atendente',
       }),
     })
 

@@ -61,12 +61,14 @@ export function useEnviarMensagem() {
       contato_id,
       conteudo,
       remetenteId,
+      humanMode,
     }: {
       empresaId: string;
       conversaId: string;
       contato_id: string;
       conteudo: string;
       remetenteId: string;
+      humanMode?: boolean;
     }) => {
       // 1. Get contact to retrieve WhatsApp number
       const { data: contato, error: contatoError } = await supabase
@@ -95,6 +97,7 @@ export function useEnviarMensagem() {
           empresa_id: empresaId,
           to: contato.whatsapp_numero,
           message: conteudo,
+          human_mode: humanMode === true,
         }),
       });
 

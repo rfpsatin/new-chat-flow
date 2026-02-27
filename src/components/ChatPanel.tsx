@@ -46,12 +46,15 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
   const handleEnviar = async () => {
     if (!mensagemInput.trim() || !conversa || !currentUser || !conversaDetalhes) return;
     
+    const humanMode = conversaDetalhes.human_mode === true;
+    
     await enviarMensagem.mutateAsync({
       empresaId,
       conversaId: conversa.conversa_id,
       contato_id: conversaDetalhes.contato_id,
       conteudo: mensagemInput.trim(),
       remetenteId: currentUser.id,
+      humanMode,
     });
     
     setMensagemInput('');
