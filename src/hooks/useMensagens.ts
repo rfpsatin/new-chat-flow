@@ -86,6 +86,9 @@ export function useEnviarMensagem() {
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       
       const functionUrl = `${supabaseUrl}/functions/v1/whapi-send-message`;
+
+      const isHuman = humanMode === true;
+      const whapiBody = `#\"human_mode=${isHuman ? 'true' : 'false'}\"# ${conteudo}`;
       
       const whapiResponse = await fetch(functionUrl, {
         method: 'POST',
@@ -96,8 +99,7 @@ export function useEnviarMensagem() {
         body: JSON.stringify({
           empresa_id: empresaId,
           to: contato.whatsapp_numero,
-          message: conteudo,
-          human_mode: humanMode === true,
+          message: whapiBody,
         }),
       });
 

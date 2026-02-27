@@ -121,11 +121,15 @@ Deno.serve(async (req) => {
       isNewConversa = true
     }
 
-    // Montar texto (mensagem + link se houver)
+    // Montar texto (mensagem + link se houver) - este é o texto \"limpo\" salvo no banco
     let messageText = mensagem_inicial.trim()
     if (link?.trim()) {
       messageText = messageText ? `${messageText}\n\n${link.trim()}` : link.trim()
     }
+
+    // Texto enviado para a Whapi com marcador de human_mode
+    const isHuman = origem_final === 'atendente'
+    const whapiBody = `#\"human_mode=${isHuman ? 'true' : 'false'}\"# ${messageText}`
 
     // Enviar via Whapi (chamar Edge Function whapi-send-message)
     const sendUrl = `${supabaseUrl}/functions/v1/whapi-send-message`
@@ -138,8 +142,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         empresa_id,
         to: whatsappNumero,
-        message: messageText,
-        human_mode: origem_final === 'atendente',
+        message: whapiBody,
       }),
     })
 
