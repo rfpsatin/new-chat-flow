@@ -30,10 +30,10 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    // Get conversation details to check if it's from n8n webhook and get n8n_webhook_id
+    // Get conversation details
     const { data: conversa, error: convError } = await supabase
       .from('conversas')
-      .select('n8n_webhook_id, origem, channel')
+      .select('n8n_webhook_id, origem, channel, contato_id, human_mode, origem_final')
       .eq('id', conversa_id)
       .single()
 
@@ -45,28 +45,35 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Only proceed if this is a conversation from n8n webhook (has origem/channel or n8n_webhook_id)
-    if (!conversa.n8n_webhook_id && !conversa.origem && !conversa.channel) {
-      console.log(`[n8n-reset-human-mode] Not an n8n webhook conversation, skipping reset`)
-      return new Response(JSON.stringify({ success: true, skipped: true, reason: 'Not an n8n webhook conversation' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    // Determine the "to" field: prefer n8n_webhook_id, fallback to whatsapp_numero
+    let recipientTo = conversa.n8n_webhook_id
+
+    if (!recipientTo) {
+      // Fetch whatsapp_numero from contatos as fallback
+      const { data: contato, error: contatoError } = await supabase
+        .from('contatos')
+        .select('whatsapp_numero')
+        .eq('id', conversa.contato_id)
+        .single()
+
+      if (contatoError || !contato) {
+        console.error(`[n8n-reset-human-mode] Failed to find contato:`, contatoError)
+        return new Response(JSON.stringify({ error: 'Contato not found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      recipientTo = contato.whatsapp_numero
+      console.log(`[n8n-reset-human-mode] Using whatsapp_numero as fallback: ${recipientTo}`)
     }
 
-    if (!conversa.n8n_webhook_id) {
-      console.error(`[n8n-reset-human-mode] n8n_webhook_id not found for conversa`)
-      return new Response(JSON.stringify({ error: 'n8n_webhook_id not found' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    console.log(`[n8n-reset-human-mode] Resetting human_mode for n8n_webhook_id: ${conversa.n8n_webhook_id}`)
+    console.log(`[n8n-reset-human-mode] Resetting human_mode, to: ${recipientTo}`)
 
     // Notify n8n to reset human_mode
     const payload = {
       action: 'reset_human_mode',
-      to: conversa.n8n_webhook_id,
+      to: recipientTo,
       conversa_id: conversa_id,
       human_mode: false,
     }
