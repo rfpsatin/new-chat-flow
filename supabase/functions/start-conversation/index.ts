@@ -143,6 +143,7 @@ Deno.serve(async (req) => {
         empresa_id,
         to: whatsappNumero,
         message: whapiBody,
+        conversa_id: conversaId,
       }),
     })
 

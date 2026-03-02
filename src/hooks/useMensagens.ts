@@ -100,6 +100,7 @@ export function useEnviarMensagem() {
           empresa_id: empresaId,
           to: contato.whatsapp_numero,
           message: whapiBody,
+          conversa_id: conversaId,
         }),
       });
 

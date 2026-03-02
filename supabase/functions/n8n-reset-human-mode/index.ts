@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
     // Get conversation details to check if it's from n8n webhook and get n8n_webhook_id
     const { data: conversa, error: convError } = await supabase
       .from('conversas')
-      .select('n8n_webhook_id, origem, channel')
+      .select('n8n_webhook_id, origem, channel, human_mode')
       .eq('id', conversa_id)
       .single()
 
@@ -68,6 +68,14 @@ Deno.serve(async (req) => {
       action: 'reset_human_mode',
       to: conversa.n8n_webhook_id,
       conversa_id: conversa_id,
+      messages: [
+        {
+          human_mode: conversa.human_mode === true,
+          conversa_id: conversa_id,
+          origem: conversa.origem ?? null,
+          channel: conversa.channel ?? null,
+        },
+      ],
     }
 
     console.log(`[n8n-reset-human-mode] Payload: ${JSON.stringify(payload)}`)
