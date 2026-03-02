@@ -9,8 +9,6 @@ interface SendMessageRequest {
   empresa_id: string
   to: string // Número do WhatsApp (formato: 5511999999999)
   message: string
-  // ID da conversa no Hub (opcional, mas recomendado para buscar human_mode direto da tabela conversas)
-  conversa_id?: string
   // Quando definido, indica se a conversa está em modo humano (true) ou não (false)
   human_mode?: boolean
 }
@@ -40,7 +38,7 @@ Deno.serve(async (req) => {
     const body: SendMessageRequest = await req.json()
     console.log(`[${requestId}] Request body:`, JSON.stringify(body, null, 2))
 
-    const { empresa_id, to, message, conversa_id, human_mode } = body
+    const { empresa_id, to, message, human_mode } = body
 
     if (!empresa_id || !to || !message) {
       console.error(`[${requestId}] ERROR: Missing required fields`)
@@ -85,41 +83,7 @@ Deno.serve(async (req) => {
     }
 
     console.log(`[${requestId}] Empresa found: ${empresa.nome_fantasia || empresa.id}`)
-
-    // Determinar human_mode efetivo baseado na tabela de conversas (quando possível)
-    let effectiveHumanMode: boolean | null = null
-
-    if (conversa_id) {
-      const { data: conversa, error: conversaError } = await supabase
-        .from('conversas')
-        .select('human_mode')
-        .eq('id', conversa_id)
-        .eq('empresa_id', empresa_id)
-        .maybeSingle()
-
-      if (conversaError) {
-        console.error(
-          `[${requestId}] ERROR loading conversa for human_mode:`,
-          conversaError
-        )
-      } else if (conversa) {
-        effectiveHumanMode = conversa.human_mode === true
-      }
-    }
-
-    // Fallback: se não conseguiu via conversa, usa o valor enviado no body (se houver)
-    if (effectiveHumanMode === null && typeof human_mode === 'boolean') {
-      effectiveHumanMode = human_mode
-    }
-
-    // Se ainda não temos valor, assume false (modo bot)
-    if (effectiveHumanMode === null) {
-      effectiveHumanMode = false
-    }
-
-    console.log(
-      `[${requestId}] Sending message to: ${to}, conversa_id: ${conversa_id}, human_mode (effective): ${effectiveHumanMode}`
-    )
+    console.log(`[${requestId}] Sending message to: ${to}, human_mode: ${human_mode}`)
 
     // Format phone number for Whapi API
     // Remove any existing @s.whatsapp.net or @c.us suffix
@@ -146,15 +110,10 @@ Deno.serve(async (req) => {
     const payload: Record<string, unknown> = {
       to: phoneNumber,
       body: message,
-      // Campo adicional diretamente na raiz para retrocompatibilidade
-      human_mode: effectiveHumanMode,
-      // Novo contrato: messages[0].human_mode vindo da tabela de conversas
-      messages: [
-        {
-          human_mode: effectiveHumanMode,
-          conversa_id: conversa_id ?? null,
-        },
-      ],
+    }
+    // Opcional: incluir human_mode para que o n8n/Whapi consigam enxergar o modo atual da conversa
+    if (typeof human_mode === 'boolean') {
+      payload.human_mode = human_mode
     }
 
     const whapiResponse = await fetch(whapiUrl, {

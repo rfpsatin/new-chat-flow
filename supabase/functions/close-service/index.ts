@@ -7,12 +7,7 @@ const corsHeaders = {
 
 const N8N_WEBHOOK_URL = 'https://n8n.maringaai.com.br/webhook/maia-beach-tennis-demo'
 
-async function updateAttendanceMode(
-  numeroParticipante: string,
-  channelId: string,
-  conversaId: string,
-  humanMode: boolean | null
-) {
+async function updateAttendanceMode(numeroParticipante: string, channelId: string, conversaId: string) {
   console.log(`[close-service] Updating attendanceMode to automated for numero_participante ${numeroParticipante}, channel_ID ${channelId}`)
 
   const payload = {
@@ -21,14 +16,6 @@ async function updateAttendanceMode(
     numero_participante: numeroParticipante,
     channel_ID: channelId,
     conversa_id: conversaId,
-    messages: [
-      {
-        human_mode: humanMode === true,
-        conversa_id: conversaId,
-        numero_participante: numeroParticipante,
-        channel_ID: channelId,
-      },
-    ],
   }
 
   console.log(`[close-service] Payload: ${JSON.stringify(payload)}`)
@@ -83,25 +70,25 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    const { data: conversa, error: convError } = await supabase
-      .from('conversas')
-      .select('contato_id, human_mode')
-      .eq('id', conversa_id)
-      .single()
-
-    if (convError || !conversa) {
-      console.error(`[close-service] Failed to find conversa:`, convError)
-      return new Response(JSON.stringify({ error: 'Conversa not found' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
     let resolvedChatId = chat_id
 
     // If chat_id not provided, look it up from the database
     if (!resolvedChatId) {
       console.log(`[close-service] chat_id not provided, looking up from database...`)
+
+      const { data: conversa, error: convError } = await supabase
+        .from('conversas')
+        .select('contato_id')
+        .eq('id', conversa_id)
+        .single()
+
+      if (convError || !conversa) {
+        console.error(`[close-service] Failed to find conversa:`, convError)
+        return new Response(JSON.stringify({ error: 'Conversa not found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
 
       const { data: contato, error: contatoError } = await supabase
         .from('contatos')
@@ -138,12 +125,7 @@ Deno.serve(async (req) => {
 
     console.log(`[close-service] Resolved channel_ID (whapi_token) for empresa ${empresa_id}`)
 
-    const result = await updateAttendanceMode(
-      resolvedChatId,
-      empresa.whapi_token,
-      conversa_id,
-      conversa.human_mode ?? null
-    )
+    const result = await updateAttendanceMode(resolvedChatId, empresa.whapi_token, conversa_id)
     console.log(`[close-service] Final result: ${result}`)
 
     return new Response(JSON.stringify({ success: result }), {

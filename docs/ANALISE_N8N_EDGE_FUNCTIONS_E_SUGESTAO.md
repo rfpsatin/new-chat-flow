@@ -28,10 +28,7 @@ Ou seja: **essa função já implementa exatamente o “hook” que centraliza m
 
 - **Objetivo:** quando alguém no Hub “reseta” o modo humano de uma conversa que veio do n8n, avisar o n8n para alinhar estado.
 - **Input:** `conversa_id`, `empresa_id` (body JSON).
-- **Comportamento:** busca a conversa; se tiver `n8n_webhook_id` (e/ou source/channel), faz POST para o webhook do n8n (`whatsapp_cinemkt`) com:
-  - Campos raiz: `{ action: 'reset_human_mode', to: n8n_webhook_id, conversa_id }`;
-  - **Novo contrato:** inclui também `messages[0].human_mode` com o valor booleano vindo de `conversas.human_mode`, além de metadados úteis (`conversa_id`, `origem`, `channel`), por exemplo:
-    - `messages: [{ human_mode: true|false, conversa_id, origem, channel }]`.
+- **Comportamento:** busca a conversa; se tiver `n8n_webhook_id` (e/ou source/channel), faz POST para o webhook do n8n (`whatsapp_cinemkt`) com `{ action: 'reset_human_mode', to: n8n_webhook_id, conversa_id }`.
 - **Uso:** sincronizar Hub → n8n (não cria mensagens; é só sinal para o n8n limpar `human_mode` no fluxo).
 
 ---
