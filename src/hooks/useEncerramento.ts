@@ -98,11 +98,17 @@ export function useEncerrarConversa() {
       // Buscar dados da conversa para verificar origem/channel
       const { data: conversaData, error: conversaDataError } = await supabase
         .from('conversas')
-        .select('origem, channel, n8n_webhook_id')
+        .select('origem, channel, n8n_webhook_id, human_mode, origem_final')
         .eq('id', conversaId)
         .single();
 
-      const isN8nCinemktConversa = conversaData && (conversaData.origem || conversaData.channel || conversaData.n8n_webhook_id);
+      const isN8nCinemktConversa = conversaData && (
+        conversaData.origem || 
+        conversaData.channel || 
+        conversaData.n8n_webhook_id || 
+        conversaData.human_mode === true || 
+        conversaData.origem_final === 'atendente'
+      );
 
       // 5a. Se for conversa do novo webhook n8n, resetar human_mode
       if (isN8nCinemktConversa) {
