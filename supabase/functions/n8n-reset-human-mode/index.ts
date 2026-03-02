@@ -68,6 +68,7 @@ Deno.serve(async (req) => {
       action: 'reset_human_mode',
       to: conversa.n8n_webhook_id,
       conversa_id: conversa_id,
+      human_mode: false,
     }
 
     console.log(`[n8n-reset-human-mode] Payload: ${JSON.stringify(payload)}`)
