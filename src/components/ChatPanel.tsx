@@ -398,6 +398,15 @@ function renderBoldText(text: string): React.ReactNode {
   });
 }
 
+function stripHumanModePrefix(text: string): string {
+  if (!text) return '';
+  const match = text.match(/^#\"human_mode=(true|false)\"#\s*(.*)$/s);
+  if (match) {
+    return match[2] || '';
+  }
+  return text;
+}
+
 function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
   const isOutgoing = mensagem.direcao === 'out';
   
@@ -434,7 +443,7 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
       }
     }
     
-    return mensagem.conteudo || '';
+    return stripHumanModePrefix(mensagem.conteudo || '');
   };
 
   const senderLabel = getSenderLabel();
