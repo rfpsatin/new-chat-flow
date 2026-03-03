@@ -887,6 +887,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      forcar_atendimento_humano: {
+        Args: { p_conversa_id: string }
+        Returns: undefined
+      }
       get_next_nr_protocolo: { Args: never; Returns: string }
       solicitar_atendimento_humano: {
         Args: { p_conversa_id: string }

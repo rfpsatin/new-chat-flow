@@ -138,6 +138,24 @@ export function useAtribuirAgente() {
   });
 }
 
+// Forçar conversa do bot para triagem com human_mode = true
+export function useForcarAtendimentoHumano() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (conversaId: string) => {
+      const { error } = await supabase.rpc('forcar_atendimento_humano', {
+        p_conversa_id: conversaId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fila'] });
+      queryClient.invalidateQueries({ queryKey: ['conversa'] });
+    },
+  });
+}
+
 export function useConversa(conversaId: string | null) {
   return useQuery({
     queryKey: ['conversa', conversaId],
