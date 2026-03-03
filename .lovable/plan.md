@@ -1,29 +1,27 @@
 
 
-## Problema identificado
+## Botão "Forçar atendimento humano" para conversas no status Bot
 
-Existem dois problemas que impedem o POST de reset ao n8n:
+### O que será feito
 
-### 1. `useEncerramento.ts` — condição de roteamento incorreta
+Adicionar um botão "Forçar atendimento humano" nas conversas com status `bot` na fila. Ao clicar, a conversa muda para `esperando_tria` e `human_mode` é setado como `true`.
 
-Na linha 101-105, o código seleciona apenas `origem, channel, n8n_webhook_id` e verifica se algum desses existe. Conversas iniciadas manualmente com `origem_final = 'atendente'` têm `human_mode = true` mas **não** têm `origem`, `channel` ou `n8n_webhook_id`. Resultado: a condição `isN8nCinemktConversa` é `false`, e o código cai no caminho do `close-service` (que usa um webhook antigo inativo, retornando 404).
+### Alterações
 
-### 2. `n8n-reset-human-mode` — fallback ausente para `n8n_webhook_id`
+#### 1. Nova função SQL `forcar_atendimento_humano`
+- Criar via migration uma função RPC que recebe `p_conversa_id` e faz:
+  - `status = 'esperando_tria'`
+  - `human_mode = true`
+  - `updated_at = now()`
+  - Condição: `WHERE status = 'bot'`
 
-Quando uma conversa é iniciada manualmente, não há `n8n_webhook_id`. A função retorna erro na linha 56-61 sem enviar o POST. A solução é usar o `whatsapp_numero` do contato como fallback para o campo `to` no payload.
+#### 2. Novo hook `useForcarAtendimentoHumano` em `src/hooks/useFila.ts`
+- Mutation que chama `supabase.rpc('forcar_atendimento_humano', { p_conversa_id })` 
+- Invalida queries `fila` e `conversa` no onSuccess
 
-## Plano de alterações
-
-### A. `useEncerramento.ts` (linhas 99-105)
-
-- Adicionar `human_mode, origem_final` ao select da conversa
-- Alterar condição: `isN8nCinemktConversa` passa a ser `true` também quando `human_mode === true` ou `origem_final === 'atendente'`
-- Isso garante que qualquer conversa com `human_mode=true` acione `n8n-reset-human-mode`
-
-### B. `n8n-reset-human-mode/index.ts` (linhas 33-62)
-
-- Adicionar `contato_id, human_mode, origem_final` ao select da conversa
-- Remover a condição que pula conversas sem `origem/channel/n8n_webhook_id` — agora basta `human_mode === true` ou ter `n8n_webhook_id`
-- Se `n8n_webhook_id` não existir: buscar `whatsapp_numero` do contato via `contato_id` e usar como `to` no payload
-- Manter o POST para `https://n8n.maringaai.com.br/webhook/whatsapp_cinemkt` com `human_mode: false`
+#### 3. Botão no `FilaPanel.tsx`
+- Para conversas com `status === 'bot'`, exibir botão "Forçar atendimento humano" (similar ao botão "Assumir" já existente)
+- Aparece no hover, posicionado no canto direito
+- Visível apenas para `sup` e `adm` (operadores não veem conversas bot)
+- Ao clicar: chama a mutation, exibe toast de sucesso/erro
 
