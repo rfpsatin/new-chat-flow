@@ -146,11 +146,21 @@ Deno.serve(async (req) => {
         const conteudo = extractMessageContent(message)
         console.log(`[${requestId}] Message content: ${conteudo.substring(0, 100)}...`)
 
-        // Mensagens de saída (from_me=true) agora também são registradas aqui
-        // para garantir que respostas do bot/agente apareçam no Hub mesmo
-        // quando não foram originadas pelo próprio Hub.
+        // Mensagens de saída (from_me=true) são registradas aqui somente quando NÃO
+        // foram originadas pelo Hub (ex: respostas do bot via n8n/Envia Texto, pesquisa).
+        // Mensagens do Hub contêm o marker #"human_mode=..."# e já foram inseridas
+        // diretamente pelo frontend/start-conversation.
         if (message.from_me === true) {
-          console.log(`[${requestId}] Handling outgoing message (from_me=true)`)
+          const textBody = message.text?.body || ''
+          const isHubOriginated = /^#"human_mode=(true|false)"#/.test(textBody)
+
+          if (isHubOriginated) {
+            console.log(`[${requestId}] Skipping from_me=true with Hub marker (already inserted by Hub)`)
+            processedCount++
+            continue
+          }
+
+          console.log(`[${requestId}] Handling outgoing message (from_me=true, non-Hub)`)
 
           const { data: ultimaConversa, error: convError } = await supabase
             .from('conversas')

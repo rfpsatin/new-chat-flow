@@ -1,4 +1,4 @@
-// n8n-reset-human-mode v2
+// n8n-reset-human-mode v3
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -30,7 +30,6 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    // Get conversation details
     const { data: conversa, error: convError } = await supabase
       .from('conversas')
       .select('n8n_webhook_id, origem, channel, contato_id, human_mode, origem_final')
@@ -45,11 +44,9 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Determine the "to" field: prefer n8n_webhook_id, fallback to whatsapp_numero
-    let recipientTo = conversa.n8n_webhook_id
+    let recipientNumber = conversa.n8n_webhook_id
 
-    if (!recipientTo) {
-      // Fetch whatsapp_numero from contatos as fallback
+    if (!recipientNumber) {
       const { data: contato, error: contatoError } = await supabase
         .from('contatos')
         .select('whatsapp_numero')
@@ -64,22 +61,40 @@ Deno.serve(async (req) => {
         })
       }
 
-      recipientTo = contato.whatsapp_numero
-      console.log(`[n8n-reset-human-mode] Using whatsapp_numero as fallback: ${recipientTo}`)
+      recipientNumber = contato.whatsapp_numero
     }
 
-    console.log(`[n8n-reset-human-mode] Resetting human_mode, to: ${recipientTo}`)
+    // Limpar sufixo do WhatsApp se existir, manter apenas dígitos
+    const cleanNumber = recipientNumber.replace(/@(s\.whatsapp\.net|c\.us)$/, '').replace(/\D/g, '')
+    const chatId = `${cleanNumber}@s.whatsapp.net`
 
-    // Notify n8n to reset human_mode
+    console.log(`[n8n-reset-human-mode] Resetting human_mode for number: ${cleanNumber}`)
+
+    // Resetar human_mode no banco de dados
+    await supabase
+      .from('conversas')
+      .update({ human_mode: false, updated_at: new Date().toISOString() })
+      .eq('id', conversa_id)
+
+    // Enviar ao n8n no formato que o Code node espera (Whapi-like)
+    // para que o Redis seja atualizado corretamente.
+    // Usa from_me=true + marker #"human_mode=false"# para que o Code
+    // extraia o valor e o fluxo atualize o Redis.
     const payload = {
-      action: 'reset_human_mode',
-      to: recipientTo,
-      conversa_id: conversa_id,
-      human_mode: false,
+      messages: [{
+        id: `reset-${Date.now()}`,
+        from_me: true,
+        type: 'text',
+        chat_id: chatId,
+        timestamp: Math.floor(Date.now() / 1000),
+        source: 'api',
+        text: { body: `#"human_mode=false"# [reset]` },
+        from: cleanNumber,
+      }],
+      event: { type: 'messages', event: 'post' },
     }
 
-    console.log(`[n8n-reset-human-mode] Payload: ${JSON.stringify(payload)}`)
-    console.log(`[n8n-reset-human-mode] Attempting POST to ${N8N_WEBHOOK_URL}`)
+    console.log(`[n8n-reset-human-mode] Sending formatted payload to n8n`)
 
     try {
       const response = await fetch(N8N_WEBHOOK_URL, {
@@ -92,31 +107,18 @@ Deno.serve(async (req) => {
       })
 
       const responseText = await response.text()
-      console.log(`[n8n-reset-human-mode] POST status: ${response.status}`)
-      console.log(`[n8n-reset-human-mode] POST response body: ${responseText.substring(0, 500)}`)
+      console.log(`[n8n-reset-human-mode] n8n response: ${response.status} - ${responseText.substring(0, 300)}`)
 
-      if (response.ok) {
-        console.log(`[n8n-reset-human-mode] POST succeeded`)
-        return new Response(JSON.stringify({ success: true }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
-
-      console.error(`[n8n-reset-human-mode] POST failed with status: ${response.status}`)
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: `n8n returned ${response.status}` 
-      }), {
-        status: 502,
+      return new Response(JSON.stringify({ success: true, redis_reset: response.ok }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
-    } catch (error) {
-      console.error(`[n8n-reset-human-mode] POST failed with exception:`, error)
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: String(error) 
+    } catch (fetchError) {
+      console.error(`[n8n-reset-human-mode] n8n call failed:`, fetchError)
+      return new Response(JSON.stringify({
+        success: true,
+        redis_reset: false,
+        warning: 'DB updated but n8n/Redis reset failed - TTL will expire in ~10min',
       }), {
-        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
@@ -128,4 +130,3 @@ Deno.serve(async (req) => {
     })
   }
 })
-

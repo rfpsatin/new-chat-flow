@@ -92,6 +92,33 @@ Deno.serve(async (req) => {
     if (conversaAtiva) {
       conversaId = conversaAtiva.id
       nrProtocolo = conversaAtiva.nr_protocolo
+
+      // Atualizar human_mode e origem_final na conversa existente para refletir
+      // a escolha feita agora (agente vs atendente humano)
+      const updateFields: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+      }
+      if (origem_final) {
+        updateFields.origem_final = origem_final
+        updateFields.human_mode = origem_final === 'atendente'
+      }
+      if (origem_inicial) {
+        updateFields.origem_inicial = origem_inicial
+      }
+      if (campanha_id) {
+        updateFields.campanha_id = campanha_id
+      }
+
+      const { error: updateConvError } = await supabase
+        .from('conversas')
+        .update(updateFields)
+        .eq('id', conversaId)
+
+      if (updateConvError) {
+        console.error(`[${requestId}] Error updating existing conversation:`, updateConvError)
+      } else {
+        console.log(`[${requestId}] Updated existing conversation: human_mode=${updateFields.human_mode}, origem_final=${updateFields.origem_final}`)
+      }
     } else {
       const origem = origem_inicial || 'atendente'
       // Determine initial status based on origem_final
