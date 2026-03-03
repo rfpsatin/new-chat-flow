@@ -28,6 +28,7 @@ import {
   BarChart3,
   Wifi,
   Megaphone,
+  Building2,
 } from "lucide-react";
 
 const menuItems = [
@@ -43,6 +44,7 @@ const menuItems = [
 const adminMenuItems = [
   { title: "Usuários", url: "/admin/usuarios", icon: UserCog },
   { title: "Motivos Encerramento", url: "/admin/motivos", icon: FileText },
+  { title: "Empresa", url: "/admin/empresa", icon: Building2 },
 ];
 
 export function AppSidebar() {

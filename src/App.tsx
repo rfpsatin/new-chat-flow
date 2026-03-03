@@ -12,6 +12,7 @@ import ConexaoPage from "./pages/ConexaoPage";
 import CampanhasPage from "./pages/CampanhasPage";
 import UsuariosPage from "./pages/admin/UsuariosPage";
 import MotivosPage from "./pages/admin/MotivosPage";
+import EmpresaPage from "./pages/admin/EmpresaPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="/atendentes" element={<UsuariosPage />} />
             <Route path="/admin/usuarios" element={<UsuariosPage />} />
             <Route path="/admin/motivos" element={<MotivosPage />} />
+            <Route path="/admin/empresa" element={<EmpresaPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
