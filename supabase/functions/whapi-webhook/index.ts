@@ -148,16 +148,37 @@ Deno.serve(async (req) => {
 
         // Mensagens de saída (from_me=true) são registradas aqui somente quando NÃO
         // foram originadas pelo Hub (ex: respostas do bot via n8n/Envia Texto, pesquisa).
-        // Mensagens do Hub contêm o marker #"human_mode=..."# e já foram inseridas
-        // diretamente pelo frontend/start-conversation.
+        // O Hub insere mensagens diretamente no banco como 'agente'/'sistema'.
+        // Para evitar duplicatas, verificamos se já existe uma mensagem recente
+        // do agente/sistema com o mesmo conteúdo na mesma conversa.
         if (message.from_me === true) {
-          const textBody = message.text?.body || ''
-          const isHubOriginated = /^#"human_mode=(true|false)"#/.test(textBody)
+          const { data: ultimaConversaDup, error: convDupError } = await supabase
+            .from('conversas')
+            .select('id')
+            .eq('empresa_id', empresaId)
+            .eq('contato_id', contato.id)
+            .neq('status', 'encerrado')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
 
-          if (isHubOriginated) {
-            console.log(`[${requestId}] Skipping from_me=true with Hub marker (already inserted by Hub)`)
-            processedCount++
-            continue
+          if (!convDupError && ultimaConversaDup) {
+            const { data: recentAgentMsg } = await supabase
+              .from('mensagens_ativas')
+              .select('id')
+              .eq('conversa_id', ultimaConversaDup.id)
+              .eq('direcao', 'out')
+              .in('tipo_remetente', ['agente', 'sistema'])
+              .eq('conteudo', conteudo)
+              .gte('criado_em', new Date(Date.now() - 120000).toISOString())
+              .limit(1)
+              .maybeSingle()
+
+            if (recentAgentMsg) {
+              console.log(`[${requestId}] Skipping from_me=true - Hub already inserted this message (matched agente msg ${recentAgentMsg.id})`)
+              processedCount++
+              continue
+            }
           }
 
           console.log(`[${requestId}] Handling outgoing message (from_me=true, non-Hub)`)

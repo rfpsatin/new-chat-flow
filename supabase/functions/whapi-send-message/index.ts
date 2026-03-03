@@ -5,11 +5,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const N8N_WEBHOOK_URL = 'https://n8n.maringaai.com.br/webhook/whatsapp_cinemkt'
+
+const HUMAN_MODE_MARKER = /^#"human_mode=(true|false)"#\s*/
+
 interface SendMessageRequest {
   empresa_id: string
-  to: string // Número do WhatsApp (formato: 5511999999999)
+  to: string
   message: string
-  // Quando definido, indica se a conversa está em modo humano (true) ou não (false)
   human_mode?: boolean
 }
 
@@ -105,15 +108,22 @@ Deno.serve(async (req) => {
     // Add @s.whatsapp.net suffix for Whapi API
     phoneNumber = `${phoneNumber}@s.whatsapp.net`
 
-    // Call Whapi.Cloud API to send message
+    // Strip human_mode marker from text before sending to Whapi
+    // so the customer never sees #"human_mode=..."# in their WhatsApp
+    const markerMatch = message.match(HUMAN_MODE_MARKER)
+    let cleanMessage = message
+    let detectedHumanMode: boolean | null = null
+
+    if (markerMatch) {
+      detectedHumanMode = markerMatch[1] === 'true'
+      cleanMessage = message.replace(HUMAN_MODE_MARKER, '')
+      console.log(`[${requestId}] Stripped human_mode marker: ${detectedHumanMode}, clean message: ${cleanMessage.substring(0, 80)}...`)
+    }
+
     const whapiUrl = 'https://gate.whapi.cloud/messages/text'
     const payload: Record<string, unknown> = {
       to: phoneNumber,
-      body: message,
-    }
-    // Opcional: incluir human_mode para que o n8n/Whapi consigam enxergar o modo atual da conversa
-    if (typeof human_mode === 'boolean') {
-      payload.human_mode = human_mode
+      body: cleanMessage,
     }
 
     const whapiResponse = await fetch(whapiUrl, {
@@ -142,6 +152,31 @@ Deno.serve(async (req) => {
 
     console.log(`[${requestId}] Message sent successfully`)
     console.log(`[${requestId}] Message ID: ${whapiData.messages?.[0]?.id || 'unknown'}`)
+
+    // If human_mode=true was detected, notify n8n to set Redis
+    // (fire-and-forget, don't block the response)
+    if (detectedHumanMode === true) {
+      const cleanNumber = phoneNumber.replace(/@.*/, '')
+      const n8nPayload = {
+        messages: [{
+          id: `hub-${Date.now()}`,
+          from_me: true,
+          type: 'text',
+          chat_id: phoneNumber,
+          timestamp: Math.floor(Date.now() / 1000),
+          source: 'api',
+          text: { body: `#"human_mode=true"# ${cleanMessage}` },
+          from: cleanNumber,
+        }],
+        event: { type: 'messages', event: 'post' },
+      }
+      console.log(`[${requestId}] Notifying n8n to set human_mode=true in Redis`)
+      fetch(N8N_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(n8nPayload),
+      }).catch(err => console.error(`[${requestId}] Failed to notify n8n:`, err))
+    }
 
     return new Response(JSON.stringify({ 
       success: true,
