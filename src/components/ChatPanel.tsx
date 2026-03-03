@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { useMensagens, useEnviarMensagem } from '@/hooks/useMensagens';
-import { useConversa } from '@/hooks/useFila';
+import { useConversa, useForcarAtendimentoHumano } from '@/hooks/useFila';
 import { MensagemAtiva, FilaAtendimento } from '@/types/atendimento';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
@@ -15,8 +15,10 @@ import {
   Phone, 
   XCircle,
   MessageSquare,
-  Loader2
+  Loader2,
+  UserCheck
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { EncerrarDialog } from '@/components/EncerrarDialog';
 import { AtribuirAtendentePopover } from '@/components/AtribuirAtendentePopover';
@@ -32,6 +34,7 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
   const { data: mensagens, isLoading: mensagensLoading } = useMensagens(conversa?.conversa_id || null);
   const { data: conversaDetalhes } = useConversa(conversa?.conversa_id || null);
   const enviarMensagem = useEnviarMensagem();
+  const forcarHumano = useForcarAtendimentoHumano();
   
   const [mensagemInput, setMensagemInput] = useState('');
   const [showEncerrar, setShowEncerrar] = useState(false);
@@ -141,9 +144,21 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
   const canEncaminhar = conversa.status === 'esperando_tria' &&
     ['adm', 'sup'].includes(currentUser?.tipo_usuario || '');
 
-  // Supervisora pode transferir conversas já em atendimento
   const canTransfer = conversa.status === 'em_atendimento_humano' &&
     ['adm', 'sup'].includes(currentUser?.tipo_usuario || '');
+
+  const canForcarHumano = conversa.status === 'bot' &&
+    ['adm', 'sup'].includes(currentUser?.tipo_usuario || '');
+
+  const handleForcarHumano = async () => {
+    if (!conversa.conversa_id) return;
+    try {
+      await forcarHumano.mutateAsync(conversa.conversa_id);
+      toast.success('Conversa enviada para triagem');
+    } catch {
+      toast.error('Erro ao forçar atendimento humano');
+    }
+  };
 
   return (
     <div className="absolute inset-0 flex flex-col bg-background">
@@ -180,6 +195,17 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
           <div className="flex flex-col items-end gap-1">
             <div className="flex items-center gap-3">
               <StatusBadge status={conversa.status} />
+              {canForcarHumano && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleForcarHumano}
+                  disabled={forcarHumano.isPending}
+                >
+                  <UserCheck className="w-4 h-4 mr-1" />
+                  Forçar humano
+                </Button>
+              )}
               {canRespond && (
                 <Button
                   variant="destructive"

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import { useFila, useAssumirConversa, useForcarAtendimentoHumano } from '@/hooks/useFila';
+import { useFila, useAssumirConversa } from '@/hooks/useFila';
 import { ConversaItem } from '@/components/ConversaItem';
 import { FiltrosFila } from '@/components/FiltrosFila';
 import { FilaAtendimento } from '@/types/atendimento';
@@ -19,7 +19,7 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
   const { empresaId, currentUser } = useApp();
   const { data: fila, isLoading } = useFila(empresaId);
   const assumirConversa = useAssumirConversa();
-  const forcarHumano = useForcarAtendimentoHumano();
+  
 
   useEffect(() => {
     if (!openConversaId || !fila?.length) return;
@@ -125,17 +125,6 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
     }
   };
 
-  const handleForcarHumano = async (conversa: FilaAtendimento, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!conversa.conversa_id) return;
-
-    try {
-      await forcarHumano.mutateAsync(conversa.conversa_id);
-      toast.success('Conversa enviada para triagem');
-    } catch (error) {
-      toast.error('Erro ao forçar atendimento humano');
-    }
-  };
 
   if (isLoading) {
     return (
@@ -217,17 +206,6 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
                       disabled={assumirConversa.isPending}
                     >
                       Assumir
-                    </Button>
-                  )}
-                  {conversa.status === 'bot' && (currentUser?.tipo_usuario === 'sup' || currentUser?.tipo_usuario === 'adm') && (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity h-7 text-xs"
-                      onClick={(e) => handleForcarHumano(conversa, e)}
-                      disabled={forcarHumano.isPending}
-                    >
-                      Forçar humano
                     </Button>
                   )}
                 </div>
