@@ -212,6 +212,7 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
           allStatusCounts={allStatusCounts}
           isSelectionMode={selectionMode}
           onToggleSelectionMode={toggleSelectionMode}
+          showSelectionOption={selectedStatus === 'bot'}
         />
       </div>
 

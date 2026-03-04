@@ -21,6 +21,7 @@ interface FiltrosFilaProps {
   allStatusCounts?: StatusCount;
   isSelectionMode?: boolean;
   onToggleSelectionMode?: () => void;
+  showSelectionOption?: boolean;
 }
 
 const statusConfig = [
@@ -41,6 +42,7 @@ export function FiltrosFila({
   allStatusCounts,
   isSelectionMode,
   onToggleSelectionMode,
+  showSelectionOption = true,
 }: FiltrosFilaProps) {
   const totalCount = statusCounts.bot + statusCounts.esperando_tria + statusCounts.fila_humano + statusCounts.em_atendimento_humano;
 
@@ -93,7 +95,7 @@ export function FiltrosFila({
             </div>
           </TooltipContent>
         </Tooltip>
-        {!isSelectionMode && onToggleSelectionMode && (
+        {!isSelectionMode && onToggleSelectionMode && showSelectionOption && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
