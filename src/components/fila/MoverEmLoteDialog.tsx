@@ -119,9 +119,9 @@ export function MoverEmLoteDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md min-h-[280px] flex flex-col">
+      <DialogContent className="sm:max-w-md flex flex-col">
         {etapa === 1 && (
-          <div className="flex flex-col flex-1 items-center justify-center gap-6 text-center">
+          <div className="flex flex-col flex-1 items-center justify-center gap-6 text-center min-h-[280px] transition-all duration-200">
             <DialogHeader className="space-y-2">
               <DialogTitle className="text-xl">
                 Mover {conversas.length} conversa{conversas.length > 1 ? 's' : ''}
@@ -155,7 +155,7 @@ export function MoverEmLoteDialog({
         )}
 
         {etapa === 2 && destino === 'triagem' && (
-          <div className="flex flex-col flex-1 items-center justify-center gap-6 text-center">
+          <div className="flex flex-col flex-1 items-center justify-center gap-6 text-center min-h-[220px] transition-all duration-200">
             <DialogHeader className="space-y-2">
               <DialogTitle className="text-xl">
                 Confirmar mover para Triagem
@@ -178,7 +178,7 @@ export function MoverEmLoteDialog({
         )}
 
         {etapa === 2 && destino === 'atendimento_humano' && (
-          <div className="flex flex-col flex-1 items-center justify-center gap-6 text-center">
+          <div className="flex flex-col flex-1 items-center justify-center gap-6 text-center min-h-[220px] transition-all duration-200">
             <DialogHeader className="space-y-2">
               <DialogTitle className="text-xl">
                 Mover para Atendimento Humano
