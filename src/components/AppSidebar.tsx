@@ -50,14 +50,12 @@ const adminMenuItems = [
 export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser, setCurrentUser, setSelectedConversa } = useApp();
+  const { currentUser, logout } = useApp();
 
   const isAdmin = currentUser?.tipo_usuario === "adm";
 
-  const handleLogout = () => {
-    setCurrentUser(null);
-    setSelectedConversa(null);
-    navigate("/");
+  const handleLogout = async () => {
+    await logout();
   };
 
   const getInitials = (name: string) => {

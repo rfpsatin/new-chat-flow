@@ -36,16 +36,21 @@ export function UsuarioDialog({
 }: UsuarioDialogProps) {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
+  const [senha, setSenha] = useState('');
   const [tipoUsuario, setTipoUsuario] = useState<'sup' | 'opr'>('opr');
+
+  const isEditing = !!usuario;
 
   useEffect(() => {
     if (usuario) {
       setNome(usuario.nome);
       setEmail(usuario.email);
       setTipoUsuario(usuario.tipo_usuario as 'sup' | 'opr');
+      setSenha('');
     } else {
       setNome('');
       setEmail('');
+      setSenha('');
       setTipoUsuario('opr');
     }
   }, [usuario, open]);
@@ -53,17 +58,16 @@ export function UsuarioDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nome.trim() || !email.trim()) return;
+    if (!isEditing && !senha.trim()) return;
     
     onSave({
       nome: nome.trim(),
       email: email.trim(),
       tipo_usuario: tipoUsuario,
+      ...((!isEditing && senha.trim()) ? { senha: senha.trim() } : {}),
     });
   };
 
-  const isEditing = !!usuario;
-
-  // Texto de ajuda baseado no tipo selecionado
   const getTipoHelp = () => {
     if (tipoUsuario === 'opr') {
       return 'Operadores são atendentes que atendem clientes na fila.';
@@ -99,8 +103,24 @@ export function UsuarioDialog({
               onChange={(e) => setEmail(e.target.value)}
               placeholder="email@exemplo.com"
               required
+              disabled={isEditing}
             />
           </div>
+          {!isEditing && (
+            <div className="space-y-2">
+              <Label htmlFor="senha">Senha</Label>
+              <Input
+                id="senha"
+                type="password"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                placeholder="Senha de acesso"
+                required
+                minLength={6}
+              />
+              <p className="text-xs text-muted-foreground">Mínimo 6 caracteres. O usuário usará esta senha para fazer login.</p>
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="tipo">Tipo de Usuário</Label>
             <Select value={tipoUsuario} onValueChange={(v) => setTipoUsuario(v as 'sup' | 'opr')}>
@@ -123,7 +143,7 @@ export function UsuarioDialog({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={isLoading || !nome.trim() || !email.trim()}>
+            <Button type="submit" disabled={isLoading || !nome.trim() || !email.trim() || (!isEditing && !senha.trim())}>
               {isLoading ? 'Salvando...' : isEditing ? 'Salvar' : 'Criar'}
             </Button>
           </DialogFooter>

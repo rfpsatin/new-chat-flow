@@ -1,7 +1,7 @@
+import { Navigate } from 'react-router-dom';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { useApp } from '@/contexts/AppContext';
-import { UserSelector } from '@/components/UserSelector';
 import { DevProvider } from '@/contexts/DevContext';
 import { DevToggle } from '@/components/dev/DevToggle';
 import { DevPanel } from '@/components/dev/DevPanel';
@@ -11,10 +11,18 @@ interface MainLayoutProps {
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
-  const { currentUser } = useApp();
+  const { currentUser, authLoading } = useApp();
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   if (!currentUser) {
-    return <UserSelector />;
+    return <Navigate to="/login" replace />;
   }
 
   return (

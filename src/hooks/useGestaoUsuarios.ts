@@ -7,6 +7,7 @@ export interface UsuarioFormData {
   nome: string;
   email: string;
   tipo_usuario: 'sup' | 'opr';
+  senha?: string; // Required on create, optional on edit
 }
 
 // Lógica automática: operador = atendente, supervisor = triagem
@@ -73,8 +74,20 @@ export function useGestaoUsuarios(empresaId: string) {
 
   const criarUsuario = useMutation({
     mutationFn: async (dados: UsuarioFormData) => {
+      if (!dados.senha) throw new Error('Senha é obrigatória para criar um usuário');
+
       const { ehAtendente, paraTriagem } = derivarAtendente(dados.tipo_usuario);
       
+      // Create Auth user via edge function
+      const { data: authResult, error: authError } = await supabase.functions.invoke('create-user-auth', {
+        body: { email: dados.email, password: dados.senha },
+      });
+
+      if (authError) throw new Error(authError.message || 'Erro ao criar conta de autenticação');
+      if (authResult?.error) throw new Error(authResult.error);
+
+      const authUserId = authResult.auth_user_id;
+
       // Criar usuário
       const { data: usuario, error: usuarioError } = await supabase
         .from('usuarios')
@@ -83,6 +96,7 @@ export function useGestaoUsuarios(empresaId: string) {
           nome: dados.nome,
           email: dados.email,
           tipo_usuario: dados.tipo_usuario,
+          auth_user_id: authUserId,
           ativo: true,
         })
         .select()
@@ -113,7 +127,7 @@ export function useGestaoUsuarios(empresaId: string) {
       queryClient.invalidateQueries({ queryKey: ['atendentes', empresaId] });
       toast({
         title: 'Usuário criado',
-        description: 'O usuário foi criado com sucesso.',
+        description: 'O usuário foi criado com sucesso. Ele pode fazer login com o email e senha definidos.',
       });
     },
     onError: (error: Error) => {
