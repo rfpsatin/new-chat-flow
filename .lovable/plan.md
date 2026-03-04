@@ -1,33 +1,33 @@
 
 
-## Fix: create-user-auth returns 400 when email already exists
+## Adicionar Admin na Criação de Empresa
 
-### Root cause
-The edge function calls `auth.admin.createUser()` which fails with `email_exists` if the email is already registered in Auth. This happens when the user tried to create access for an email that was previously registered (e.g. via the super admin flow). The function should handle this by looking up the existing Auth user instead of failing.
+### Resumo
+Ao criar uma empresa no painel super admin, adicionar campos opcionais de email e senha para criar automaticamente um usuário administrador (`tipo_usuario = 'adm'`) vinculado à nova empresa.
 
-Additionally, the CORS headers are missing required Supabase client headers, which can cause preflight failures.
+### Fluxo
+1. Super admin preenche dados da empresa + email/senha do admin
+2. Empresa é criada no banco
+3. Edge function `create-user-auth` cria a conta Auth com email/senha
+4. Registro na tabela `usuarios` com `tipo_usuario = 'adm'`, `empresa_id` da nova empresa e `auth_user_id` retornado
 
-### Changes
+### Alterações
 
-#### 1. `supabase/functions/create-user-auth/index.ts`
-- Update CORS headers to include all required Supabase client headers
-- When `createUser` fails with `email_exists`, use `auth.admin.listUsers()` to find the existing user by email and return their ID
-- Optionally update the password for the existing user using `auth.admin.updateUserById()`
+#### 1. `src/pages/superadmin/EmpresasPage.tsx`
+- Adicionar campos `admin_email` e `admin_senha` ao formulário (visíveis apenas no modo criação)
+- Passar esses valores para a mutation de criação
 
-```
-Flow:
-1. Try createUser(email, password)
-2. If error.message contains "already been registered":
-   a. List users filtered by email
-   b. Get existing user ID
-   c. Update password with updateUserById
-   d. Return { auth_user_id: existingUser.id }
-3. Otherwise return error as before
-```
+#### 2. `src/hooks/useSuperAdminEmpresas.ts`
+- Alterar `createMutation` para:
+  1. Inserir empresa e obter o `id` retornado
+  2. Se `admin_email` e `admin_senha` foram fornecidos, chamar edge function `create-user-auth` para criar conta Auth
+  3. Inserir registro em `usuarios` com `auth_user_id`, `empresa_id`, `nome` (derivado do email), `email`, `tipo_usuario = 'adm'`
 
-#### 2. Republish the app
-The CSS MIME error on the published URL is due to stale build assets. A republish will fix this.
+#### 3. Nenhuma alteração no banco ou edge functions
+- A edge function `create-user-auth` já existe e faz exatamente o necessário
+- A tabela `usuarios` já aceita inserts (RLS permite)
 
-### Files modified
-- `supabase/functions/create-user-auth/index.ts`
+### Arquivos modificados
+- `src/pages/superadmin/EmpresasPage.tsx`
+- `src/hooks/useSuperAdminEmpresas.ts`
 
