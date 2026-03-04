@@ -1,3 +1,4 @@
+// @version 2 — deploy target: hyizldxjiwjeruxqrqbv
 // Iniciar conversa 1:1 a partir de um contato (envia primeira mensagem e cria/usa conversa)
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 

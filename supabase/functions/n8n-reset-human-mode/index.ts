@@ -1,3 +1,4 @@
+// @version 4 — deploy target: hyizldxjiwjeruxqrqbv
 // n8n-reset-human-mode v3
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
