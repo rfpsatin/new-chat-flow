@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User } from '@supabase/supabase-js';
 
@@ -20,18 +20,33 @@ export function SuperAdminProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const resolved = useRef(false);
+
+  const resolve = () => {
+    if (!resolved.current) {
+      resolved.current = true;
+      setLoading(false);
+    }
+  };
 
   const checkSuperAdmin = async (userId: string) => {
-    const { data } = await supabase
-      .from('super_admins')
-      .select('id')
-      .eq('auth_user_id', userId)
-      .maybeSingle();
-    return !!data;
+    try {
+      const { data } = await supabase
+        .from('super_admins')
+        .select('id')
+        .eq('auth_user_id', userId)
+        .maybeSingle();
+      return !!data;
+    } catch {
+      return false;
+    }
   };
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // Timeout fallback: force loading=false after 5s
+    const timeout = setTimeout(resolve, 5000);
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         setUser(session.user);
         const isAdmin = await checkSuperAdmin(session.user.id);
@@ -40,7 +55,7 @@ export function SuperAdminProvider({ children }: { children: ReactNode }) {
         setUser(null);
         setIsSuperAdmin(false);
       }
-      setLoading(false);
+      resolve();
     });
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -49,10 +64,13 @@ export function SuperAdminProvider({ children }: { children: ReactNode }) {
         const isAdmin = await checkSuperAdmin(session.user.id);
         setIsSuperAdmin(isAdmin);
       }
-      setLoading(false);
-    });
+      resolve();
+    }).catch(() => resolve());
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const logout = async () => {

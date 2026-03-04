@@ -1,22 +1,33 @@
 
 
-## Fix: SuperAdmin panel stuck on loading spinner
+## Adicionar Admin na Criação de Empresa
 
-### Root cause
-The `SuperAdminContext` has no error handling around `checkSuperAdmin()`. If the query to `super_admins` fails (e.g., network issue, expired token, or RLS rejection), the async callback throws before reaching `setLoading(false)`, leaving the guard stuck on the spinner forever. Additionally, the `/login` page works fine — the issue is only on `/superadmin`.
+### Resumo
+Ao criar uma empresa no painel super admin, adicionar campos opcionais de email e senha para criar automaticamente um usuário administrador (`tipo_usuario = 'adm'`) vinculado à nova empresa.
 
-### Changes
+### Fluxo
+1. Super admin preenche dados da empresa + email/senha do admin
+2. Empresa é criada no banco
+3. Edge function `create-user-auth` cria a conta Auth com email/senha
+4. Registro na tabela `usuarios` com `tipo_usuario = 'adm'`, `empresa_id` da nova empresa e `auth_user_id` retornado
 
-#### 1. `src/contexts/SuperAdminContext.tsx`
-- Wrap `checkSuperAdmin` calls in try/catch so `setLoading(false)` always executes
-- Add a timeout fallback: if loading doesn't resolve in 5s, force `setLoading(false)`
-- When not logged in and loading resolves, the guard will redirect to `/login` (where the logout button is accessible)
+### Alterações
 
-#### 2. `src/components/SuperAdminGuard.tsx`
-- Add a "Voltar ao login" (back to login) link on the loading screen so even while loading, the user can escape
-- This addresses the original request: even if stuck, the user can navigate away
+#### 1. `src/pages/superadmin/EmpresasPage.tsx`
+- Adicionar campos `admin_email` e `admin_senha` ao formulário (visíveis apenas no modo criação)
+- Passar esses valores para a mutation de criação
 
-### Files modified
-- `src/contexts/SuperAdminContext.tsx`
-- `src/components/SuperAdminGuard.tsx`
+#### 2. `src/hooks/useSuperAdminEmpresas.ts`
+- Alterar `createMutation` para:
+  1. Inserir empresa e obter o `id` retornado
+  2. Se `admin_email` e `admin_senha` foram fornecidos, chamar edge function `create-user-auth` para criar conta Auth
+  3. Inserir registro em `usuarios` com `auth_user_id`, `empresa_id`, `nome` (derivado do email), `email`, `tipo_usuario = 'adm'`
+
+#### 3. Nenhuma alteração no banco ou edge functions
+- A edge function `create-user-auth` já existe e faz exatamente o necessário
+- A tabela `usuarios` já aceita inserts (RLS permite)
+
+### Arquivos modificados
+- `src/pages/superadmin/EmpresasPage.tsx`
+- `src/hooks/useSuperAdminEmpresas.ts`
 
