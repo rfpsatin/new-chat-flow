@@ -19,9 +19,11 @@ interface EmpresaForm {
   razao_social: string;
   nome_fantasia: string;
   cnpj: string;
+  admin_email: string;
+  admin_senha: string;
 }
 
-const emptyForm: EmpresaForm = { razao_social: '', nome_fantasia: '', cnpj: '' };
+const emptyForm: EmpresaForm = { razao_social: '', nome_fantasia: '', cnpj: '', admin_email: '', admin_senha: '' };
 
 export default function SuperAdminEmpresasPage() {
   const { data: empresas, isLoading, createMutation, updateMutation, toggleAtivoMutation } = useSuperAdminEmpresas();
@@ -31,7 +33,7 @@ export default function SuperAdminEmpresasPage() {
 
   const openCreate = () => { setForm(emptyForm); setDialogOpen(true); };
   const openEdit = (e: any) => {
-    setForm({ id: e.id, razao_social: e.razao_social, nome_fantasia: e.nome_fantasia || '', cnpj: e.cnpj });
+    setForm({ id: e.id, razao_social: e.razao_social, nome_fantasia: e.nome_fantasia || '', cnpj: e.cnpj, admin_email: '', admin_senha: '' });
     setDialogOpen(true);
   };
 
@@ -130,11 +132,33 @@ export default function SuperAdminEmpresasPage() {
               <Label>CNPJ</Label>
               <Input value={form.cnpj} onChange={e => setForm(f => ({ ...f, cnpj: e.target.value }))} />
             </div>
+            {!isEditing && (
+              <>
+                <div className="border-t pt-4 mt-2">
+                  <p className="text-sm text-muted-foreground mb-3">Administrador (opcional)</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Email do Admin</Label>
+                  <Input type="email" value={form.admin_email} onChange={e => setForm(f => ({ ...f, admin_email: e.target.value }))} placeholder="admin@empresa.com" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Senha do Admin</Label>
+                  <Input type="password" value={form.admin_senha} onChange={e => setForm(f => ({ ...f, admin_senha: e.target.value }))} placeholder="Mínimo 6 caracteres" />
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSubmit} disabled={createMutation.isPending || updateMutation.isPending}>
-              {isEditing ? 'Salvar' : 'Criar'}
+            <Button
+              onClick={handleSubmit}
+              disabled={
+                createMutation.isPending || updateMutation.isPending ||
+                !form.razao_social.trim() || !form.cnpj.trim() ||
+                (!isEditing && !!form.admin_email.trim() !== !!form.admin_senha.trim())
+              }
+            >
+              {createMutation.isPending ? 'Criando...' : updateMutation.isPending ? 'Salvando...' : isEditing ? 'Salvar' : 'Criar'}
             </Button>
           </DialogFooter>
         </DialogContent>

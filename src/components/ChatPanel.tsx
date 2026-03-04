@@ -137,8 +137,13 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
     );
   }
 
-  const canRespond = conversa.status === 'em_atendimento_humano' && 
-    conversa.agente_responsavel_id === currentUser?.id;
+  // Usa sempre o status/dados mais recentes da conversa (detalhes vindos do banco)
+  // para decidir se o atendente ainda pode responder/encerrar.
+  const effectiveStatus = conversaDetalhes?.status ?? conversa.status;
+  const effectiveAgenteId = conversaDetalhes?.agente_responsavel_id ?? conversa.agente_responsavel_id;
+
+  const canRespond = effectiveStatus === 'em_atendimento_humano' && 
+    effectiveAgenteId === currentUser?.id;
   
   // Supervisora pode encaminhar conversas que estão aguardando triagem
   const canEncaminhar = conversa.status === 'esperando_tria' &&
