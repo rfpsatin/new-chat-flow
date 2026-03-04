@@ -1,33 +1,26 @@
 
 
-## Adicionar Admin na Criação de Empresa
+## Alterar admin do Cinesystem para sidiclei@cinesystem.com.br
 
-### Resumo
-Ao criar uma empresa no painel super admin, adicionar campos opcionais de email e senha para criar automaticamente um usuário administrador (`tipo_usuario = 'adm'`) vinculado à nova empresa.
+### Situação atual
+- Empresa: **Cinesystem Cinemas LTDA** (id: `11111111-...`)
+- Admin atual: **Satin Admin** (email: carlos@cinesystem.com, sem `auth_user_id` vinculado)
 
-### Fluxo
-1. Super admin preenche dados da empresa + email/senha do admin
-2. Empresa é criada no banco
-3. Edge function `create-user-auth` cria a conta Auth com email/senha
-4. Registro na tabela `usuarios` com `tipo_usuario = 'adm'`, `empresa_id` da nova empresa e `auth_user_id` retornado
+### O que será feito
 
-### Alterações
+1. **Criar usuário de autenticação** via edge function `create-user-auth` (precisa ser chamada com autenticação válida, então vou criar uma edge function temporária `provision-admin` que usa service role key internamente)
 
-#### 1. `src/pages/superadmin/EmpresasPage.tsx`
-- Adicionar campos `admin_email` e `admin_senha` ao formulário (visíveis apenas no modo criação)
-- Passar esses valores para a mutation de criação
+2. **Atualizar o registro do admin na tabela `usuarios`**: alterar o email para `sidiclei@cinesystem.com.br`, nome para "Sidiclei", e vincular o `auth_user_id` retornado
 
-#### 2. `src/hooks/useSuperAdminEmpresas.ts`
-- Alterar `createMutation` para:
-  1. Inserir empresa e obter o `id` retornado
-  2. Se `admin_email` e `admin_senha` foram fornecidos, chamar edge function `create-user-auth` para criar conta Auth
-  3. Inserir registro em `usuarios` com `auth_user_id`, `empresa_id`, `nome` (derivado do email), `email`, `tipo_usuario = 'adm'`
+3. **Remover a edge function temporária** após uso
 
-#### 3. Nenhuma alteração no banco ou edge functions
-- A edge function `create-user-auth` já existe e faz exatamente o necessário
-- A tabela `usuarios` já aceita inserts (RLS permite)
+### Alternativa mais simples
+Criar tudo em uma única edge function dedicada `provision-cinesystem-admin` que:
+- Cria o auth user com email `sidiclei@cinesystem.com.br` e senha `#Teste_123`
+- Atualiza o registro existente do admin (id `22222222-2222-2222-2222-222222222221`) com o novo email e `auth_user_id`
+- Retorna confirmação
 
-### Arquivos modificados
-- `src/pages/superadmin/EmpresasPage.tsx`
-- `src/hooks/useSuperAdminEmpresas.ts`
+### Arquivos
+- **Criar**: `supabase/functions/provision-cinesystem-admin/index.ts` (temporário, será removido depois)
+- **Sem alterações** em arquivos do frontend
 
