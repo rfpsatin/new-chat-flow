@@ -8,6 +8,7 @@ import { AtendimentosPorFechamentoChart } from '@/components/dashboard/Atendimen
 import { AgentesTable } from '@/components/dashboard/AgentesTable';
 import { LeadTimeTimelineChart } from '@/components/dashboard/LeadTimeTimelineChart';
 import { OpenAtendimentoAgentesTable } from '@/components/dashboard/OpenAtendimentoAgentesTable';
+import { CampanhasDashboard } from '@/components/dashboard/CampanhasDashboard';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
@@ -26,8 +27,8 @@ function formatDuration(seconds: number) {
 export default function DashboardAtendimentosPage() {
   const { empresaId } = useApp();
   const [periodo, setPeriodo] = useState<PeriodoFiltro>('hoje');
-  const [activeTab, setActiveTab] = useState<'atendimentos' | 'aberto'>('atendimentos');
-  const handleTabChange = (tab: 'atendimentos' | 'aberto') => {
+  const [activeTab, setActiveTab] = useState<'atendimentos' | 'aberto' | 'campanhas'>('atendimentos');
+  const handleTabChange = (tab: 'atendimentos' | 'aberto' | 'campanhas') => {
     setActiveTab(tab);
     if (tab === 'atendimentos' && periodo === 'prazo') {
       setPeriodo('hoje');
@@ -55,6 +56,7 @@ export default function DashboardAtendimentosPage() {
     queryClient.invalidateQueries({ queryKey: ['dashboard-por-motivo'] });
     queryClient.invalidateQueries({ queryKey: ['dashboard-agentes'] });
     queryClient.invalidateQueries({ queryKey: ['dashboard-open'] });
+    queryClient.invalidateQueries({ queryKey: ['campanhas-stats'] });
   };
 
   const openCards = useMemo(() => {
@@ -178,7 +180,7 @@ export default function DashboardAtendimentosPage() {
                 />
               </div>
             </>
-          ) : (
+          ) : activeTab === 'aberto' ? (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {openCards.map((card) => (
@@ -207,6 +209,8 @@ export default function DashboardAtendimentosPage() {
                 isLoading={isLoadingOpen}
               />
             </>
+          ) : (
+            <CampanhasDashboard empresaId={empresaId} />
           )}
         </div>
       </ScrollArea>
