@@ -58,6 +58,18 @@ export function EncerrarEmLoteDialog({
     setEtapa(2);
   };
 
+  const withTimeout = <T,>(
+    operation: () => Promise<T>,
+    timeoutMs = 15000,
+    timeoutMessage = 'Operação demorou mais que o esperado'
+  ) =>
+    Promise.race([
+      operation(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs)
+      ),
+    ]);
+
   const executarEncerramento = async (enviarAvaliacao: boolean) => {
     setIsProcessing(true);
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -74,65 +86,89 @@ export function EncerrarEmLoteDialog({
             continue;
           }
 
-          if (enviarAvaliacao && conversa.whatsapp_numero) {
-            await fetch(`${supabaseUrl}/functions/v1/whapi-send-message`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${supabaseAnonKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                empresa_id: empresaId,
-                to: conversa.whatsapp_numero,
-                message: MENSAGEM_PESQUISA,
-              }),
-            });
+          // Se não enviar avaliação, encerra direto sem chamadas externas para evitar travamentos.
+          if (enviarAvaliacao) {
+            if (conversa.whatsapp_numero) {
+              try {
+                await withTimeout(() =>
+                  fetch(`${supabaseUrl}/functions/v1/whapi-send-message`, {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${supabaseAnonKey}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      empresa_id: empresaId,
+                      to: conversa.whatsapp_numero,
+                      message: MENSAGEM_PESQUISA,
+                    }),
+                  })
+                );
 
-            await supabase
-              .from('conversas')
-              .update({ pesquisa_enviada_em: new Date().toISOString() })
-              .eq('id', conversa.conversa_id);
-          }
+                await withTimeout(async () =>
+                  supabase
+                    .from('conversas')
+                    .update({ pesquisa_enviada_em: new Date().toISOString() })
+                    .eq('id', conversa.conversa_id)
+                );
+              } catch (sendError) {
+                console.error('Erro ao enviar avaliação (seguindo encerramento):', conversa.conversa_id, sendError);
+              }
+            }
 
-          // Check if n8n conversa for reset
-          const { data: conversaData } = await supabase
-            .from('conversas')
-            .select('origem, channel, n8n_webhook_id, human_mode, origem_final')
-            .eq('id', conversa.conversa_id)
-            .single();
+            try {
+              const { data: conversaData } = await withTimeout(async () =>
+                supabase
+                  .from('conversas')
+                  .select('origem, channel, n8n_webhook_id, human_mode, origem_final')
+                  .eq('id', conversa.conversa_id)
+                  .single()
+              );
 
-          const isN8n = conversaData && (
-            conversaData.origem || conversaData.channel || conversaData.n8n_webhook_id ||
-            conversaData.human_mode === true || conversaData.origem_final === 'atendente'
-          );
+              const isN8n = conversaData && (
+                conversaData.origem || conversaData.channel || conversaData.n8n_webhook_id ||
+                conversaData.human_mode === true || conversaData.origem_final === 'atendente'
+              );
 
-          if (isN8n) {
-            await fetch(`${supabaseUrl}/functions/v1/n8n-reset-human-mode`, {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${supabaseAnonKey}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ conversa_id: conversa.conversa_id, empresa_id: empresaId }),
-            }).catch(console.error);
-          } else {
-            const { data: contato } = await supabase
-              .from('contatos')
-              .select('whatsapp_numero')
-              .eq('id', conversa.contato_id!)
-              .single();
-            if (contato) {
-              await fetch(`${supabaseUrl}/functions/v1/close-service`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${supabaseAnonKey}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ conversa_id: conversa.conversa_id, empresa_id: empresaId, chat_id: contato.whatsapp_numero }),
-              }).catch(console.error);
+              if (isN8n) {
+                await withTimeout(() =>
+                  fetch(`${supabaseUrl}/functions/v1/n8n-reset-human-mode`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${supabaseAnonKey}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ conversa_id: conversa.conversa_id, empresa_id: empresaId }),
+                  })
+                ).catch(console.error);
+              } else {
+                const { data: contato } = await withTimeout(async () =>
+                  supabase
+                    .from('contatos')
+                    .select('whatsapp_numero')
+                    .eq('id', conversa.contato_id!)
+                    .single()
+                );
+
+                if (contato) {
+                  await withTimeout(() =>
+                    fetch(`${supabaseUrl}/functions/v1/close-service`, {
+                      method: 'POST',
+                      headers: { 'Authorization': `Bearer ${supabaseAnonKey}`, 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ conversa_id: conversa.conversa_id, empresa_id: empresaId, chat_id: contato.whatsapp_numero }),
+                    })
+                  ).catch(console.error);
+                }
+              }
+            } catch (externalError) {
+              console.error('Erro em integrações externas (seguindo encerramento):', conversa.conversa_id, externalError);
             }
           }
 
-          // Encerrar conversa
-          const { error } = await supabase.rpc('encerrar_conversa', {
-            p_conversa_id: conversa.conversa_id,
-            p_motivo_id: motivoId,
-            p_usuario_id: usuarioId,
-          });
+          const { error } = await withTimeout(async () =>
+            supabase.rpc('encerrar_conversa', {
+              p_conversa_id: conversa.conversa_id,
+              p_motivo_id: motivoId,
+              p_usuario_id: usuarioId,
+            })
+          );
 
           if (error) throw error;
           sucesso++;
