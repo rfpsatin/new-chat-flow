@@ -2,6 +2,22 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+const normalizeCnpj = (value: string) => value.replace(/\D/g, '');
+
+const buildFriendlyErrorMessage = (error: unknown) => {
+  if (error instanceof Error) return error.message;
+
+  const maybeSupabaseError = error as { code?: string; message?: string; details?: string };
+  if (maybeSupabaseError?.code === '23505') {
+    const details = `${maybeSupabaseError.details ?? ''} ${maybeSupabaseError.message ?? ''}`.toLowerCase();
+    if (details.includes('cnpj')) return 'Este CNPJ ja esta cadastrado.';
+    if (details.includes('email')) return 'Este e-mail ja esta em uso.';
+    return 'Registro duplicado. Verifique os dados informados.';
+  }
+
+  return 'Nao foi possivel concluir a operacao.';
+};
+
 export function useSuperAdminEmpresas() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -21,53 +37,90 @@ export function useSuperAdminEmpresas() {
   const createMutation = useMutation({
     mutationFn: async (values: { razao_social: string; nome_fantasia: string; cnpj: string; admin_email?: string; admin_senha?: string }) => {
       const { admin_email, admin_senha, ...empresaData } = values;
+      const cnpj = normalizeCnpj(empresaData.cnpj);
+      const adminEmail = admin_email?.trim().toLowerCase();
+      const adminSenha = admin_senha?.trim();
+
+      if (cnpj.length !== 14) {
+        throw new Error('Informe um CNPJ valido com 14 digitos.');
+      }
 
       const normalizedData = {
-        ...empresaData,
+        razao_social: empresaData.razao_social.trim(),
         nome_fantasia: empresaData.nome_fantasia?.trim() || null,
+        cnpj,
       };
+
+      if (adminEmail) {
+        const { data: existingUser, error: existingUserError } = await supabase
+          .from('usuarios')
+          .select('id')
+          .eq('email', adminEmail)
+          .maybeSingle();
+
+        if (existingUserError) throw existingUserError;
+        if (existingUser) throw new Error('Este e-mail de admin ja esta cadastrado.');
+      }
 
       const { data: empresa, error } = await supabase.from('empresas').insert(normalizedData).select('id').single();
       if (error) throw error;
 
-      if (admin_email && admin_senha) {
-        const { data: authData, error: authError } = await supabase.functions.invoke('create-user-auth', {
-          body: { email: admin_email, password: admin_senha },
-        });
-        if (authError) throw new Error(authError.message || 'Erro ao criar conta auth do admin');
-        if (authData?.error) throw new Error(authData.error);
+      if (adminEmail && adminSenha) {
+        try {
+          const { data: authData, error: authError } = await supabase.functions.invoke('create-user-auth', {
+            body: { email: adminEmail, password: adminSenha },
+          });
+          if (authError) throw new Error(authError.message || 'Erro ao criar conta auth do admin');
+          if (authData?.error) throw new Error(authData.error);
 
-        const nome = admin_email.split('@')[0];
-        const { error: userError } = await supabase.from('usuarios').insert({
-          auth_user_id: authData.auth_user_id,
-          empresa_id: empresa.id,
-          nome,
-          email: admin_email,
-          tipo_usuario: 'adm',
-        });
-        if (userError) throw userError;
+          const nome = adminEmail.split('@')[0];
+          const { error: userError } = await supabase.from('usuarios').insert({
+            auth_user_id: authData.auth_user_id,
+            empresa_id: empresa.id,
+            nome,
+            email: adminEmail,
+            tipo_usuario: 'adm',
+          });
+          if (userError) throw userError;
+        } catch (adminCreationError) {
+          // Evita empresa sem admin quando a segunda etapa falhar.
+          await supabase.from('empresas').delete().eq('id', empresa.id);
+          throw adminCreationError;
+        }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['superadmin-empresas'] });
       toast({ title: 'Empresa criada com sucesso' });
     },
-    onError: (err: Error) => {
-      toast({ title: 'Erro ao criar empresa', description: err.message, variant: 'destructive' });
+    onError: (error: unknown) => {
+      toast({ title: 'Erro ao criar empresa', description: buildFriendlyErrorMessage(error), variant: 'destructive' });
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, ...values }: { id: string; razao_social: string; nome_fantasia: string; cnpj: string }) => {
-      const { error } = await supabase.from('empresas').update(values).eq('id', id);
+      const cnpj = normalizeCnpj(values.cnpj);
+      if (cnpj.length !== 14) {
+        throw new Error('Informe um CNPJ valido com 14 digitos.');
+      }
+
+      const { error } = await supabase
+        .from('empresas')
+        .update({
+          razao_social: values.razao_social.trim(),
+          nome_fantasia: values.nome_fantasia?.trim() || null,
+          cnpj,
+        })
+        .eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['superadmin-empresas'] });
       toast({ title: 'Empresa atualizada com sucesso' });
     },
-    onError: (err: Error) => {
-      toast({ title: 'Erro ao atualizar empresa', description: err.message, variant: 'destructive' });
+    onError: (error: unknown) => {
+      toast({ title: 'Erro ao atualizar empresa', description: buildFriendlyErrorMessage(error), variant: 'destructive' });
     },
   });
 
