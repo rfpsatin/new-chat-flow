@@ -200,16 +200,6 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
 
   return (
     <div className="absolute inset-0 flex flex-col">
-      {/* Selection actions bar */}
-      {selectionMode && (
-        <SelecaoMultiplaActions
-          selectedCount={selectedIds.size}
-          onEncerrar={() => setShowEncerrarDialog(true)}
-          onMover={() => setShowMoverDialog(true)}
-          onCancelar={exitSelectionMode}
-        />
-      )}
-
       {/* Filters */}
       <div className="p-4 border-b bg-card">
         <FiltrosFila
@@ -277,6 +267,16 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
           </div>
         )}
       </div>
+
+      {/* Selection actions bar - bottom */}
+      {selectionMode && (
+        <SelecaoMultiplaActions
+          selectedCount={selectedIds.size}
+          onEncerrar={() => setShowEncerrarDialog(true)}
+          onMover={() => setShowMoverDialog(true)}
+          onCancelar={exitSelectionMode}
+        />
+      )}
 
       {/* Dialogs */}
       <EncerrarEmLoteDialog
