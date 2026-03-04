@@ -1,4 +1,5 @@
-import { Search, Bot, Clock, Users, Headphones, LayoutGrid, Info } from 'lucide-react';
+import { Search, Bot, Clock, Users, Headphones, LayoutGrid, Info, MoreVertical, CheckSquare } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -18,6 +19,8 @@ interface FiltrosFilaProps {
   statusCounts: StatusCount;
   tipoUsuario?: 'adm' | 'sup' | 'opr';
   allStatusCounts?: StatusCount;
+  isSelectionMode?: boolean;
+  onToggleSelectionMode?: () => void;
 }
 
 const statusConfig = [
@@ -36,6 +39,8 @@ export function FiltrosFila({
   statusCounts,
   tipoUsuario,
   allStatusCounts,
+  isSelectionMode,
+  onToggleSelectionMode,
 }: FiltrosFilaProps) {
   const totalCount = statusCounts.bot + statusCounts.esperando_tria + statusCounts.fila_humano + statusCounts.em_atendimento_humano;
 
@@ -88,6 +93,25 @@ export function FiltrosFila({
             </div>
           </TooltipContent>
         </Tooltip>
+        {!isSelectionMode && onToggleSelectionMode && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors focus:outline-none focus:ring-1 focus:ring-ring"
+                aria-label="Mais opções"
+              >
+                <MoreVertical className="w-4 h-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onToggleSelectionMode}>
+                <CheckSquare className="w-4 h-4 mr-2" />
+                Selecionar conversas
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {/* Status chips - single select */}
