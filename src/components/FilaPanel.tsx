@@ -10,7 +10,7 @@ import { Loader2, Inbox, FilterX } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface FilaPanelProps {
-  onSelectConversa: (conversa: FilaAtendimento) => void;
+  onSelectConversa: (conversa: FilaAtendimento | null) => void;
   selectedConversaId: string | null;
   openConversaId?: string | null;
 }
@@ -28,11 +28,16 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
   }, [openConversaId, fila, onSelectConversa]);
 
   // Sincronizar conversa selecionada quando a fila atualiza (ex: mudanca de status via realtime)
+  // Quando a conversa sai da fila (ex: encerrada), limpa a selecao automaticamente.
   const prevSnapshotRef = useRef('');
   useEffect(() => {
-    if (!selectedConversaId || !fila?.length) return;
+    if (!selectedConversaId || !fila) return;
     const updated = fila.find((f) => f.conversa_id === selectedConversaId);
-    if (!updated) return;
+    if (!updated) {
+      prevSnapshotRef.current = '';
+      onSelectConversa(null);
+      return;
+    }
     const snapshot = `${updated.status}|${updated.agente_responsavel_id}|${updated.last_message_at}`;
     if (snapshot !== prevSnapshotRef.current) {
       prevSnapshotRef.current = snapshot;

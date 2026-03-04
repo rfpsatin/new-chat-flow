@@ -268,6 +268,45 @@ Deno.serve(async (req) => {
 
         // Daqui para baixo, apenas mensagens de entrada (cliente)
 
+        // Interceptar respostas de pesquisa de satisfação ANTES de criar conversa/inserir mensagem.
+        // Quando a conversa está encerrada com pesquisa pendente e o cliente responde 1-5,
+        // salvamos a nota e pulamos todo o processamento para evitar que n8n/bot responda.
+        {
+          const { data: ultimaConvPesquisa } = await supabase
+            .from('conversas')
+            .select('id, status, pesquisa_enviada_em, pesquisa_respondida_em')
+            .eq('empresa_id', empresaId)
+            .eq('contato_id', contato.id)
+            .eq('status', 'encerrado')
+            .not('pesquisa_enviada_em', 'is', null)
+            .is('pesquisa_respondida_em', null)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+          if (ultimaConvPesquisa) {
+            const pesquisaEnviadaEm = new Date(ultimaConvPesquisa.pesquisa_enviada_em)
+            const agora = new Date()
+            const horasPassadas = (agora.getTime() - pesquisaEnviadaEm.getTime()) / (1000 * 60 * 60)
+            const nota = parseInt(conteudo.trim())
+            const isNotaValida = !isNaN(nota) && nota >= 1 && nota <= 5
+
+            if (horasPassadas <= 24 && isNotaValida) {
+              console.log(`[${requestId}] Valid satisfaction rating: ${nota} (conversa ${ultimaConvPesquisa.id})`)
+              await supabase
+                .from('conversas')
+                .update({
+                  nota_satisfacao: nota,
+                  pesquisa_respondida_em: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', ultimaConvPesquisa.id)
+              processedCount++
+              continue
+            }
+          }
+        }
+
         const conversa = await findOrCreateConversa(
           supabase,
           empresaId,
