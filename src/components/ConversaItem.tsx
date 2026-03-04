@@ -12,9 +12,12 @@ interface ConversaItemProps {
   onClick: () => void;
   showBadge?: boolean;
   showAgentName?: boolean;
+  selectionMode?: boolean;
+  isChecked?: boolean;
+  onToggleCheck?: () => void;
 }
 
-export function ConversaItem({ conversa, isSelected, onClick, showBadge = true, showAgentName = true }: ConversaItemProps) {
+export function ConversaItem({ conversa, isSelected, onClick, showBadge = true, showAgentName = true, selectionMode = false, isChecked = false, onToggleCheck }: ConversaItemProps) {
   const getInitials = (name: string | null) => {
     if (!name) return '?';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -87,16 +90,43 @@ export function ConversaItem({ conversa, isSelected, onClick, showBadge = true, 
     !!conversa.agente_nome;
   const primeiroNome = conversa.agente_nome?.split(/\s+/)[0] ?? '';
 
+  const handleClick = () => {
+    if (selectionMode && onToggleCheck) {
+      onToggleCheck();
+    } else {
+      onClick();
+    }
+  };
+
   return (
     <button
-      onClick={onClick}
+      onClick={handleClick}
       className={cn(
         'w-full p-4 text-left rounded-lg transition-all duration-200 min-h-[100px]',
         'hover:bg-accent/50',
-        isSelected && 'bg-accent ring-1 ring-primary/20'
+        isSelected && !selectionMode && 'bg-accent ring-1 ring-primary/20',
+        selectionMode && isChecked && 'bg-primary/5 ring-1 ring-primary/30'
       )}
     >
       <div className="flex items-start gap-3 h-full">
+        {selectionMode && (
+          <div className="flex items-center shrink-0 pt-1">
+            <div
+              className={cn(
+                'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all',
+                isChecked
+                  ? 'bg-primary border-primary'
+                  : 'border-muted-foreground/40'
+              )}
+            >
+              {isChecked && (
+                <svg className="w-3 h-3 text-primary-foreground" viewBox="0 0 12 12" fill="none">
+                  <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </div>
+          </div>
+        )}
         <Avatar className="h-11 w-11 shrink-0">
           <AvatarFallback className="bg-primary/10 text-primary font-medium">
             {getInitials(getDisplayName())}

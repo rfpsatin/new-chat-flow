@@ -1,8 +1,11 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { useFila, useAssumirConversa } from '@/hooks/useFila';
 import { ConversaItem } from '@/components/ConversaItem';
 import { FiltrosFila } from '@/components/FiltrosFila';
+import { SelecaoMultiplaActions } from '@/components/fila/SelecaoMultiplaActions';
+import { EncerrarEmLoteDialog } from '@/components/fila/EncerrarEmLoteDialog';
+import { MoverEmLoteDialog } from '@/components/fila/MoverEmLoteDialog';
 import { FilaAtendimento } from '@/types/atendimento';
 
 import { Button } from '@/components/ui/button';
@@ -48,6 +51,33 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('todos');
+
+  // Selection mode states
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showEncerrarDialog, setShowEncerrarDialog] = useState(false);
+  const [showMoverDialog, setShowMoverDialog] = useState(false);
+
+  const toggleSelectionMode = useCallback(() => {
+    setSelectionMode(prev => {
+      if (prev) setSelectedIds(new Set());
+      return !prev;
+    });
+  }, []);
+
+  const toggleSelectId = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const exitSelectionMode = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }, []);
 
   // Filtra conversas visíveis baseado no perfil do usuário
   const conversasVisiveis = useMemo(() => {
@@ -170,6 +200,16 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
 
   return (
     <div className="absolute inset-0 flex flex-col">
+      {/* Selection actions bar */}
+      {selectionMode && (
+        <SelecaoMultiplaActions
+          selectedCount={selectedIds.size}
+          onEncerrar={() => setShowEncerrarDialog(true)}
+          onMover={() => setShowMoverDialog(true)}
+          onCancelar={exitSelectionMode}
+        />
+      )}
+
       {/* Filters */}
       <div className="p-4 border-b bg-card">
         <FiltrosFila
@@ -180,6 +220,8 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
           statusCounts={statusCounts}
           tipoUsuario={currentUser?.tipo_usuario}
           allStatusCounts={allStatusCounts}
+          isSelectionMode={selectionMode}
+          onToggleSelectionMode={toggleSelectionMode}
         />
       </div>
 
@@ -213,6 +255,9 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
                       onClick={() => onSelectConversa(conversa)}
                       showBadge={selectedStatus === 'todos'}
                       showAgentName={currentUser?.tipo_usuario !== 'opr'}
+                      selectionMode={selectionMode}
+                      isChecked={selectedIds.has(conversa.conversa_id!)}
+                      onToggleCheck={() => toggleSelectId(conversa.conversa_id!)}
                     />
                   </div>
                   {isDesignadoParaMim && (
@@ -232,6 +277,22 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
           </div>
         )}
       </div>
+
+      {/* Dialogs */}
+      <EncerrarEmLoteDialog
+        open={showEncerrarDialog}
+        onOpenChange={setShowEncerrarDialog}
+        conversas={filteredConversas.filter(c => selectedIds.has(c.conversa_id!))}
+        empresaId={empresaId!}
+        usuarioId={currentUser?.id || ''}
+        onComplete={exitSelectionMode}
+      />
+      <MoverEmLoteDialog
+        open={showMoverDialog}
+        onOpenChange={setShowMoverDialog}
+        conversas={filteredConversas.filter(c => selectedIds.has(c.conversa_id!))}
+        onComplete={exitSelectionMode}
+      />
     </div>
   );
 }
