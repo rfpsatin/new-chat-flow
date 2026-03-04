@@ -66,6 +66,7 @@ export function useFila(empresaId: string) {
         },
         () => {
           queryClient.invalidateQueries({ queryKey: ['fila', empresaId] });
+          queryClient.invalidateQueries({ queryKey: ['conversa'] });
         }
       )
       .subscribe();

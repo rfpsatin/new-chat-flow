@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { useFila, useAssumirConversa } from '@/hooks/useFila';
 import { ConversaItem } from '@/components/ConversaItem';
@@ -26,6 +26,19 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
     const c = fila.find((f) => f.conversa_id === openConversaId);
     if (c) onSelectConversa(c);
   }, [openConversaId, fila, onSelectConversa]);
+
+  // Sincronizar conversa selecionada quando a fila atualiza (ex: mudanca de status via realtime)
+  const prevSnapshotRef = useRef('');
+  useEffect(() => {
+    if (!selectedConversaId || !fila?.length) return;
+    const updated = fila.find((f) => f.conversa_id === selectedConversaId);
+    if (!updated) return;
+    const snapshot = `${updated.status}|${updated.agente_responsavel_id}|${updated.human_mode}|${updated.last_message_at}`;
+    if (snapshot !== prevSnapshotRef.current) {
+      prevSnapshotRef.current = snapshot;
+      onSelectConversa(updated);
+    }
+  }, [fila, selectedConversaId, onSelectConversa]);
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
