@@ -119,6 +119,8 @@ export interface HistoricoConversa {
   agente_nome: string | null;
   /** Número de protocolo (ex: 20260218-0000002). */
   nr_protocolo: string | null;
+  /** Status da conversa no momento do encerramento (ex: bot, esperando_tria, fila_humano, em_atendimento_humano). */
+  status_ao_encerrar: string | null;
 }
 
 export interface ContatoComHistorico {
