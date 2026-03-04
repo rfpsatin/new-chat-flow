@@ -1,27 +1,22 @@
 
 
-## Ajustes na Seleção Múltipla da Fila de Atendimento
+## Nova Aba "Campanhas" no Dashboard
 
-### 1. Barra de ações para a parte inferior
-**`SelecaoMultiplaActions.tsx`** — Alterar de `border-b` (topo) para posicionamento fixo na parte inferior do painel. Usar `border-t` e fonte menor (`text-xs`) para o contador. Trocar layout de `justify-between` para compacto centralizado.
+### Resumo
+Adicionar uma terceira aba "Campanhas" ao lado de "Atendimentos" e "Atendimentos em Aberto" no DashboardFilters. Ao selecionar, exibir cards individuais por campanha usando dados da view `vw_campanha_stats` (já existente), mostrando total de enviados e respostas (conversas abertas).
 
-**`FilaPanel.tsx`** — Mover o `<SelecaoMultiplaActions>` de antes dos filtros para depois da lista de conversas (parte inferior do flex container), com posição fixa no fundo.
+### Arquivos a criar
 
-### 2. Padronização visual dos pop-ups de Encerrar
-**`EncerrarEmLoteDialog.tsx`** — Definir altura mínima fixa no `DialogContent` para ambas as etapas terem o mesmo tamanho. Usar classes consistentes de padding/spacing em ambas as etapas.
-
-### 3. Botões centralizados nos pop-ups
-**`EncerrarEmLoteDialog.tsx`** — Substituir `DialogFooter` por `div` com `flex justify-center gap-3` em ambas as etapas, centralizando os botões horizontalmente.
-
-### 4. Texto justificado nos pop-ups
-**`EncerrarEmLoteDialog.tsx`** — Adicionar `text-justify` ao `DialogDescription` em ambas as etapas.
-
-### 5. Correção CRÍTICA — Bug "Não enviar"
-**`EncerrarEmLoteDialog.tsx`** — O bug está na função `executarEncerramento`. Quando `enviarAvaliacao=false`, a função tenta buscar dados da conversa e chamar edge functions que podem falhar silenciosamente ou travar. O problema principal é que se `conversa.conversa_id` for `null/undefined`, o `supabase.rpc` falha e o `catch` incrementa erros mas o `setIsProcessing(false)` pode não ser alcançado se houver erro não capturado. Solução: envolver todo o loop em `try/finally` para garantir que `setIsProcessing(false)` e `handleClose()` sempre executem, independentemente de erros.
+1. **`src/components/dashboard/CampanhasDashboard.tsx`** — Componente que recebe `empresaId` e renderiza a lista de campanhas em cards. Usa o hook `useCampanhasStats` existente. Cada card exibe: nome da campanha, status, total de enviados (`enviados`) e total de respostas (`conversas_abertas`). Layout em grid `grid-cols-1 md:grid-cols-2 lg:grid-cols-3`, usando o componente `Card` existente com o mesmo padrão visual dos KPI cards (fonte, espaçamento, cores). Exibe skeleton loading e estado vazio.
 
 ### Arquivos a modificar
 
-1. **`src/components/fila/SelecaoMultiplaActions.tsx`** — Reposicionar para bottom, reduzir fonte, layout compacto
-2. **`src/components/fila/EncerrarEmLoteDialog.tsx`** — Altura consistente, botões centralizados, texto justificado, fix do bug de loading
-3. **`src/components/FilaPanel.tsx`** — Mover `SelecaoMultiplaActions` para o final do container (bottom)
+2. **`src/components/dashboard/DashboardFilters.tsx`** — Ampliar o type do `activeTab` para incluir `'campanhas'`. Adicionar `TabsTrigger` "Campanhas" na `TabsList`. Esconder filtros de período/agente quando `activeTab === 'campanhas'` (campanhas não precisam de filtro de período).
+
+3. **`src/pages/DashboardAtendimentosPage.tsx`** — Ampliar state `activeTab` para `'atendimentos' | 'aberto' | 'campanhas'`. Importar `CampanhasDashboard`. Adicionar bloco condicional `activeTab === 'campanhas'` renderizando `<CampanhasDashboard empresaId={empresaId} />`. Adicionar invalidação de `campanhas-stats` no `handleRefresh`.
+
+### Dados
+- `vw_campanha_stats.enviados` = quantidade que receberam a mensagem
+- `vw_campanha_stats.conversas_abertas` = quantidade que responderam
+- Ambos já existem na view, sem necessidade de migração
 
