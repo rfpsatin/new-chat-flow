@@ -23,6 +23,18 @@ interface EmpresaForm {
   admin_senha: string;
 }
 
+interface EmpresaListItem {
+  id: string;
+  razao_social: string;
+  nome_fantasia: string | null;
+  cnpj: string;
+  ativo: boolean;
+  created_at: string;
+  admin_nome: string | null;
+  admin_email: string | null;
+  admin_ativo: boolean | null;
+}
+
 const emptyForm: EmpresaForm = { razao_social: '', nome_fantasia: '', cnpj: '', admin_email: '', admin_senha: '' };
 
 export default function SuperAdminEmpresasPage() {
@@ -30,9 +42,11 @@ export default function SuperAdminEmpresasPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<EmpresaForm>(emptyForm);
   const isEditing = !!form.id;
+  const empresasList = (empresas ?? []) as EmpresaListItem[];
+  const selectedEmpresa = isEditing ? empresasList.find((empresa) => empresa.id === form.id) : null;
 
   const openCreate = () => { setForm(emptyForm); setDialogOpen(true); };
-  const openEdit = (e: any) => {
+  const openEdit = (e: EmpresaListItem) => {
     setForm({ id: e.id, razao_social: e.razao_social, nome_fantasia: e.nome_fantasia || '', cnpj: e.cnpj, admin_email: '', admin_senha: '' });
     setDialogOpen(true);
   };
@@ -74,7 +88,7 @@ export default function SuperAdminEmpresasPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {empresas?.map((emp) => (
+                {empresasList.map((emp) => (
                   <TableRow key={emp.id}>
                     <TableCell className="font-medium">{emp.razao_social}</TableCell>
                     <TableCell>{emp.nome_fantasia || '—'}</TableCell>
@@ -101,7 +115,7 @@ export default function SuperAdminEmpresasPage() {
                     </TableCell>
                   </TableRow>
                 ))}
-                {empresas?.length === 0 && (
+                {empresasList.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                       Nenhuma empresa cadastrada
@@ -132,6 +146,27 @@ export default function SuperAdminEmpresasPage() {
               <Label>CNPJ</Label>
               <Input value={form.cnpj} onChange={e => setForm(f => ({ ...f, cnpj: e.target.value }))} />
             </div>
+            {isEditing && (
+              <div className="border-t pt-4 mt-2 space-y-2">
+                <p className="text-sm text-muted-foreground">Administrador vinculado</p>
+                <div className="grid gap-2 rounded-md border p-3 bg-muted/30">
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">Nome:</span>{' '}
+                    {selectedEmpresa?.admin_nome || 'Nao informado'}
+                  </p>
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">E-mail:</span>{' '}
+                    {selectedEmpresa?.admin_email || 'Nao vinculado'}
+                  </p>
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">Status:</span>{' '}
+                    {selectedEmpresa?.admin_email
+                      ? selectedEmpresa.admin_ativo ? 'Ativo' : 'Inativo'
+                      : 'Sem administrador'}
+                  </p>
+                </div>
+              </div>
+            )}
             {!isEditing && (
               <>
                 <div className="border-t pt-4 mt-2">

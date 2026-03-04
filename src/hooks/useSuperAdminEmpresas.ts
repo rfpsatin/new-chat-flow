@@ -25,12 +25,38 @@ export function useSuperAdminEmpresas() {
   const query = useQuery({
     queryKey: ['superadmin-empresas'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: empresas, error } = await supabase
         .from('empresas')
         .select('id, razao_social, nome_fantasia, cnpj, ativo, created_at')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data;
+      if (!empresas?.length) return empresas;
+
+      const empresaIds = empresas.map((empresa) => empresa.id);
+      const { data: admins, error: adminsError } = await supabase
+        .from('usuarios')
+        .select('empresa_id, nome, email, ativo, created_at')
+        .in('empresa_id', empresaIds)
+        .eq('tipo_usuario', 'adm')
+        .order('created_at', { ascending: true });
+      if (adminsError) throw adminsError;
+
+      const adminByEmpresa = new Map<string, (typeof admins)[number]>();
+      for (const admin of admins ?? []) {
+        if (!adminByEmpresa.has(admin.empresa_id)) {
+          adminByEmpresa.set(admin.empresa_id, admin);
+        }
+      }
+
+      return empresas.map((empresa) => {
+        const admin = adminByEmpresa.get(empresa.id);
+        return {
+          ...empresa,
+          admin_nome: admin?.nome ?? null,
+          admin_email: admin?.email ?? null,
+          admin_ativo: admin?.ativo ?? null,
+        };
+      });
     },
   });
 
