@@ -202,6 +202,24 @@ Deno.serve(async (req) => {
             continue
           }
 
+          // Strip marker e detectar human_mode em respostas do bot
+          let conteudoLimpo = conteudo
+          let humanModeDetected = false
+
+          const markerMatch = conteudo.match(/^#"human_mode=(true|false)"#\s*/)
+          if (markerMatch) {
+            humanModeDetected = markerMatch[1] === 'true'
+            conteudoLimpo = conteudo.replace(/^#"human_mode=(true|false)"#\s*/, '')
+            console.log(`[${requestId}] Stripped marker from bot msg, human_mode=${humanModeDetected}`)
+          }
+
+          // Detectar frase de atendimento humano do agente IA (sem marker)
+          const humanPhrase = /ESCOLHEU SEGUIR COM ATENDIMENTO HUMANO|REDIRECIONAR O ATENDIMENTO/i
+          if (!humanModeDetected && humanPhrase.test(conteudoLimpo)) {
+            humanModeDetected = true
+            console.log(`[${requestId}] Detected human attendance phrase in bot response`)
+          }
+
           const { error: outMsgError } = await supabase
             .from('mensagens_ativas')
             .insert({
@@ -210,7 +228,7 @@ Deno.serve(async (req) => {
               contato_id: contato.id,
               direcao: 'out',
               tipo_remetente: 'bot',
-              conteudo: conteudo,
+              conteudo: conteudoLimpo,
               payload: message,
             })
 
@@ -219,12 +237,23 @@ Deno.serve(async (req) => {
             throw outMsgError
           }
 
+          // Atualizar conversa: timestamp + human_mode se detectado
+          const convUpdateFields: Record<string, unknown> = {
+            last_message_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }
+
+          if (humanModeDetected) {
+            convUpdateFields.human_mode = true
+            if (ultimaConversa.status === 'bot') {
+              convUpdateFields.status = 'esperando_tria'
+            }
+            console.log(`[${requestId}] Setting human_mode=true, status→esperando_tria on conversa ${ultimaConversa.id}`)
+          }
+
           const { error: outUpdateError } = await supabase
             .from('conversas')
-            .update({
-              last_message_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
+            .update(convUpdateFields)
             .eq('id', ultimaConversa.id)
 
           if (outUpdateError) {
