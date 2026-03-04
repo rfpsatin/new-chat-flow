@@ -1,49 +1,27 @@
 
 
-## Seleção Múltipla de Conversas na Fila de Atendimento
+## Ajustes na Seleção Múltipla da Fila de Atendimento
 
-### Resumo
+### 1. Barra de ações para a parte inferior
+**`SelecaoMultiplaActions.tsx`** — Alterar de `border-b` (topo) para posicionamento fixo na parte inferior do painel. Usar `border-t` e fonte menor (`text-xs`) para o contador. Trocar layout de `justify-between` para compacto centralizado.
 
-Adicionar modo de seleção múltipla na FilaPanel com botão "..." após os filtros, permitindo encerrar ou mover conversas em lote.
+**`FilaPanel.tsx`** — Mover o `<SelecaoMultiplaActions>` de antes dos filtros para depois da lista de conversas (parte inferior do flex container), com posição fixa no fundo.
 
-### Arquivos a criar
+### 2. Padronização visual dos pop-ups de Encerrar
+**`EncerrarEmLoteDialog.tsx`** — Definir altura mínima fixa no `DialogContent` para ambas as etapas terem o mesmo tamanho. Usar classes consistentes de padding/spacing em ambas as etapas.
 
-1. **`src/components/fila/SelecaoMultiplaActions.tsx`** — Barra de ações flutuante (Encerrar / Mover) que aparece no modo seleção, com contagem de selecionados.
+### 3. Botões centralizados nos pop-ups
+**`EncerrarEmLoteDialog.tsx`** — Substituir `DialogFooter` por `div` com `flex justify-center gap-3` em ambas as etapas, centralizando os botões horizontalmente.
 
-2. **`src/components/fila/EncerrarEmLoteDialog.tsx`** — Dialog de 2 etapas:
-   - Etapa 1: Confirmação com explicação (sairão do filtro Bot, sessão no histórico, tag bot mantida)
-   - Etapa 2: "Enviar avaliação?" com Sim/Não
-   - Ao confirmar, itera sobre as conversas selecionadas chamando `encerrar_conversa` (com ou sem envio de pesquisa via whapi-send-message)
+### 4. Texto justificado nos pop-ups
+**`EncerrarEmLoteDialog.tsx`** — Adicionar `text-justify` ao `DialogDescription` em ambas as etapas.
 
-3. **`src/components/fila/MoverEmLoteDialog.tsx`** — Dialog de 2 etapas:
-   - Etapa 1: Escolher destino (Triagem ou Atendimento Humano)
-   - Etapa 2: Se Triagem → confirmação simples (chama `forcar_atendimento_humano` para cada). Se Atendimento Humano → seleção obrigatória de atendente (lista de `atendentes` ativos) + confirmação (chama `encaminhar_para_atendente` ou `atribuir_agente` para cada)
+### 5. Correção CRÍTICA — Bug "Não enviar"
+**`EncerrarEmLoteDialog.tsx`** — O bug está na função `executarEncerramento`. Quando `enviarAvaliacao=false`, a função tenta buscar dados da conversa e chamar edge functions que podem falhar silenciosamente ou travar. O problema principal é que se `conversa.conversa_id` for `null/undefined`, o `supabase.rpc` falha e o `catch` incrementa erros mas o `setIsProcessing(false)` pode não ser alcançado se houver erro não capturado. Solução: envolver todo o loop em `try/finally` para garantir que `setIsProcessing(false)` e `handleClose()` sempre executem, independentemente de erros.
 
 ### Arquivos a modificar
 
-4. **`src/components/FiltrosFila.tsx`** — Adicionar botão "..." (MoreVertical icon) após a última tag de filtro. Ao clicar, dropdown com "Selecionar conversas". Recebe props `onToggleSelectionMode` e `isSelectionMode`.
-
-5. **`src/components/ConversaItem.tsx`** — Receber props `selectionMode: boolean`, `isChecked: boolean`, `onToggleCheck: () => void`. Quando `selectionMode=true`, exibir checkbox circular no lado esquerdo do card (antes do avatar). O click no card alterna o check em vez de abrir a conversa.
-
-6. **`src/components/FilaPanel.tsx`** — Gerenciar estado do modo seleção (`selectionMode`, `selectedIds: Set<string>`). Passar props aos componentes filhos. Renderizar `SelecaoMultiplaActions` quando `selectionMode=true`. Ao sair do modo seleção, limpar seleção.
-
-### Lógica de encerramento em lote
-
-- Para cada conversa selecionada, o fluxo será:
-  - **Com avaliação**: mesma lógica do `useEncerrarConversa` atual (envia pesquisa via whapi-send-message, depois chama `encerrar_conversa` RPC)
-  - **Sem avaliação**: chama apenas `encerrar_conversa` RPC (sem envio de mensagem WhatsApp)
-- Criar hook `useEncerrarEmLote` que recebe lista de conversas e flag `enviarAvaliacao`
-
-### Lógica de mover em lote
-
-- **Para Triagem**: chama `forcar_atendimento_humano` RPC para cada conversa (funciona apenas para conversas com status `bot`)
-- **Para Atendimento Humano**: chama `encaminhar_para_atendente` (se `esperando_tria`) ou `atribuir_agente` (se `fila_humano`) para cada conversa, com o atendente selecionado
-
-### UX
-
-- Botão "..." discreto, alinhado após os filtros
-- Checkboxes circulares animados no lado esquerdo de cada card
-- Barra de ações fixa no topo/inferior com botões "Encerrar" e "Mover" desabilitados até seleção
-- Botão "Cancelar" para sair do modo seleção
-- Dialogs modais com etapas claras e textos explicativos
+1. **`src/components/fila/SelecaoMultiplaActions.tsx`** — Reposicionar para bottom, reduzir fonte, layout compacto
+2. **`src/components/fila/EncerrarEmLoteDialog.tsx`** — Altura consistente, botões centralizados, texto justificado, fix do bug de loading
+3. **`src/components/FilaPanel.tsx`** — Mover `SelecaoMultiplaActions` para o final do container (bottom)
 
