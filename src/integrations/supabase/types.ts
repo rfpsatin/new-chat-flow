@@ -631,6 +631,27 @@ export type Database = {
         }
         Relationships: []
       }
+      super_admins: {
+        Row: {
+          auth_user_id: string
+          created_at: string
+          email: string
+          id: string
+        }
+        Insert: {
+          auth_user_id: string
+          created_at?: string
+          email: string
+          id?: string
+        }
+        Update: {
+          auth_user_id?: string
+          created_at?: string
+          email?: string
+          id?: string
+        }
+        Relationships: []
+      }
       usuarios: {
         Row: {
           ativo: boolean
@@ -892,6 +913,7 @@ export type Database = {
         Returns: undefined
       }
       get_next_nr_protocolo: { Args: never; Returns: string }
+      is_super_admin: { Args: { p_user_id: string }; Returns: boolean }
       solicitar_atendimento_humano: {
         Args: { p_conversa_id: string }
         Returns: undefined
