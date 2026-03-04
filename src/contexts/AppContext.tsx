@@ -22,10 +22,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
 
   useEffect(() => {
+    let initialSessionHandled = false;
+
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Skip the INITIAL_SESSION event if we already handled it via getSession
+      if (event === 'INITIAL_SESSION' && initialSessionHandled) return;
+
       if (session?.user) {
-        // Fetch usuario record by auth_user_id
         const { data: usuario } = await supabase
           .from('usuarios')
           .select('*')
@@ -36,7 +40,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (usuario) {
           setCurrentUser(usuario as Usuario);
         } else {
+          // Has auth session but no active usuario record - sign out
+          console.warn('Auth session found but no active usuario record, signing out');
           setCurrentUser(null);
+          await supabase.auth.signOut();
+          navigate('/login', { replace: true });
         }
       } else {
         setCurrentUser(null);
@@ -45,8 +53,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setAuthLoading(false);
     });
 
-    // Check existing session
+    // Check existing session on mount
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      initialSessionHandled = true;
       if (session?.user) {
         const { data: usuario } = await supabase
           .from('usuarios')
@@ -57,6 +66,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         if (usuario) {
           setCurrentUser(usuario as Usuario);
+        } else {
+          // Has auth session but no active usuario - sign out and redirect
+          console.warn('Stale auth session detected, signing out');
+          setCurrentUser(null);
+          await supabase.auth.signOut();
+          navigate('/login', { replace: true });
         }
       }
       setAuthLoading(false);
