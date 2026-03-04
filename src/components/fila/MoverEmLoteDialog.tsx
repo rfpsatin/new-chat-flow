@@ -45,52 +45,76 @@ export function MoverEmLoteDialog({
     setEtapa(2);
   };
 
+  const withTimeout = <T,>(
+    operation: () => Promise<T>,
+    timeoutMs = 15000,
+    timeoutMessage = 'Operação demorou mais que o esperado'
+  ) =>
+    Promise.race([
+      operation(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs)
+      ),
+    ]);
+
   const executarMover = async () => {
     setIsProcessing(true);
     let sucesso = 0;
     let erros = 0;
 
-    for (const conversa of conversas) {
-      try {
-        if (destino === 'triagem') {
-          const { error } = await supabase.rpc('forcar_atendimento_humano', {
-            p_conversa_id: conversa.conversa_id!,
-          });
-          if (error) throw error;
-        } else if (destino === 'atendimento_humano') {
-          // Use appropriate RPC based on current status
-          if (conversa.status === 'esperando_tria') {
-            const { error } = await supabase.rpc('encaminhar_para_atendente', {
-              p_conversa_id: conversa.conversa_id!,
-              p_agente_id: atendenteId,
-            });
-            if (error) throw error;
-          } else {
-            const { error } = await supabase.rpc('atribuir_agente', {
-              p_conversa_id: conversa.conversa_id!,
-              p_agente_id: atendenteId,
-            });
-            if (error) throw error;
+    try {
+      for (const conversa of conversas) {
+        try {
+          if (!conversa.conversa_id) {
+            erros++;
+            continue;
           }
+
+          if (destino === 'triagem') {
+            const { error } = await withTimeout(async () =>
+              supabase.rpc('forcar_atendimento_humano', {
+                p_conversa_id: conversa.conversa_id,
+              })
+            );
+            if (error) throw error;
+          } else if (destino === 'atendimento_humano') {
+            if (conversa.status === 'esperando_tria') {
+              const { error } = await withTimeout(async () =>
+                supabase.rpc('encaminhar_para_atendente', {
+                  p_conversa_id: conversa.conversa_id,
+                  p_agente_id: atendenteId,
+                })
+              );
+              if (error) throw error;
+            } else {
+              const { error } = await withTimeout(async () =>
+                supabase.rpc('atribuir_agente', {
+                  p_conversa_id: conversa.conversa_id,
+                  p_agente_id: atendenteId,
+                })
+              );
+              if (error) throw error;
+            }
+          }
+          sucesso++;
+        } catch (err) {
+          console.error('Erro ao mover conversa:', conversa.conversa_id, err);
+          erros++;
         }
-        sucesso++;
-      } catch (err) {
-        console.error('Erro ao mover conversa:', conversa.conversa_id, err);
-        erros++;
       }
+
+      queryClient.invalidateQueries({ queryKey: ['fila'] });
+
+      if (erros === 0) {
+        toast.success(`${sucesso} conversa${sucesso > 1 ? 's' : ''} movida${sucesso > 1 ? 's' : ''} com sucesso`);
+      } else {
+        toast.warning(`${sucesso} movida${sucesso > 1 ? 's' : ''}, ${erros} com erro`);
+      }
+    } finally {
+      setIsProcessing(false);
+      handleClose();
+      onComplete();
     }
-
-    queryClient.invalidateQueries({ queryKey: ['fila'] });
-
-    if (erros === 0) {
-      toast.success(`${sucesso} conversa${sucesso > 1 ? 's' : ''} movida${sucesso > 1 ? 's' : ''} com sucesso`);
-    } else {
-      toast.warning(`${sucesso} movida${sucesso > 1 ? 's' : ''}, ${erros} com erro`);
-    }
-
-    setIsProcessing(false);
-    handleClose();
-    onComplete();
   };
 
   return (
