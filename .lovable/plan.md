@@ -1,28 +1,33 @@
 
 
-## Diagnóstico e Correção - Criação de Empresas
+## Adicionar Admin na Criação de Empresa
 
-### Problemas identificados
+### Resumo
+Ao criar uma empresa no painel super admin, adicionar campos opcionais de email e senha para criar automaticamente um usuário administrador (`tipo_usuario = 'adm'`) vinculado à nova empresa.
 
-1. **Botão "Criar" não fica clicável**: O `disabled` do botão depende de `createMutation.isPending || updateMutation.isPending`. Se a mutation falhou numa tentativa anterior e ficou em estado inconsistente, o botão pode travar. Além disso, não há validação mínima dos campos obrigatórios (`razao_social`, `cnpj`) — o botão deveria ser desabilitado apenas quando pendente, mas o usuário pode estar confundindo com falta de feedback visual.
-
-2. **Criação falha silenciosamente**: O `nome_fantasia` é enviado como string vazia `''` em vez de `null`. A coluna aceita `null` mas string vazia pode causar comportamento inesperado. Mais importante: se o insert da empresa funciona mas a edge function `create-user-auth` falha (não deployada, erro interno), o toast de erro aparece mas a empresa pode já ter sido criada parcialmente.
-
-3. **Falta feedback visual**: Não há indicação de loading no botão, nem validação dos campos obrigatórios antes de submeter.
+### Fluxo
+1. Super admin preenche dados da empresa + email/senha do admin
+2. Empresa é criada no banco
+3. Edge function `create-user-auth` cria a conta Auth com email/senha
+4. Registro na tabela `usuarios` com `tipo_usuario = 'adm'`, `empresa_id` da nova empresa e `auth_user_id` retornado
 
 ### Alterações
 
-#### 1. `src/hooks/useSuperAdminEmpresas.ts`
-- Converter `nome_fantasia` vazio para `null` antes do insert
-- Melhorar tratamento de erro da edge function (checar `authData?.error` e resposta HTTP)
-- Garantir que a mutation não fique presa em pending
+#### 1. `src/pages/superadmin/EmpresasPage.tsx`
+- Adicionar campos `admin_email` e `admin_senha` ao formulário (visíveis apenas no modo criação)
+- Passar esses valores para a mutation de criação
 
-#### 2. `src/pages/superadmin/EmpresasPage.tsx`
-- Desabilitar o botão "Criar" apenas quando `isPending` **ou** quando campos obrigatórios estão vazios (`razao_social` e `cnpj`)
-- Adicionar texto de loading no botão ("Criando..." / "Salvando...")
-- Validar que se `admin_email` for preenchido, `admin_senha` também deve ser (e vice-versa)
+#### 2. `src/hooks/useSuperAdminEmpresas.ts`
+- Alterar `createMutation` para:
+  1. Inserir empresa e obter o `id` retornado
+  2. Se `admin_email` e `admin_senha` foram fornecidos, chamar edge function `create-user-auth` para criar conta Auth
+  3. Inserir registro em `usuarios` com `auth_user_id`, `empresa_id`, `nome` (derivado do email), `email`, `tipo_usuario = 'adm'`
+
+#### 3. Nenhuma alteração no banco ou edge functions
+- A edge function `create-user-auth` já existe e faz exatamente o necessário
+- A tabela `usuarios` já aceita inserts (RLS permite)
 
 ### Arquivos modificados
-- `src/hooks/useSuperAdminEmpresas.ts`
 - `src/pages/superadmin/EmpresasPage.tsx`
+- `src/hooks/useSuperAdminEmpresas.ts`
 

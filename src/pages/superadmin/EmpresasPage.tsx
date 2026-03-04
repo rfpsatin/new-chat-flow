@@ -150,8 +150,15 @@ export default function SuperAdminEmpresasPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSubmit} disabled={createMutation.isPending || updateMutation.isPending}>
-              {isEditing ? 'Salvar' : 'Criar'}
+            <Button
+              onClick={handleSubmit}
+              disabled={
+                createMutation.isPending || updateMutation.isPending ||
+                !form.razao_social.trim() || !form.cnpj.trim() ||
+                (!isEditing && !!form.admin_email.trim() !== !!form.admin_senha.trim())
+              }
+            >
+              {createMutation.isPending ? 'Criando...' : updateMutation.isPending ? 'Salvando...' : isEditing ? 'Salvar' : 'Criar'}
             </Button>
           </DialogFooter>
         </DialogContent>
