@@ -1,33 +1,49 @@
 
 
-## Adicionar Admin na Criação de Empresa
+## Seleção Múltipla de Conversas na Fila de Atendimento
 
 ### Resumo
-Ao criar uma empresa no painel super admin, adicionar campos opcionais de email e senha para criar automaticamente um usuário administrador (`tipo_usuario = 'adm'`) vinculado à nova empresa.
 
-### Fluxo
-1. Super admin preenche dados da empresa + email/senha do admin
-2. Empresa é criada no banco
-3. Edge function `create-user-auth` cria a conta Auth com email/senha
-4. Registro na tabela `usuarios` com `tipo_usuario = 'adm'`, `empresa_id` da nova empresa e `auth_user_id` retornado
+Adicionar modo de seleção múltipla na FilaPanel com botão "..." após os filtros, permitindo encerrar ou mover conversas em lote.
 
-### Alterações
+### Arquivos a criar
 
-#### 1. `src/pages/superadmin/EmpresasPage.tsx`
-- Adicionar campos `admin_email` e `admin_senha` ao formulário (visíveis apenas no modo criação)
-- Passar esses valores para a mutation de criação
+1. **`src/components/fila/SelecaoMultiplaActions.tsx`** — Barra de ações flutuante (Encerrar / Mover) que aparece no modo seleção, com contagem de selecionados.
 
-#### 2. `src/hooks/useSuperAdminEmpresas.ts`
-- Alterar `createMutation` para:
-  1. Inserir empresa e obter o `id` retornado
-  2. Se `admin_email` e `admin_senha` foram fornecidos, chamar edge function `create-user-auth` para criar conta Auth
-  3. Inserir registro em `usuarios` com `auth_user_id`, `empresa_id`, `nome` (derivado do email), `email`, `tipo_usuario = 'adm'`
+2. **`src/components/fila/EncerrarEmLoteDialog.tsx`** — Dialog de 2 etapas:
+   - Etapa 1: Confirmação com explicação (sairão do filtro Bot, sessão no histórico, tag bot mantida)
+   - Etapa 2: "Enviar avaliação?" com Sim/Não
+   - Ao confirmar, itera sobre as conversas selecionadas chamando `encerrar_conversa` (com ou sem envio de pesquisa via whapi-send-message)
 
-#### 3. Nenhuma alteração no banco ou edge functions
-- A edge function `create-user-auth` já existe e faz exatamente o necessário
-- A tabela `usuarios` já aceita inserts (RLS permite)
+3. **`src/components/fila/MoverEmLoteDialog.tsx`** — Dialog de 2 etapas:
+   - Etapa 1: Escolher destino (Triagem ou Atendimento Humano)
+   - Etapa 2: Se Triagem → confirmação simples (chama `forcar_atendimento_humano` para cada). Se Atendimento Humano → seleção obrigatória de atendente (lista de `atendentes` ativos) + confirmação (chama `encaminhar_para_atendente` ou `atribuir_agente` para cada)
 
-### Arquivos modificados
-- `src/pages/superadmin/EmpresasPage.tsx`
-- `src/hooks/useSuperAdminEmpresas.ts`
+### Arquivos a modificar
+
+4. **`src/components/FiltrosFila.tsx`** — Adicionar botão "..." (MoreVertical icon) após a última tag de filtro. Ao clicar, dropdown com "Selecionar conversas". Recebe props `onToggleSelectionMode` e `isSelectionMode`.
+
+5. **`src/components/ConversaItem.tsx`** — Receber props `selectionMode: boolean`, `isChecked: boolean`, `onToggleCheck: () => void`. Quando `selectionMode=true`, exibir checkbox circular no lado esquerdo do card (antes do avatar). O click no card alterna o check em vez de abrir a conversa.
+
+6. **`src/components/FilaPanel.tsx`** — Gerenciar estado do modo seleção (`selectionMode`, `selectedIds: Set<string>`). Passar props aos componentes filhos. Renderizar `SelecaoMultiplaActions` quando `selectionMode=true`. Ao sair do modo seleção, limpar seleção.
+
+### Lógica de encerramento em lote
+
+- Para cada conversa selecionada, o fluxo será:
+  - **Com avaliação**: mesma lógica do `useEncerrarConversa` atual (envia pesquisa via whapi-send-message, depois chama `encerrar_conversa` RPC)
+  - **Sem avaliação**: chama apenas `encerrar_conversa` RPC (sem envio de mensagem WhatsApp)
+- Criar hook `useEncerrarEmLote` que recebe lista de conversas e flag `enviarAvaliacao`
+
+### Lógica de mover em lote
+
+- **Para Triagem**: chama `forcar_atendimento_humano` RPC para cada conversa (funciona apenas para conversas com status `bot`)
+- **Para Atendimento Humano**: chama `encaminhar_para_atendente` (se `esperando_tria`) ou `atribuir_agente` (se `fila_humano`) para cada conversa, com o atendente selecionado
+
+### UX
+
+- Botão "..." discreto, alinhado após os filtros
+- Checkboxes circulares animados no lado esquerdo de cada card
+- Barra de ações fixa no topo/inferior com botões "Encerrar" e "Mover" desabilitados até seleção
+- Botão "Cancelar" para sair do modo seleção
+- Dialogs modais com etapas claras e textos explicativos
 
