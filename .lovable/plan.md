@@ -1,33 +1,38 @@
 
 
-## Adicionar Admin na Criação de Empresa
+## Problema: Hub não carrega — nenhum usuario tem auth_user_id
 
-### Resumo
-Ao criar uma empresa no painel super admin, adicionar campos opcionais de email e senha para criar automaticamente um usuário administrador (`tipo_usuario = 'adm'`) vinculado à nova empresa.
+### Diagnóstico
+Todos os 6 registros na tabela `usuarios` têm `auth_user_id = NULL`. O fluxo de login unificado exige que cada usuario tenha uma conta Auth vinculada via `auth_user_id`. Sem isso:
+- Acessar `/` → AppContext não encontra usuario pela sessão → redireciona para `/login`
+- Na tela de login, mesmo que existisse uma conta Auth, o sistema não encontraria o usuario correspondente
 
-### Fluxo
-1. Super admin preenche dados da empresa + email/senha do admin
-2. Empresa é criada no banco
-3. Edge function `create-user-auth` cria a conta Auth com email/senha
-4. Registro na tabela `usuarios` com `tipo_usuario = 'adm'`, `empresa_id` da nova empresa e `auth_user_id` retornado
+### Solução
+Criar uma edge function administrativa que o super admin pode invocar para **provisionar contas Auth para usuarios existentes** e vincular o `auth_user_id`. Além disso, adicionar um botão na página de gestão de usuários para "Criar acesso" para usuarios sem `auth_user_id`.
 
 ### Alterações
 
-#### 1. `src/pages/superadmin/EmpresasPage.tsx`
-- Adicionar campos `admin_email` e `admin_senha` ao formulário (visíveis apenas no modo criação)
-- Passar esses valores para a mutation de criação
+#### 1. Edge function `create-user-auth` — já existe
+A function já aceita `email` e `password` e retorna `auth_user_id`. Vamos reutilizá-la.
 
-#### 2. `src/hooks/useSuperAdminEmpresas.ts`
-- Alterar `createMutation` para:
-  1. Inserir empresa e obter o `id` retornado
-  2. Se `admin_email` e `admin_senha` foram fornecidos, chamar edge function `create-user-auth` para criar conta Auth
-  3. Inserir registro em `usuarios` com `auth_user_id`, `empresa_id`, `nome` (derivado do email), `email`, `tipo_usuario = 'adm'`
+#### 2. `src/hooks/useGestaoUsuarios.ts`
+- Adicionar mutation `criarAcessoMutation` que:
+  1. Recebe `usuario_id`, `email`, `senha`
+  2. Invoca `create-user-auth` com email/senha
+  3. Atualiza o registro `usuarios` setando `auth_user_id`
 
-#### 3. Nenhuma alteração no banco ou edge functions
-- A edge function `create-user-auth` já existe e faz exatamente o necessário
-- A tabela `usuarios` já aceita inserts (RLS permite)
+#### 3. `src/pages/admin/UsuariosPage.tsx` (ou componente equivalente)
+- Para usuarios sem `auth_user_id`, mostrar botão "Criar acesso" que abre dialog pedindo senha
+- Ao submeter, chama a mutation acima
+
+#### 4. Alternativa imediata — provisionar via painel super admin
+- Na página de empresas do super admin, ao editar empresa, permitir criar acesso para o admin existente
+- Ou: criar um script SQL direto que vincula o super admin existente a um usuario
+
+### Fluxo imediato para desbloquear
+O caminho mais rápido é o super admin (que já consegue logar em `/superadmin`) usar o painel de gestão de usuários para criar acesso Auth para os operadores existentes. Precisamos garantir que esse fluxo funcione a partir do painel admin da empresa.
 
 ### Arquivos modificados
-- `src/pages/superadmin/EmpresasPage.tsx`
-- `src/hooks/useSuperAdminEmpresas.ts`
+- `src/hooks/useGestaoUsuarios.ts` — adicionar mutation para criar acesso Auth
+- `src/components/UsuarioDialog.tsx` — botão/ação para criar acesso para usuario existente sem `auth_user_id`
 
