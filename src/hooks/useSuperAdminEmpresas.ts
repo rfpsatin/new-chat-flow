@@ -22,7 +22,12 @@ export function useSuperAdminEmpresas() {
     mutationFn: async (values: { razao_social: string; nome_fantasia: string; cnpj: string; admin_email?: string; admin_senha?: string }) => {
       const { admin_email, admin_senha, ...empresaData } = values;
 
-      const { data: empresa, error } = await supabase.from('empresas').insert(empresaData).select('id').single();
+      const normalizedData = {
+        ...empresaData,
+        nome_fantasia: empresaData.nome_fantasia?.trim() || null,
+      };
+
+      const { data: empresa, error } = await supabase.from('empresas').insert(normalizedData).select('id').single();
       if (error) throw error;
 
       if (admin_email && admin_senha) {
