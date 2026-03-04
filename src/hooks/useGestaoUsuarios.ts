@@ -42,7 +42,7 @@ export function useGestaoUsuarios(empresaId: string) {
         .from('usuarios')
         .select('*')
         .eq('empresa_id', empresaId)
-        .in('tipo_usuario', ['sup', 'opr'])
+        .in('tipo_usuario', ['sup', 'opr', 'adm'])
         .order('nome');
       
       if (usuariosError) throw usuariosError;
@@ -219,7 +219,6 @@ export function useGestaoUsuarios(empresaId: string) {
 
   const toggleAtivoUsuario = useMutation({
     mutationFn: async ({ id, ativo }: { id: string; ativo: boolean }) => {
-      // Atualizar status do usuário
       const { data, error } = await supabase
         .from('usuarios')
         .update({ ativo })
@@ -229,7 +228,6 @@ export function useGestaoUsuarios(empresaId: string) {
       
       if (error) throw error;
       
-      // Sincronizar status com atendente se existir
       await supabase
         .from('atendentes')
         .update({ ativo })
@@ -256,11 +254,48 @@ export function useGestaoUsuarios(empresaId: string) {
     },
   });
 
+  const criarAcesso = useMutation({
+    mutationFn: async ({ usuarioId, email, senha }: { usuarioId: string; email: string; senha: string }) => {
+      const { data: authResult, error: authError } = await supabase.functions.invoke('create-user-auth', {
+        body: { email, password: senha },
+      });
+
+      if (authError) throw new Error(authError.message || 'Erro ao criar conta de autenticação');
+      if (authResult?.error) throw new Error(authResult.error);
+
+      const authUserId = authResult.auth_user_id;
+
+      const { error: updateError } = await supabase
+        .from('usuarios')
+        .update({ auth_user_id: authUserId })
+        .eq('id', usuarioId);
+
+      if (updateError) throw updateError;
+
+      return { authUserId };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['gestao-usuarios', empresaId] });
+      toast({
+        title: 'Acesso criado',
+        description: 'O usuário agora pode fazer login com email e senha.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erro ao criar acesso',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   return {
     usuarios: usuariosQuery.data ?? [],
     isLoading: usuariosQuery.isLoading,
     criarUsuario,
     editarUsuario,
     toggleAtivoUsuario,
+    criarAcesso,
   };
 }
