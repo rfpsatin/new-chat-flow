@@ -33,7 +33,7 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
     if (!selectedConversaId || !fila?.length) return;
     const updated = fila.find((f) => f.conversa_id === selectedConversaId);
     if (!updated) return;
-    const snapshot = `${updated.status}|${updated.agente_responsavel_id}|${updated.human_mode}|${updated.last_message_at}`;
+    const snapshot = `${updated.status}|${updated.agente_responsavel_id}|${updated.last_message_at}`;
     if (snapshot !== prevSnapshotRef.current) {
       prevSnapshotRef.current = snapshot;
       onSelectConversa(updated);
