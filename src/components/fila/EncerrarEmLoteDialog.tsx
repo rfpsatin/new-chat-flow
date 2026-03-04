@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -66,100 +66,106 @@ export function EncerrarEmLoteDialog({
     let sucesso = 0;
     let erros = 0;
 
-    for (const conversa of conversas) {
-      try {
-        if (enviarAvaliacao && conversa.whatsapp_numero) {
-          // Send evaluation message
-          await fetch(`${supabaseUrl}/functions/v1/whapi-send-message`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${supabaseAnonKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              empresa_id: empresaId,
-              to: conversa.whatsapp_numero,
-              message: MENSAGEM_PESQUISA,
-            }),
-          });
+    try {
+      for (const conversa of conversas) {
+        try {
+          if (!conversa.conversa_id) {
+            erros++;
+            continue;
+          }
 
-          await supabase
+          if (enviarAvaliacao && conversa.whatsapp_numero) {
+            await fetch(`${supabaseUrl}/functions/v1/whapi-send-message`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${supabaseAnonKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                empresa_id: empresaId,
+                to: conversa.whatsapp_numero,
+                message: MENSAGEM_PESQUISA,
+              }),
+            });
+
+            await supabase
+              .from('conversas')
+              .update({ pesquisa_enviada_em: new Date().toISOString() })
+              .eq('id', conversa.conversa_id);
+          }
+
+          // Check if n8n conversa for reset
+          const { data: conversaData } = await supabase
             .from('conversas')
-            .update({ pesquisa_enviada_em: new Date().toISOString() })
-            .eq('id', conversa.conversa_id);
-        }
-
-        // Check if n8n conversa for reset
-        const { data: conversaData } = await supabase
-          .from('conversas')
-          .select('origem, channel, n8n_webhook_id, human_mode, origem_final')
-          .eq('id', conversa.conversa_id!)
-          .single();
-
-        const isN8n = conversaData && (
-          conversaData.origem || conversaData.channel || conversaData.n8n_webhook_id ||
-          conversaData.human_mode === true || conversaData.origem_final === 'atendente'
-        );
-
-        if (isN8n) {
-          await fetch(`${supabaseUrl}/functions/v1/n8n-reset-human-mode`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${supabaseAnonKey}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ conversa_id: conversa.conversa_id, empresa_id: empresaId }),
-          }).catch(console.error);
-        } else {
-          const { data: contato } = await supabase
-            .from('contatos')
-            .select('whatsapp_numero')
-            .eq('id', conversa.contato_id!)
+            .select('origem, channel, n8n_webhook_id, human_mode, origem_final')
+            .eq('id', conversa.conversa_id)
             .single();
-          if (contato) {
-            await fetch(`${supabaseUrl}/functions/v1/close-service`, {
+
+          const isN8n = conversaData && (
+            conversaData.origem || conversaData.channel || conversaData.n8n_webhook_id ||
+            conversaData.human_mode === true || conversaData.origem_final === 'atendente'
+          );
+
+          if (isN8n) {
+            await fetch(`${supabaseUrl}/functions/v1/n8n-reset-human-mode`, {
               method: 'POST',
               headers: { 'Authorization': `Bearer ${supabaseAnonKey}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ conversa_id: conversa.conversa_id, empresa_id: empresaId, chat_id: contato.whatsapp_numero }),
+              body: JSON.stringify({ conversa_id: conversa.conversa_id, empresa_id: empresaId }),
             }).catch(console.error);
+          } else {
+            const { data: contato } = await supabase
+              .from('contatos')
+              .select('whatsapp_numero')
+              .eq('id', conversa.contato_id!)
+              .single();
+            if (contato) {
+              await fetch(`${supabaseUrl}/functions/v1/close-service`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${supabaseAnonKey}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ conversa_id: conversa.conversa_id, empresa_id: empresaId, chat_id: contato.whatsapp_numero }),
+              }).catch(console.error);
+            }
           }
+
+          // Encerrar conversa
+          const { error } = await supabase.rpc('encerrar_conversa', {
+            p_conversa_id: conversa.conversa_id,
+            p_motivo_id: motivoId,
+            p_usuario_id: usuarioId,
+          });
+
+          if (error) throw error;
+          sucesso++;
+        } catch (err) {
+          console.error('Erro ao encerrar conversa:', conversa.conversa_id, err);
+          erros++;
         }
-
-        // Encerrar conversa
-        const { error } = await supabase.rpc('encerrar_conversa', {
-          p_conversa_id: conversa.conversa_id!,
-          p_motivo_id: motivoId,
-          p_usuario_id: usuarioId,
-        });
-
-        if (error) throw error;
-        sucesso++;
-      } catch (err) {
-        console.error('Erro ao encerrar conversa:', conversa.conversa_id, err);
-        erros++;
       }
+
+      queryClient.invalidateQueries({ queryKey: ['fila'] });
+      queryClient.invalidateQueries({ queryKey: ['conversa'] });
+      queryClient.invalidateQueries({ queryKey: ['mensagens'] });
+
+      if (erros === 0) {
+        toast.success(`${sucesso} conversa${sucesso > 1 ? 's' : ''} encerrada${sucesso > 1 ? 's' : ''} com sucesso`);
+      } else {
+        toast.warning(`${sucesso} encerrada${sucesso > 1 ? 's' : ''}, ${erros} com erro`);
+      }
+    } finally {
+      setIsProcessing(false);
+      handleClose();
+      onComplete();
     }
-
-    queryClient.invalidateQueries({ queryKey: ['fila'] });
-    queryClient.invalidateQueries({ queryKey: ['conversa'] });
-    queryClient.invalidateQueries({ queryKey: ['mensagens'] });
-
-    if (erros === 0) {
-      toast.success(`${sucesso} conversa${sucesso > 1 ? 's' : ''} encerrada${sucesso > 1 ? 's' : ''} com sucesso`);
-    } else {
-      toast.warning(`${sucesso} encerrada${sucesso > 1 ? 's' : ''}, ${erros} com erro`);
-    }
-
-    setIsProcessing(false);
-    handleClose();
-    onComplete();
   };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md min-h-[280px] flex flex-col">
         {etapa === 1 && (
-          <>
+          <div className="flex flex-col flex-1 justify-between">
             <DialogHeader>
               <DialogTitle>Encerrar {conversas.length} conversa{conversas.length > 1 ? 's' : ''}</DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-justify">
                 As conversas selecionadas serão encerradas e sairão da fila. As sessões ficarão armazenadas
                 no histórico, mantendo a tag do estágio em que se encontravam.
               </DialogDescription>
@@ -177,21 +183,21 @@ export function EncerrarEmLoteDialog({
                 </SelectContent>
               </Select>
             </div>
-            <DialogFooter className="gap-2">
+            <div className="flex justify-center gap-3 pt-4">
               <Button variant="outline" onClick={handleClose}>Cancelar</Button>
               <Button onClick={handleConfirmarEtapa1}>Confirmar</Button>
-            </DialogFooter>
-          </>
+            </div>
+          </div>
         )}
         {etapa === 2 && (
-          <>
+          <div className="flex flex-col flex-1 justify-between">
             <DialogHeader>
               <DialogTitle>Enviar avaliação de atendimento?</DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-justify">
                 Deseja enviar a mensagem de avaliação de atendimento para as conversas selecionadas antes de encerrá-las?
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter className="gap-2">
+            <div className="flex justify-center gap-3 pt-4">
               <Button
                 variant="outline"
                 onClick={() => executarEncerramento(false)}
@@ -207,8 +213,8 @@ export function EncerrarEmLoteDialog({
                 {isProcessing ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
                 Sim, enviar
               </Button>
-            </DialogFooter>
-          </>
+            </div>
+          </div>
         )}
       </DialogContent>
     </Dialog>
