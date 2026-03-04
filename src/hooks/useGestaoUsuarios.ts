@@ -75,12 +75,14 @@ export function useGestaoUsuarios(empresaId: string) {
   const criarUsuario = useMutation({
     mutationFn: async (dados: UsuarioFormData) => {
       if (!dados.senha) throw new Error('Senha é obrigatória para criar um usuário');
+      if (!empresaId) throw new Error('Empresa do usuário atual não identificada.');
 
       const { ehAtendente, paraTriagem } = derivarAtendente(dados.tipo_usuario);
+      const email = dados.email.trim().toLowerCase();
       
       // Create Auth user via edge function
       const { data: authResult, error: authError } = await supabase.functions.invoke('create-user-auth', {
-        body: { email: dados.email, password: dados.senha },
+        body: { email, password: dados.senha },
       });
 
       if (authError) throw new Error(authError.message || 'Erro ao criar conta de autenticação');
@@ -93,8 +95,8 @@ export function useGestaoUsuarios(empresaId: string) {
         .from('usuarios')
         .insert({
           empresa_id: empresaId,
-          nome: dados.nome,
-          email: dados.email,
+          nome: dados.nome.trim(),
+          email,
           tipo_usuario: dados.tipo_usuario,
           auth_user_id: authUserId,
           ativo: true,
@@ -143,14 +145,15 @@ export function useGestaoUsuarios(empresaId: string) {
     mutationFn: async ({ id, dados }: { id: string; dados: Partial<UsuarioFormData> }) => {
       // Atualizar usuário
       const updateData: Record<string, unknown> = {};
-      if (dados.nome !== undefined) updateData.nome = dados.nome;
-      if (dados.email !== undefined) updateData.email = dados.email;
+      if (dados.nome !== undefined) updateData.nome = dados.nome.trim();
+      if (dados.email !== undefined) updateData.email = dados.email.trim().toLowerCase();
       if (dados.tipo_usuario !== undefined) updateData.tipo_usuario = dados.tipo_usuario;
       
       const { data: usuario, error: usuarioError } = await supabase
         .from('usuarios')
         .update(updateData)
         .eq('id', id)
+        .eq('empresa_id', empresaId)
         .select()
         .single();
       
@@ -224,6 +227,7 @@ export function useGestaoUsuarios(empresaId: string) {
         .from('usuarios')
         .update({ ativo })
         .eq('id', id)
+        .eq('empresa_id', empresaId)
         .select()
         .single();
       

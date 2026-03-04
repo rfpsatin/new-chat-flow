@@ -25,6 +25,10 @@ interface UsuarioDialogProps {
   usuario?: Usuario | null;
   onSave: (dados: UsuarioFormData) => void;
   isLoading?: boolean;
+  empresaInfo?: {
+    id: string;
+    nome: string;
+  } | null;
 }
 
 export function UsuarioDialog({
@@ -33,6 +37,7 @@ export function UsuarioDialog({
   usuario,
   onSave,
   isLoading,
+  empresaInfo,
 }: UsuarioDialogProps) {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
@@ -84,6 +89,31 @@ export function UsuarioDialog({
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Empresa atual</p>
+            <div className="space-y-2">
+              <div className="space-y-1">
+                <Label htmlFor="empresa-nome">Empresa</Label>
+                <Input
+                  id="empresa-nome"
+                  value={empresaInfo?.nome ?? 'Empresa nao identificada'}
+                  disabled
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="empresa-id">ID da Empresa (tenant)</Label>
+                <Input
+                  id="empresa-id"
+                  value={empresaInfo?.id ?? '-'}
+                  disabled
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Este campo nao pode ser alterado aqui. Somente super admin pode mudar o tenant.
+            </p>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="nome">Nome</Label>
             <Input

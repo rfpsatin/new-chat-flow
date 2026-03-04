@@ -23,6 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Plus, Search, Pencil, UserCheck, UserX, Headphones } from 'lucide-react';
 
 interface UsuarioComAtendente extends Usuario {
@@ -40,6 +42,19 @@ export default function UsuariosPage() {
   const empresaId = currentUser?.empresa_id ?? '';
   
   const { usuarios, isLoading, criarUsuario, editarUsuario, toggleAtivoUsuario } = useGestaoUsuarios(empresaId);
+  const { data: empresaAtual } = useQuery({
+    queryKey: ['empresa-atual-nome', empresaId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('empresas')
+        .select('id, razao_social, nome_fantasia')
+        .eq('id', empresaId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!empresaId,
+  });
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [usuarioEditando, setUsuarioEditando] = useState<UsuarioComAtendente | null>(null);
@@ -224,6 +239,14 @@ export default function UsuariosPage() {
           usuario={usuarioEditando}
           onSave={handleSalvar}
           isLoading={criarUsuario.isPending || editarUsuario.isPending}
+          empresaInfo={
+            empresaAtual
+              ? {
+                  id: empresaAtual.id,
+                  nome: empresaAtual.nome_fantasia || empresaAtual.razao_social,
+                }
+              : null
+          }
         />
       </AdminGuard>
     </MainLayout>
