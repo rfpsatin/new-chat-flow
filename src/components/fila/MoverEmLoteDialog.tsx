@@ -119,75 +119,99 @@ export function MoverEmLoteDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md min-h-[280px] flex flex-col">
         {etapa === 1 && (
-          <>
-            <DialogHeader>
-              <DialogTitle>Mover {conversas.length} conversa{conversas.length > 1 ? 's' : ''}</DialogTitle>
-              <DialogDescription>
+          <div className="flex flex-col flex-1 items-center justify-center gap-6 text-center">
+            <DialogHeader className="space-y-2">
+              <DialogTitle className="text-xl">
+                Mover {conversas.length} conversa{conversas.length > 1 ? 's' : ''}
+              </DialogTitle>
+              <DialogDescription className="max-w-md">
                 Para qual destino deseja mover as conversas selecionadas?
               </DialogDescription>
             </DialogHeader>
-            <div className="flex flex-col gap-3 py-4">
-              <Button variant="outline" className="justify-start h-12" onClick={() => handleSelecionarDestino('triagem')}>
+            <div className="w-full max-w-sm flex flex-col gap-3">
+              <Button
+                variant="outline"
+                className="justify-center h-12"
+                onClick={() => handleSelecionarDestino('triagem')}
+              >
                 🔄 Triagem
               </Button>
-              <Button variant="outline" className="justify-start h-12" onClick={() => handleSelecionarDestino('atendimento_humano')}>
+              <Button
+                variant="outline"
+                className="justify-center h-12"
+                onClick={() => handleSelecionarDestino('atendimento_humano')}
+              >
                 👤 Atendimento Humano
               </Button>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={handleClose}>Cancelar</Button>
-            </DialogFooter>
-          </>
+            <div className="flex justify-center gap-3 pt-2">
+              <Button variant="outline" onClick={handleClose}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
         )}
+
         {etapa === 2 && destino === 'triagem' && (
-          <>
-            <DialogHeader>
-              <DialogTitle>Confirmar mover para Triagem</DialogTitle>
-              <DialogDescription>
+          <div className="flex flex-col flex-1 items-center justify-center gap-6 text-center">
+            <DialogHeader className="space-y-2">
+              <DialogTitle className="text-xl">
+                Confirmar mover para Triagem
+              </DialogTitle>
+              <DialogDescription className="max-w-md">
                 As {conversas.length} conversa{conversas.length > 1 ? 's' : ''} selecionadas serão movidas para o filtro Triagem.
-                Apenas conversas com status "Bot" serão movidas.
+                Apenas conversas com status &quot;Bot&quot; serão movidas.
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setEtapa(1)}>Voltar</Button>
+            <div className="flex justify-center gap-3 pt-2">
+              <Button variant="outline" onClick={() => setEtapa(1)}>
+                Voltar
+              </Button>
               <Button onClick={executarMover} disabled={isProcessing}>
                 {isProcessing && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
                 Confirmar
               </Button>
-            </DialogFooter>
-          </>
+            </div>
+          </div>
         )}
+
         {etapa === 2 && destino === 'atendimento_humano' && (
-          <>
-            <DialogHeader>
-              <DialogTitle>Mover para Atendimento Humano</DialogTitle>
-              <DialogDescription>
+          <div className="flex flex-col flex-1 items-center justify-center gap-6 text-center">
+            <DialogHeader className="space-y-2">
+              <DialogTitle className="text-xl">
+                Mover para Atendimento Humano
+              </DialogTitle>
+              <DialogDescription className="max-w-md">
                 Selecione o atendente que receberá as {conversas.length} conversa{conversas.length > 1 ? 's' : ''}.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-3 py-2">
-              <label className="text-sm font-medium">Atendente</label>
+            <div className="w-full max-w-sm space-y-3">
+              <label className="text-sm font-medium text-left">Atendente</label>
               <Select value={atendenteId} onValueChange={setAtendenteId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um atendente..." />
                 </SelectTrigger>
                 <SelectContent>
                   {atendentesAtivos.map((a) => (
-                    <SelectItem key={a.id} value={a.usuario_id}>{a.nome}</SelectItem>
+                    <SelectItem key={a.id} value={a.usuario_id}>
+                      {a.nome}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setEtapa(1)}>Voltar</Button>
+            <div className="flex justify-center gap-3 pt-2">
+              <Button variant="outline" onClick={() => setEtapa(1)}>
+                Voltar
+              </Button>
               <Button onClick={executarMover} disabled={isProcessing || !atendenteId}>
                 {isProcessing && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
                 Confirmar
               </Button>
-            </DialogFooter>
-          </>
+            </div>
+          </div>
         )}
       </DialogContent>
     </Dialog>

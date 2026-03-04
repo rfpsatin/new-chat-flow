@@ -198,16 +198,18 @@ export function EncerrarEmLoteDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md min-h-[280px] flex flex-col">
         {etapa === 1 && (
-          <div className="flex flex-col flex-1 justify-between">
-            <DialogHeader>
-              <DialogTitle>Encerrar {conversas.length} conversa{conversas.length > 1 ? 's' : ''}</DialogTitle>
-              <DialogDescription className="text-justify">
+          <div className="flex flex-col flex-1 items-center justify-center gap-6 text-center">
+            <DialogHeader className="space-y-2">
+              <DialogTitle className="text-xl">
+                Encerrar {conversas.length} conversa{conversas.length > 1 ? 's' : ''}
+              </DialogTitle>
+              <DialogDescription className="max-w-md">
                 As conversas selecionadas serão encerradas e sairão da fila. As sessões ficarão armazenadas
                 no histórico, mantendo a tag do estágio em que se encontravam.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-3 py-2">
-              <label className="text-sm font-medium">Motivo de encerramento</label>
+            <div className="w-full max-w-sm space-y-3">
+              <label className="text-sm font-medium text-left">Motivo de encerramento</label>
               <Select value={motivoId} onValueChange={setMotivoId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um motivo..." />
@@ -219,21 +221,23 @@ export function EncerrarEmLoteDialog({
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex justify-center gap-3 pt-4">
+            <div className="flex justify-center gap-3 pt-2">
               <Button variant="outline" onClick={handleClose}>Cancelar</Button>
               <Button onClick={handleConfirmarEtapa1}>Confirmar</Button>
             </div>
           </div>
         )}
         {etapa === 2 && (
-          <div className="flex flex-col flex-1 justify-between">
-            <DialogHeader>
-              <DialogTitle>Enviar avaliação de atendimento?</DialogTitle>
-              <DialogDescription className="text-justify">
+          <div className="flex flex-col flex-1 items-center justify-center gap-6 text-center">
+            <DialogHeader className="space-y-2">
+              <DialogTitle className="text-xl">
+                Enviar avaliação de atendimento?
+              </DialogTitle>
+              <DialogDescription className="max-w-md">
                 Deseja enviar a mensagem de avaliação de atendimento para as conversas selecionadas antes de encerrá-las?
               </DialogDescription>
             </DialogHeader>
-            <div className="flex justify-center gap-3 pt-4">
+            <div className="flex justify-center gap-3 pt-2">
               <Button
                 variant="outline"
                 onClick={() => executarEncerramento(false)}

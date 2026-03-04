@@ -109,6 +109,7 @@ export function SessoesDetailPanel({
                       {sessao.encerrado_em && (
                         <div className="text-xs text-muted-foreground mt-1">
                           Encerrado: {format(new Date(sessao.encerrado_em), 'HH:mm', { locale: ptBR })}
+                          {sessao.status_ao_encerrar === 'bot' && ' | Bot'}
                         </div>
                       )}
 
@@ -129,10 +130,9 @@ export function SessoesDetailPanel({
                       )}
 
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        {sessao.status_ao_encerrar && (
+                        {sessao.status_ao_encerrar && sessao.status_ao_encerrar !== 'bot' && (
                           <span className="inline-block text-xs bg-primary/15 text-primary px-2 py-0.5 rounded font-medium">
-                            {sessao.status_ao_encerrar === 'bot' ? 'Bot' :
-                             sessao.status_ao_encerrar === 'esperando_tria' ? 'Triagem' :
+                            {sessao.status_ao_encerrar === 'esperando_tria' ? 'Triagem' :
                              sessao.status_ao_encerrar === 'fila_humano' ? 'Na Fila' :
                              sessao.status_ao_encerrar === 'em_atendimento_humano' ? 'Atendimento' :
                              sessao.status_ao_encerrar}
