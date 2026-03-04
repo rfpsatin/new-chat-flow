@@ -8,6 +8,7 @@ import { Usuario } from '@/types/atendimento';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -25,7 +26,14 @@ import {
 } from '@/components/ui/select';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Search, Pencil, UserCheck, UserX, Headphones } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Plus, Search, Pencil, UserCheck, UserX, Headphones, KeyRound } from 'lucide-react';
 
 interface UsuarioComAtendente extends Usuario {
   atendente?: {
@@ -41,7 +49,7 @@ export default function UsuariosPage() {
   const { currentUser } = useApp();
   const empresaId = currentUser?.empresa_id ?? '';
   
-  const { usuarios, isLoading, criarUsuario, editarUsuario, toggleAtivoUsuario } = useGestaoUsuarios(empresaId);
+  const { usuarios, isLoading, criarUsuario, editarUsuario, toggleAtivoUsuario, criarAcesso } = useGestaoUsuarios(empresaId);
   const { data: empresaAtual } = useQuery({
     queryKey: ['empresa-atual-nome', empresaId],
     queryFn: async () => {
@@ -61,6 +69,11 @@ export default function UsuariosPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filtroTipo, setFiltroTipo] = useState<string>('todos');
   const [filtroStatus, setFiltroStatus] = useState<string>('todos');
+
+  // State for "Criar acesso" dialog
+  const [acessoDialogOpen, setAcessoDialogOpen] = useState(false);
+  const [acessoUsuario, setAcessoUsuario] = useState<UsuarioComAtendente | null>(null);
+  const [acessoSenha, setAcessoSenha] = useState('');
 
   const usuariosFiltrados = (usuarios as UsuarioComAtendente[]).filter((u) => {
     const matchSearch = u.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -97,15 +110,30 @@ export default function UsuariosPage() {
     toggleAtivoUsuario.mutate({ id: usuario.id, ativo: !usuario.ativo });
   };
 
+  const handleCriarAcesso = (usuario: UsuarioComAtendente) => {
+    setAcessoUsuario(usuario);
+    setAcessoSenha('');
+    setAcessoDialogOpen(true);
+  };
+
+  const handleSubmitAcesso = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!acessoUsuario || !acessoSenha.trim()) return;
+    criarAcesso.mutate(
+      { usuarioId: acessoUsuario.id, email: acessoUsuario.email, senha: acessoSenha.trim() },
+      { onSuccess: () => { setAcessoDialogOpen(false); setAcessoUsuario(null); } }
+    );
+  };
+
   const getTipoLabel = (tipo: string) => {
     switch (tipo) {
+      case 'adm': return 'Administrador';
       case 'sup': return 'Supervisor';
       case 'opr': return 'Operador';
       default: return tipo;
     }
   };
 
-  // Derivar info de atendente do tipo de usuário
   const getAtendenteLabel = (tipoUsuario: string) => {
     if (tipoUsuario === 'opr') return 'Atendente';
     if (tipoUsuario === 'sup') return 'Triagem';
@@ -144,6 +172,7 @@ export default function UsuariosPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos os tipos</SelectItem>
+                  <SelectItem value="adm">Administrador</SelectItem>
                   <SelectItem value="sup">Supervisor</SelectItem>
                   <SelectItem value="opr">Operador</SelectItem>
                 </SelectContent>
@@ -178,8 +207,9 @@ export default function UsuariosPage() {
                     <TableHead>Email</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead>Atendente</TableHead>
+                    <TableHead>Acesso</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="w-[100px]">Ações</TableHead>
+                    <TableHead className="w-[140px]">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -188,15 +218,31 @@ export default function UsuariosPage() {
                         <TableCell className="font-medium">{usuario.nome}</TableCell>
                         <TableCell>{usuario.email}</TableCell>
                         <TableCell>
-                          <Badge variant={usuario.tipo_usuario === 'sup' ? 'default' : 'secondary'}>
+                          <Badge variant={usuario.tipo_usuario === 'adm' ? 'destructive' : usuario.tipo_usuario === 'sup' ? 'default' : 'secondary'}>
                             {getTipoLabel(usuario.tipo_usuario)}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Headphones className="w-4 h-4 text-primary" />
-                            <span className="text-sm">{getAtendenteLabel(usuario.tipo_usuario)}</span>
-                          </div>
+                          {usuario.tipo_usuario !== 'adm' ? (
+                            <div className="flex items-center gap-2">
+                              <Headphones className="w-4 h-4 text-primary" />
+                              <span className="text-sm">{getAtendenteLabel(usuario.tipo_usuario)}</span>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {usuario.auth_user_id ? (
+                            <Badge variant="outline" className="text-green-600 border-green-600">
+                              <KeyRound className="w-3 h-3 mr-1" />
+                              Vinculado
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-amber-600 border-amber-600">
+                              Sem acesso
+                            </Badge>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Badge variant={usuario.ativo ? 'default' : 'outline'}>
@@ -205,6 +251,16 @@ export default function UsuariosPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
+                            {!usuario.auth_user_id && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Criar acesso (login)"
+                                onClick={() => handleCriarAcesso(usuario)}
+                              >
+                                <KeyRound className="w-4 h-4 text-amber-600" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"
@@ -248,6 +304,42 @@ export default function UsuariosPage() {
               : null
           }
         />
+
+        {/* Dialog para criar acesso Auth para usuario existente */}
+        <Dialog open={acessoDialogOpen} onOpenChange={setAcessoDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Criar Acesso de Login</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmitAcesso} className="space-y-4">
+              <div className="rounded-md border p-3 bg-muted/30 space-y-1">
+                <p className="text-sm"><span className="text-muted-foreground">Nome:</span> {acessoUsuario?.nome}</p>
+                <p className="text-sm"><span className="text-muted-foreground">Email:</span> {acessoUsuario?.email}</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="acesso-senha">Senha</Label>
+                <Input
+                  id="acesso-senha"
+                  type="password"
+                  value={acessoSenha}
+                  onChange={(e) => setAcessoSenha(e.target.value)}
+                  placeholder="Senha de acesso"
+                  required
+                  minLength={6}
+                />
+                <p className="text-xs text-muted-foreground">Mínimo 6 caracteres. O usuário usará o email acima e esta senha para fazer login.</p>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setAcessoDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={criarAcesso.isPending || acessoSenha.trim().length < 6}>
+                  {criarAcesso.isPending ? 'Criando...' : 'Criar Acesso'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </AdminGuard>
     </MainLayout>
   );
