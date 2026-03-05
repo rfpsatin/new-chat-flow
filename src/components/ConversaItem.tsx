@@ -86,6 +86,7 @@ export function ConversaItem({ conversa, isSelected, onClick, showBadge = true, 
     encerrado: 'Encerrado',
   };
   const showAgentNameInStatus =
+    showAgentName &&
     (conversa.status === 'fila_humano' || conversa.status === 'em_atendimento_humano') &&
     !!conversa.agente_nome;
   const primeiroNome = conversa.agente_nome?.split(/\s+/)[0] ?? '';

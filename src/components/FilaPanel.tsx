@@ -245,7 +245,7 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
                       isSelected={selectedConversaId === conversa.conversa_id}
                       onClick={() => onSelectConversa(conversa)}
                       showBadge={selectedStatus === 'todos'}
-                      showAgentName={currentUser?.tipo_usuario !== 'opr'}
+                      showAgentName={currentUser?.tipo_usuario === 'adm'}
                       selectionMode={selectionMode}
                       isChecked={selectedIds.has(conversa.conversa_id!)}
                       onToggleCheck={() => toggleSelectId(conversa.conversa_id!)}
