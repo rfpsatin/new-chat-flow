@@ -134,15 +134,15 @@ export function FiltrosFila({
             const isSubFiltered = hasSubFilter && isActive && !!subFiltroAgenteId;
 
             return (
-              <div key={key} className="inline-flex items-center">
+              <div key={key} className="inline-flex items-stretch h-8">
                 <button
                   onClick={() => {
                     onSelectStatus(key);
                     if (key !== selectedStatus) onSubFiltroAgenteChange?.(null);
                   }}
                   className={cn(
-                    'inline-flex items-center gap-1.5 text-xs font-medium transition-all',
-                    'border shrink-0 px-2.5 py-1.5',
+                    'inline-flex h-full items-center gap-1.5 text-xs font-medium transition-all',
+                    'border shrink-0 px-2.5',
                     hasSubFilter ? 'rounded-l-full border-r-0' : 'rounded-full',
                     isActive
                       ? 'bg-primary text-primary-foreground border-primary'
@@ -163,44 +163,57 @@ export function FiltrosFila({
                   </span>
                 </button>
                 {hasSubFilter && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
+                  <>
+                    {isActive ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            className={cn(
+                              'inline-flex h-full items-center justify-center px-2 text-xs transition-all border rounded-r-full',
+                              'bg-primary text-primary-foreground border-primary hover:bg-primary/90',
+                              isSubFiltered && 'ring-1 ring-primary-foreground/40'
+                            )}
+                          >
+                            <ChevronDown className="w-3 h-3" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="min-w-[160px]">
+                          <DropdownMenuItem
+                            onClick={() => {
+                              onSelectStatus(key);
+                              onSubFiltroAgenteChange?.(null);
+                            }}
+                            className={cn(!subFiltroAgenteId && 'font-semibold')}
+                          >
+                            Todos
+                          </DropdownMenuItem>
+                          {agentesDisponiveis?.map((agente) => (
+                            <DropdownMenuItem
+                              key={agente.id}
+                              onClick={() => {
+                                onSelectStatus(key);
+                                onSubFiltroAgenteChange?.(agente.id);
+                              }}
+                              className={cn(subFiltroAgenteId === agente.id && 'font-semibold')}
+                            >
+                              {agente.nome}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : (
                       <button
+                        type="button"
+                        aria-disabled="true"
                         className={cn(
-                          'inline-flex items-center px-1.5 py-1.5 text-xs transition-all border rounded-r-full',
-                          isActive
-                            ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90'
-                            : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted',
-                          isSubFiltered && 'ring-1 ring-primary-foreground/40'
+                          'inline-flex h-full items-center justify-center px-2 text-xs transition-all border rounded-r-full',
+                          'bg-muted/50 text-muted-foreground border-border opacity-60 cursor-not-allowed'
                         )}
                       >
                         <ChevronDown className="w-3 h-3" />
                       </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="min-w-[160px]">
-                      <DropdownMenuItem
-                        onClick={() => {
-                          onSelectStatus(key);
-                          onSubFiltroAgenteChange?.(null);
-                        }}
-                        className={cn(!subFiltroAgenteId && 'font-semibold')}
-                      >
-                        Todos
-                      </DropdownMenuItem>
-                      {agentesDisponiveis?.map((agente) => (
-                        <DropdownMenuItem
-                          key={agente.id}
-                          onClick={() => {
-                            onSelectStatus(key);
-                            onSubFiltroAgenteChange?.(agente.id);
-                          }}
-                          className={cn(subFiltroAgenteId === agente.id && 'font-semibold')}
-                        >
-                          {agente.nome}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    )}
+                  </>
                 )}
               </div>
             );
@@ -221,15 +234,15 @@ export function FiltrosFila({
               const isSubFiltered = hasSubFilter && isActive && !!subFiltroAgenteId;
 
               return (
-                <div key={key} className="inline-flex items-center">
+                <div key={key} className="inline-flex items-stretch h-8">
                   <button
                     onClick={() => {
                       onSelectStatus(key);
                       if (key !== selectedStatus) onSubFiltroAgenteChange?.(null);
                     }}
                     className={cn(
-                      'inline-flex items-center gap-1.5 text-xs font-medium transition-all',
-                      'border shrink-0 px-4 py-1.5',
+                      'inline-flex h-full items-center gap-1.5 text-xs font-medium transition-all',
+                      'border shrink-0 px-4',
                       hasSubFilter ? 'rounded-l-full border-r-0' : 'rounded-full',
                       isActive
                         ? 'bg-primary text-primary-foreground border-primary'
@@ -250,44 +263,57 @@ export function FiltrosFila({
                     </span>
                   </button>
                   {hasSubFilter && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
+                    <>
+                      {isActive ? (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              className={cn(
+                                'inline-flex h-full items-center justify-center px-2 text-xs transition-all border rounded-r-full',
+                                'bg-primary text-primary-foreground border-primary hover:bg-primary/90',
+                                isSubFiltered && 'ring-1 ring-primary-foreground/40'
+                              )}
+                            >
+                              <ChevronDown className="w-3 h-3" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="min-w-[160px]">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                onSelectStatus(key);
+                                onSubFiltroAgenteChange?.(null);
+                              }}
+                              className={cn(!subFiltroAgenteId && 'font-semibold')}
+                            >
+                              Todos
+                            </DropdownMenuItem>
+                            {agentesDisponiveis?.map((agente) => (
+                              <DropdownMenuItem
+                                key={agente.id}
+                                onClick={() => {
+                                  onSelectStatus(key);
+                                  onSubFiltroAgenteChange?.(agente.id);
+                                }}
+                                className={cn(subFiltroAgenteId === agente.id && 'font-semibold')}
+                              >
+                                {agente.nome}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : (
                         <button
+                          type="button"
+                          aria-disabled="true"
                           className={cn(
-                            'inline-flex items-center px-1.5 py-1.5 text-xs transition-all border rounded-r-full',
-                            isActive
-                              ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90'
-                              : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted',
-                            isSubFiltered && 'ring-1 ring-primary-foreground/40'
+                            'inline-flex h-full items-center justify-center px-2 text-xs transition-all border rounded-r-full',
+                            'bg-muted/50 text-muted-foreground border-border opacity-60 cursor-not-allowed'
                           )}
                         >
                           <ChevronDown className="w-3 h-3" />
                         </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="min-w-[160px]">
-                        <DropdownMenuItem
-                          onClick={() => {
-                            onSelectStatus(key);
-                            onSubFiltroAgenteChange?.(null);
-                          }}
-                          className={cn(!subFiltroAgenteId && 'font-semibold')}
-                        >
-                          Todos
-                        </DropdownMenuItem>
-                        {agentesDisponiveis?.map((agente) => (
-                          <DropdownMenuItem
-                            key={agente.id}
-                            onClick={() => {
-                              onSelectStatus(key);
-                              onSubFiltroAgenteChange?.(agente.id);
-                            }}
-                            className={cn(subFiltroAgenteId === agente.id && 'font-semibold')}
-                          >
-                            {agente.nome}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                      )}
+                    </>
                   )}
                 </div>
               );
