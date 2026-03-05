@@ -79,7 +79,11 @@ export function SessoesDetailPanel({
           <div className="p-2 space-y-2">
             {sessoes.map((sessao) => {
               const isAberta = sessoesAbertas.includes(sessao.conversa_id);
-              
+              const statusAoEncerrar = sessao.status_ao_encerrar
+                ? sessao.status_ao_encerrar.toLowerCase()
+                : null;
+              const isBotEncerrado = statusAoEncerrar === 'bot';
+
               return (
                 <div
                   key={sessao.conversa_id}
@@ -109,6 +113,7 @@ export function SessoesDetailPanel({
                       {sessao.encerrado_em && (
                         <div className="text-xs text-muted-foreground mt-1">
                           Encerrado: {format(new Date(sessao.encerrado_em), 'HH:mm', { locale: ptBR })}
+                          {isBotEncerrado && ' | Bot'}
                         </div>
                       )}
 
@@ -129,6 +134,14 @@ export function SessoesDetailPanel({
                       )}
 
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        {statusAoEncerrar && !isBotEncerrado && (
+                          <span className="inline-block text-xs bg-primary/15 text-primary px-2 py-0.5 rounded font-medium">
+                            {statusAoEncerrar === 'esperando_tria' ? 'Triagem' :
+                             statusAoEncerrar === 'fila_humano' ? 'Na Fila' :
+                             statusAoEncerrar === 'em_atendimento_humano' ? 'Atendimento' :
+                             statusAoEncerrar}
+                          </span>
+                        )}
                         {sessao.motivo_encerramento && (
                           <span className="inline-block text-xs bg-muted px-2 py-0.5 rounded">
                             {sessao.motivo_encerramento}

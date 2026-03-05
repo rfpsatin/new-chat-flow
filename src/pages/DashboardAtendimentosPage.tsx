@@ -8,6 +8,7 @@ import { AtendimentosPorFechamentoChart } from '@/components/dashboard/Atendimen
 import { AgentesTable } from '@/components/dashboard/AgentesTable';
 import { LeadTimeTimelineChart } from '@/components/dashboard/LeadTimeTimelineChart';
 import { OpenAtendimentoAgentesTable } from '@/components/dashboard/OpenAtendimentoAgentesTable';
+import { CampanhasDashboard } from '@/components/dashboard/CampanhasDashboard';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
 import { useApp } from '@/contexts/AppContext';
@@ -18,7 +19,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 interface DashboardFilterState {
   periodo: PeriodoFiltro;
-  activeTab: 'atendimentos' | 'aberto';
+  activeTab: 'atendimentos' | 'aberto' | 'campanhas';
   somenteEmAndamento: boolean;
   filaAgenteId: string;
   atendimentoAgenteId: string;
@@ -45,7 +46,7 @@ export default function DashboardAtendimentosPage() {
   const isDirty = JSON.stringify(draftFilters) !== JSON.stringify(appliedFilters);
   const activeFilters = appliedFilters ?? draftFilters;
 
-  const handleTabChange = (tab: 'atendimentos' | 'aberto') => {
+  const handleTabChange = (tab: 'atendimentos' | 'aberto' | 'campanhas') => {
     setDraftFilters((prev) => ({
       ...prev,
       activeTab: tab,
@@ -78,6 +79,7 @@ export default function DashboardAtendimentosPage() {
     queryClient.invalidateQueries({ queryKey: ['dashboard-por-motivo'] });
     queryClient.invalidateQueries({ queryKey: ['dashboard-agentes'] });
     queryClient.invalidateQueries({ queryKey: ['dashboard-open'] });
+    queryClient.invalidateQueries({ queryKey: ['campanhas-stats'] });
   };
 
   const openCards = useMemo(() => {
@@ -129,7 +131,7 @@ export default function DashboardAtendimentosPage() {
             onSomenteEmAndamentoChange={(value) => setDraftFilters((prev) => ({ ...prev, somenteEmAndamento: value }))}
           />
 
-          {!hasAppliedFilters ? (
+          {!hasAppliedFilters && activeFilters.activeTab !== 'campanhas' ? (
             <Card className="p-8 text-center text-muted-foreground">
               Defina os filtros e clique em <strong>Aplicar filtros</strong> para carregar os dados do dashboard.
             </Card>
@@ -208,7 +210,7 @@ export default function DashboardAtendimentosPage() {
                 />
               </div>
             </>
-          ) : (
+          ) : activeFilters.activeTab === 'aberto' ? (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {openCards.map((card) => (
@@ -237,6 +239,8 @@ export default function DashboardAtendimentosPage() {
                 isLoading={isLoadingOpen}
               />
             </>
+          ) : (
+            <CampanhasDashboard empresaId={empresaId} />
           )}
         </div>
       </ScrollArea>

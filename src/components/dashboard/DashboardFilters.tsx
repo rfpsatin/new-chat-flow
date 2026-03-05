@@ -14,8 +14,8 @@ interface DashboardFiltersProps {
   isLoading?: boolean;
   hasAppliedFilters?: boolean;
   isDirty?: boolean;
-  activeTab: 'atendimentos' | 'aberto';
-  onTabChange: (tab: 'atendimentos' | 'aberto') => void;
+  activeTab: 'atendimentos' | 'aberto' | 'campanhas';
+  onTabChange: (tab: 'atendimentos' | 'aberto' | 'campanhas') => void;
   agentes?: { id: string; nome: string }[];
   filaAgenteId?: string;
   onFilaAgenteChange?: (value: string) => void;
@@ -45,7 +45,7 @@ export function DashboardFilters({
 }: DashboardFiltersProps) {
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-      <Tabs value={activeTab} onValueChange={(v) => onTabChange(v as 'atendimentos' | 'aberto')} className="w-auto">
+      <Tabs value={activeTab} onValueChange={(v) => onTabChange(v as 'atendimentos' | 'aberto' | 'campanhas')} className="w-auto">
         <TabsList className="bg-muted">
           <TabsTrigger value="atendimentos" className="data-[state=active]:bg-background">
             Atendimentos
@@ -53,10 +53,13 @@ export function DashboardFilters({
           <TabsTrigger value="aberto" className="data-[state=active]:bg-background">
             Atendimentos em Aberto
           </TabsTrigger>
+          <TabsTrigger value="campanhas" className="data-[state=active]:bg-background">
+            Campanhas
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 
-      <div className="flex flex-wrap items-center gap-3">
+      {activeTab !== 'campanhas' && <div className="flex flex-wrap items-center gap-3">
         {activeTab === 'aberto' && (
           <>
             <div className="flex items-center gap-2">
@@ -130,7 +133,7 @@ export function DashboardFilters({
         >
           <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
         </Button>
-      </div>
+      </div>}
     </div>
   );
 }

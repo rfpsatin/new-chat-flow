@@ -234,6 +234,7 @@ export type Database = {
           pesquisa_respondida_em: string | null
           resumo: string | null
           status: string
+          status_ao_encerrar: string | null
           updated_at: string
         }
         Insert: {
@@ -261,6 +262,7 @@ export type Database = {
           pesquisa_respondida_em?: string | null
           resumo?: string | null
           status: string
+          status_ao_encerrar?: string | null
           updated_at?: string
         }
         Update: {
@@ -288,6 +290,7 @@ export type Database = {
           pesquisa_respondida_em?: string | null
           resumo?: string | null
           status?: string
+          status_ao_encerrar?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -821,6 +824,7 @@ export type Database = {
           origem_inicial: string | null
           resumo: string | null
           status: string | null
+          status_ao_encerrar: string | null
           whatsapp_numero: string | null
         }
         Relationships: [
