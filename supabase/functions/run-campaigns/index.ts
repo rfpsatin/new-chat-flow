@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
     }
 
     let totalSent = 0
-    const results: { campanha_id: string; enviados: number; erros: number }[] = []
+    const results: { campanha_id: string; enviados: number; erros: number; pulados_concorrencia?: number }[] = []
 
     for (const campanha of campanhas) {
       // Marcar como em execução se ainda não estava
@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
       // Destinatários pendentes
       const { data: destinatarios, error: destError } = await supabase
         .from('campanha_destinatarios')
-        .select('id, contato_id, whatsapp_numero')
+        .select('id, contato_id, whatsapp_numero, tentativas')
         .eq('campanha_id', campanha.id)
         .eq('status_envio', 'pendente')
         .limit(batchSize)
@@ -110,14 +110,30 @@ Deno.serve(async (req) => {
       const startConvUrl = `${supabaseUrl}/functions/v1/start-conversation`
 
       for (const dest of destinatarios) {
-        await supabase
+        // Claim atômico do destinatário para evitar processamento duplicado
+        // em execuções concorrentes da função
+        const { data: claimedDest, error: claimError } = await supabase
           .from('campanha_destinatarios')
           .update({
             status_envio: 'enviando',
-            tentativas: 1,
+            tentativas: (dest.tentativas ?? 0) + 1,
             ultima_tentativa_em: now,
           })
           .eq('id', dest.id)
+          .eq('status_envio', 'pendente')
+          .select('id')
+          .maybeSingle()
+
+        if (claimError) {
+          console.error(`[${requestId}] Error claiming destinatário ${dest.id}:`, claimError)
+          erros++
+          continue
+        }
+
+        // Se outro worker já claimou este registro, não processar novamente
+        if (!claimedDest) {
+          continue
+        }
 
         const origemFinal = campanha.modo_resposta === 'atendente' ? 'atendente' : 'agente'
 
