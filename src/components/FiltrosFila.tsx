@@ -1,4 +1,4 @@
-import { Search, Bot, Clock, Users, Headphones, LayoutGrid, Info, MoreVertical, CheckSquare } from 'lucide-react';
+import { Search, Bot, Clock, Users, Headphones, LayoutGrid, Info, MoreVertical, CheckSquare, ChevronDown } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -22,6 +22,10 @@ interface FiltrosFilaProps {
   isSelectionMode?: boolean;
   onToggleSelectionMode?: () => void;
   showSelectionOption?: boolean;
+  // Sub-filtro por agente
+  agentesDisponiveis?: { id: string; nome: string }[];
+  subFiltroAgenteId?: string | null;
+  onSubFiltroAgenteChange?: (agenteId: string | null) => void;
 }
 
 const statusConfig = [
@@ -43,6 +47,9 @@ export function FiltrosFila({
   isSelectionMode,
   onToggleSelectionMode,
   showSelectionOption = true,
+  agentesDisponiveis,
+  subFiltroAgenteId,
+  onSubFiltroAgenteChange,
 }: FiltrosFilaProps) {
   const totalCount = statusCounts.bot + statusCounts.esperando_tria + statusCounts.fila_humano + statusCounts.em_atendimento_humano;
 
@@ -123,54 +130,20 @@ export function FiltrosFila({
           {firstRowFilters.slice(0, 3).map(({ key, label, icon: Icon }) => {
             const isActive = selectedStatus === key;
             const count = key === 'todos' ? totalCount : (statusCounts[key as keyof StatusCount] || 0);
+            const hasSubFilter = (key === 'fila_humano' || key === 'em_atendimento_humano') && !!agentesDisponiveis?.length;
+            const isSubFiltered = hasSubFilter && isActive && !!subFiltroAgenteId;
 
             return (
-              <button
-                key={key}
-                onClick={() => onSelectStatus(key)}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-full text-xs font-medium transition-all',
-                  'border shrink-0 px-2.5 py-1.5',
-                  isActive
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted'
-                )}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{label}</span>
-                <span
-                  className={cn(
-                    'px-1.5 py-0.5 rounded-full text-[10px] min-w-[20px] text-center',
-                    isActive
-                      ? 'bg-primary-foreground/20 text-primary-foreground'
-                      : 'bg-muted text-muted-foreground'
-                  )}
-                >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-          {/* Preencher com espaços vazios se houver menos de 3 filtros */}
-          {firstRowFilters.length < 3 && Array.from({ length: 3 - firstRowFilters.length }).map((_, i) => (
-            <div key={`empty-${i}`} className="flex-1" />
-          ))}
-        </div>
-
-        {/* Segunda linha - sem justificação, com gap pequeno, margem igual ao campo de pesquisa */}
-        {secondRowFilters.length > 0 && (
-          <div className="flex items-center gap-2 pl-3">
-            {secondRowFilters.map(({ key, label, icon: Icon }) => {
-              const isActive = selectedStatus === key;
-              const count = key === 'todos' ? totalCount : (statusCounts[key as keyof StatusCount] || 0);
-
-              return (
+              <div key={key} className="inline-flex items-center">
                 <button
-                  key={key}
-                  onClick={() => onSelectStatus(key)}
+                  onClick={() => {
+                    onSelectStatus(key);
+                    if (key !== selectedStatus) onSubFiltroAgenteChange?.(null);
+                  }}
                   className={cn(
-                    'inline-flex items-center gap-1.5 rounded-full text-xs font-medium transition-all',
-                    'border shrink-0 px-4 py-1.5',
+                    'inline-flex items-center gap-1.5 text-xs font-medium transition-all',
+                    'border shrink-0 px-2.5 py-1.5',
+                    hasSubFilter ? 'rounded-l-full border-r-0' : 'rounded-full',
                     isActive
                       ? 'bg-primary text-primary-foreground border-primary'
                       : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted'
@@ -189,6 +162,134 @@ export function FiltrosFila({
                     {count}
                   </span>
                 </button>
+                {hasSubFilter && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        className={cn(
+                          'inline-flex items-center px-1.5 py-1.5 text-xs transition-all border rounded-r-full',
+                          isActive
+                            ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90'
+                            : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted',
+                          isSubFiltered && 'ring-1 ring-primary-foreground/40'
+                        )}
+                      >
+                        <ChevronDown className="w-3 h-3" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="min-w-[160px]">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          onSelectStatus(key);
+                          onSubFiltroAgenteChange?.(null);
+                        }}
+                        className={cn(!subFiltroAgenteId && 'font-semibold')}
+                      >
+                        Todos
+                      </DropdownMenuItem>
+                      {agentesDisponiveis?.map((agente) => (
+                        <DropdownMenuItem
+                          key={agente.id}
+                          onClick={() => {
+                            onSelectStatus(key);
+                            onSubFiltroAgenteChange?.(agente.id);
+                          }}
+                          className={cn(subFiltroAgenteId === agente.id && 'font-semibold')}
+                        >
+                          {agente.nome}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
+            );
+          })}
+          {/* Preencher com espaços vazios se houver menos de 3 filtros */}
+          {firstRowFilters.length < 3 && Array.from({ length: 3 - firstRowFilters.length }).map((_, i) => (
+            <div key={`empty-${i}`} className="flex-1" />
+          ))}
+        </div>
+
+        {/* Segunda linha - sem justificação, com gap pequeno, margem igual ao campo de pesquisa */}
+        {secondRowFilters.length > 0 && (
+          <div className="flex items-center gap-2 pl-3">
+            {secondRowFilters.map(({ key, label, icon: Icon }) => {
+              const isActive = selectedStatus === key;
+              const count = key === 'todos' ? totalCount : (statusCounts[key as keyof StatusCount] || 0);
+              const hasSubFilter = (key === 'fila_humano' || key === 'em_atendimento_humano') && !!agentesDisponiveis?.length;
+              const isSubFiltered = hasSubFilter && isActive && !!subFiltroAgenteId;
+
+              return (
+                <div key={key} className="inline-flex items-center">
+                  <button
+                    onClick={() => {
+                      onSelectStatus(key);
+                      if (key !== selectedStatus) onSubFiltroAgenteChange?.(null);
+                    }}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 text-xs font-medium transition-all',
+                      'border shrink-0 px-4 py-1.5',
+                      hasSubFilter ? 'rounded-l-full border-r-0' : 'rounded-full',
+                      isActive
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted'
+                    )}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{label}</span>
+                    <span
+                      className={cn(
+                        'px-1.5 py-0.5 rounded-full text-[10px] min-w-[20px] text-center',
+                        isActive
+                          ? 'bg-primary-foreground/20 text-primary-foreground'
+                          : 'bg-muted text-muted-foreground'
+                      )}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                  {hasSubFilter && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          className={cn(
+                            'inline-flex items-center px-1.5 py-1.5 text-xs transition-all border rounded-r-full',
+                            isActive
+                              ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90'
+                              : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted',
+                            isSubFiltered && 'ring-1 ring-primary-foreground/40'
+                          )}
+                        >
+                          <ChevronDown className="w-3 h-3" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="min-w-[160px]">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            onSelectStatus(key);
+                            onSubFiltroAgenteChange?.(null);
+                          }}
+                          className={cn(!subFiltroAgenteId && 'font-semibold')}
+                        >
+                          Todos
+                        </DropdownMenuItem>
+                        {agentesDisponiveis?.map((agente) => (
+                          <DropdownMenuItem
+                            key={agente.id}
+                            onClick={() => {
+                              onSelectStatus(key);
+                              onSubFiltroAgenteChange?.(agente.id);
+                            }}
+                            className={cn(subFiltroAgenteId === agente.id && 'font-semibold')}
+                          >
+                            {agente.nome}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
               );
             })}
           </div>
