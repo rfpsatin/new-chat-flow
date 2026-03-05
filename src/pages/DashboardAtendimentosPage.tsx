@@ -16,6 +16,14 @@ import { useDashboardOpenStats } from '@/hooks/useDashboardOpenStats';
 import { useOperadores } from '@/hooks/useUsuarios';
 import { useQueryClient } from '@tanstack/react-query';
 
+interface DashboardFilterState {
+  periodo: PeriodoFiltro;
+  activeTab: 'atendimentos' | 'aberto';
+  somenteEmAndamento: boolean;
+  filaAgenteId: string;
+  atendimentoAgenteId: string;
+}
+
 function formatDuration(seconds: number) {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -25,29 +33,44 @@ function formatDuration(seconds: number) {
 
 export default function DashboardAtendimentosPage() {
   const { empresaId } = useApp();
-  const [periodo, setPeriodo] = useState<PeriodoFiltro>('hoje');
-  const [activeTab, setActiveTab] = useState<'atendimentos' | 'aberto'>('atendimentos');
+  const [draftFilters, setDraftFilters] = useState<DashboardFilterState>({
+    periodo: 'hoje',
+    activeTab: 'atendimentos',
+    somenteEmAndamento: true,
+    filaAgenteId: 'todos',
+    atendimentoAgenteId: 'todos',
+  });
+  const [appliedFilters, setAppliedFilters] = useState<DashboardFilterState | null>(null);
+  const hasAppliedFilters = !!appliedFilters;
+  const isDirty = JSON.stringify(draftFilters) !== JSON.stringify(appliedFilters);
+  const activeFilters = appliedFilters ?? draftFilters;
+
   const handleTabChange = (tab: 'atendimentos' | 'aberto') => {
-    setActiveTab(tab);
-    if (tab === 'atendimentos' && periodo === 'prazo') {
-      setPeriodo('hoje');
-    }
+    setDraftFilters((prev) => ({
+      ...prev,
+      activeTab: tab,
+      periodo: tab === 'atendimentos' && prev.periodo === 'prazo' ? 'hoje' : prev.periodo,
+    }));
   };
-  const [somenteEmAndamento, setSomenteEmAndamento] = useState(true);
-  const [filaAgenteId, setFilaAgenteId] = useState<string>('todos');
-  const [atendimentoAgenteId, setAtendimentoAgenteId] = useState<string>('todos');
-  const { stats, isLoading } = useDashboardStats(empresaId, periodo);
+
+  const handleApplyFilters = () => {
+    setAppliedFilters(draftFilters);
+  };
+
+  const { stats, isLoading } = useDashboardStats(empresaId, activeFilters.periodo, hasAppliedFilters);
   const { data: openStats, isLoading: isLoadingOpen } = useDashboardOpenStats(
     empresaId,
-    periodo,
-    somenteEmAndamento,
-    filaAgenteId === 'todos' ? undefined : filaAgenteId,
-    atendimentoAgenteId === 'todos' ? undefined : atendimentoAgenteId
+    activeFilters.periodo,
+    activeFilters.somenteEmAndamento,
+    activeFilters.filaAgenteId === 'todos' ? undefined : activeFilters.filaAgenteId,
+    activeFilters.atendimentoAgenteId === 'todos' ? undefined : activeFilters.atendimentoAgenteId,
+    hasAppliedFilters
   );
-  const { data: agentes } = useOperadores(empresaId);
+  const { data: agentes } = useOperadores(empresaId, hasAppliedFilters && draftFilters.activeTab === 'aberto');
   const queryClient = useQueryClient();
 
   const handleRefresh = () => {
+    if (!hasAppliedFilters) return;
     queryClient.invalidateQueries({ queryKey: ['dashboard-kpis'] });
     queryClient.invalidateQueries({ queryKey: ['dashboard-mensagens'] });
     queryClient.invalidateQueries({ queryKey: ['dashboard-contatos-hora'] });
@@ -88,22 +111,29 @@ export default function DashboardAtendimentosPage() {
         <div className="p-6 space-y-6">
           {/* Header com filtros */}
           <DashboardFilters 
-            periodo={periodo}
-            onPeriodoChange={setPeriodo}
+            periodo={draftFilters.periodo}
+            onPeriodoChange={(periodo) => setDraftFilters((prev) => ({ ...prev, periodo }))}
             onRefresh={handleRefresh}
+            onApply={handleApplyFilters}
             isLoading={isLoading}
-            activeTab={activeTab}
+            hasAppliedFilters={hasAppliedFilters}
+            isDirty={isDirty}
+            activeTab={draftFilters.activeTab}
             onTabChange={handleTabChange}
             agentes={agentes}
-            filaAgenteId={filaAgenteId}
-            onFilaAgenteChange={setFilaAgenteId}
-            atendimentoAgenteId={atendimentoAgenteId}
-            onAtendimentoAgenteChange={setAtendimentoAgenteId}
-            somenteEmAndamento={somenteEmAndamento}
-            onSomenteEmAndamentoChange={setSomenteEmAndamento}
+            filaAgenteId={draftFilters.filaAgenteId}
+            onFilaAgenteChange={(value) => setDraftFilters((prev) => ({ ...prev, filaAgenteId: value }))}
+            atendimentoAgenteId={draftFilters.atendimentoAgenteId}
+            onAtendimentoAgenteChange={(value) => setDraftFilters((prev) => ({ ...prev, atendimentoAgenteId: value }))}
+            somenteEmAndamento={draftFilters.somenteEmAndamento}
+            onSomenteEmAndamentoChange={(value) => setDraftFilters((prev) => ({ ...prev, somenteEmAndamento: value }))}
           />
 
-          {activeTab === 'atendimentos' ? (
+          {!hasAppliedFilters ? (
+            <Card className="p-8 text-center text-muted-foreground">
+              Defina os filtros e clique em <strong>Aplicar filtros</strong> para carregar os dados do dashboard.
+            </Card>
+          ) : activeFilters.activeTab === 'atendimentos' ? (
             <>
               {/* KPI Cards */}
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">

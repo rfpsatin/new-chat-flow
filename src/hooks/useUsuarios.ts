@@ -19,7 +19,7 @@ export function useUsuarios(empresaId: string) {
   });
 }
 
-export function useOperadores(empresaId: string) {
+export function useOperadores(empresaId: string, enabled = true) {
   return useQuery({
     queryKey: ['operadores', empresaId],
     queryFn: async () => {
@@ -34,5 +34,6 @@ export function useOperadores(empresaId: string) {
       if (error) throw error;
       return data as Usuario[];
     },
+    enabled: !!empresaId && enabled,
   });
 }

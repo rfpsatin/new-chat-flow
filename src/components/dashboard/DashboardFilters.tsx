@@ -10,7 +10,10 @@ interface DashboardFiltersProps {
   periodo: PeriodoFiltro;
   onPeriodoChange: (periodo: PeriodoFiltro) => void;
   onRefresh: () => void;
+  onApply: () => void;
   isLoading?: boolean;
+  hasAppliedFilters?: boolean;
+  isDirty?: boolean;
   activeTab: 'atendimentos' | 'aberto';
   onTabChange: (tab: 'atendimentos' | 'aberto') => void;
   agentes?: { id: string; nome: string }[];
@@ -26,7 +29,10 @@ export function DashboardFilters({
   periodo,
   onPeriodoChange,
   onRefresh,
+  onApply,
   isLoading,
+  hasAppliedFilters,
+  isDirty,
   activeTab,
   onTabChange,
   agentes,
@@ -107,12 +113,20 @@ export function DashboardFilters({
           </SelectContent>
         </Select>
 
+        <Button
+          variant="default"
+          onClick={onApply}
+          disabled={isLoading || (!!hasAppliedFilters && !isDirty)}
+        >
+          Aplicar filtros
+        </Button>
+
         <Button 
           variant="outline" 
           size="icon" 
           className="bg-card"
           onClick={onRefresh}
-          disabled={isLoading}
+          disabled={isLoading || !hasAppliedFilters}
         >
           <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
         </Button>

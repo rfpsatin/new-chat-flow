@@ -67,7 +67,8 @@ export function useDashboardOpenStats(
   periodo: PeriodoFiltro,
   somenteEmAndamento: boolean,
   filaAgenteId?: string,
-  atendimentoAgenteId?: string
+  atendimentoAgenteId?: string,
+  enabled = true
 ) {
   const { inicio, fim } = getDateRange(periodo);
 
@@ -216,6 +217,6 @@ export function useDashboardOpenStats(
         agentes,
       } as DashboardOpenStats;
     },
-    enabled: !!empresaId,
+    enabled: !!empresaId && enabled,
   });
 }

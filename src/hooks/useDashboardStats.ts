@@ -141,7 +141,7 @@ function gerarHorasCompletas(dados: { hora: number; total: number }[]): ContatoP
   }));
 }
 
-export function useDashboardStats(empresaId: string, periodo: PeriodoFiltro) {
+export function useDashboardStats(empresaId: string, periodo: PeriodoFiltro, enabled = true) {
   const { inicio, fim, inicioAnterior, fimAnterior } = getDateRange(periodo);
 
   // Query principal: KPIs do período atual
@@ -177,7 +177,7 @@ export function useDashboardStats(empresaId: string, periodo: PeriodoFiltro) {
 
       return { atendimentos, clientesUnicos, tmaSegundos };
     },
-    enabled: !!empresaId
+    enabled: !!empresaId && enabled
   });
 
   // Query: KPIs do período anterior (para comparação)
@@ -199,7 +199,7 @@ export function useDashboardStats(empresaId: string, periodo: PeriodoFiltro) {
         clientesUnicos: new Set(data?.map(c => c.contato_id)).size
       };
     },
-    enabled: !!empresaId
+    enabled: !!empresaId && enabled
   });
 
   // Query: Mensagens (enviadas e recebidas)
@@ -219,7 +219,7 @@ export function useDashboardStats(empresaId: string, periodo: PeriodoFiltro) {
       const recebidas = data?.filter(m => m.direcao === 'in').length || 0;
       return { enviadas, recebidas };
     },
-    enabled: !!empresaId
+    enabled: !!empresaId && enabled
   });
 
   // Query: Mensagens do período anterior
@@ -240,7 +240,7 @@ export function useDashboardStats(empresaId: string, periodo: PeriodoFiltro) {
         recebidas: data?.filter(m => m.direcao === 'in').length || 0
       };
     },
-    enabled: !!empresaId
+    enabled: !!empresaId && enabled
   });
 
   // Query: Contatos por hora
@@ -265,7 +265,7 @@ export function useDashboardStats(empresaId: string, periodo: PeriodoFiltro) {
 
       return Array.from(porHora.entries()).map(([hora, total]) => ({ hora, total }));
     },
-    enabled: !!empresaId
+    enabled: !!empresaId && enabled
   });
 
   // Query: Atendimentos por canal
@@ -294,7 +294,7 @@ export function useDashboardStats(empresaId: string, periodo: PeriodoFiltro) {
         value 
       }));
     },
-    enabled: !!empresaId
+    enabled: !!empresaId && enabled
   });
 
   // Query: Atendimentos por motivo de encerramento
@@ -324,7 +324,7 @@ export function useDashboardStats(empresaId: string, periodo: PeriodoFiltro) {
 
       return Array.from(porMotivo.entries()).map(([name, value]) => ({ name, value }));
     },
-    enabled: !!empresaId
+    enabled: !!empresaId && enabled
   });
 
   // Query: Agentes (operadores e supervisores)
@@ -428,7 +428,7 @@ export function useDashboardStats(empresaId: string, periodo: PeriodoFiltro) {
         };
       }) || [];
     },
-    enabled: !!empresaId
+    enabled: !!empresaId && enabled
   });
 
   // Query: Média de atendimentos por agente (período anterior para comparação)
