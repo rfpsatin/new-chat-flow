@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
         ? `${campanha.mensagem_texto || ''}\n\n${campanha.link}`.trim()
         : (campanha.mensagem_texto || '').trim()
 
-      const sendUrl = `${supabaseUrl}/functions/v1/whapi-send-message`
+      const startConvUrl = `${supabaseUrl}/functions/v1/start-conversation`
 
       for (const dest of destinatarios) {
         await supabase
@@ -119,27 +119,10 @@ Deno.serve(async (req) => {
           })
           .eq('id', dest.id)
 
-        const res = await fetch(sendUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${supabaseServiceKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            empresa_id: campanha.empresa_id,
-            to: dest.whatsapp_numero.replace(/@(s\.whatsapp\.net|c\.us)$/, '').trim(),
-            message: messageText,
-          }),
-        })
+        const origemFinal = campanha.modo_resposta === 'atendente' ? 'atendente' : 'agente'
 
-        const data = await res.json().catch(() => ({}))
-        const messageId = data.message_id || data.response?.messages?.[0]?.id
-
-        if (res.ok) {
-          // Create conversation via start-conversation to respect origem_final
-          const origemFinal = campanha.modo_resposta === 'atendente' ? 'atendente' : 'agente'
-          const startConvUrl = `${supabaseUrl}/functions/v1/start-conversation`
-          await fetch(startConvUrl, {
+        try {
+          const res = await fetch(startConvUrl, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${supabaseServiceKey}`,
@@ -153,18 +136,39 @@ Deno.serve(async (req) => {
               origem_final: origemFinal,
               campanha_id: campanha.id,
             }),
-          }).catch(err => console.error(`[${requestId}] Error creating conversation for dest ${dest.id}:`, err))
+          })
 
-          await supabase
-            .from('campanha_destinatarios')
-            .update({
-              status_envio: 'enviado',
-              mensagem_id_whatsapp: messageId || null,
-            })
-            .eq('id', dest.id)
-          enviados++
-          totalSent++
-        } else {
+          const data = await res.json().catch(() => ({}))
+
+          if (res.ok && (data?.success === true)) {
+            const conversaId = data.conversa_id as string | undefined
+
+            await supabase
+              .from('campanha_destinatarios')
+              .update({
+                status_envio: 'enviado',
+                conversa_id: conversaId || null,
+              })
+              .eq('id', dest.id)
+
+            enviados++
+            totalSent++
+          } else {
+            console.error(
+              `[${requestId}] start-conversation failed for dest ${dest.id}:`,
+              data
+            )
+            await supabase
+              .from('campanha_destinatarios')
+              .update({ status_envio: 'erro_envio' })
+              .eq('id', dest.id)
+            erros++
+          }
+        } catch (err) {
+          console.error(
+            `[${requestId}] Error calling start-conversation for dest ${dest.id}:`,
+            err
+          )
           await supabase
             .from('campanha_destinatarios')
             .update({ status_envio: 'erro_envio' })

@@ -169,7 +169,7 @@ export function FiltrosFila({
                         <DropdownMenuTrigger asChild>
                           <button
                             className={cn(
-                              'inline-flex h-full items-center justify-center px-2 text-xs transition-all border rounded-r-full',
+                              'inline-flex h-full items-center justify-center px-1.5 text-xs transition-all border rounded-r-full',
                               'bg-primary text-primary-foreground border-primary hover:bg-primary/90',
                               isSubFiltered && 'ring-1 ring-primary-foreground/40'
                             )}
@@ -204,10 +204,13 @@ export function FiltrosFila({
                     ) : (
                       <button
                         type="button"
-                        aria-disabled="true"
+                        onClick={() => {
+                          onSelectStatus(key);
+                          if (key !== selectedStatus) onSubFiltroAgenteChange?.(null);
+                        }}
                         className={cn(
-                          'inline-flex h-full items-center justify-center px-2 text-xs transition-all border rounded-r-full',
-                          'bg-muted/50 text-muted-foreground border-border opacity-60 cursor-not-allowed'
+                          'inline-flex h-full items-center justify-center px-1.5 text-xs transition-all border rounded-r-full',
+                          'bg-muted/50 text-muted-foreground border-border hover:bg-muted'
                         )}
                       >
                         <ChevronDown className="w-3 h-3" />
@@ -269,7 +272,7 @@ export function FiltrosFila({
                           <DropdownMenuTrigger asChild>
                             <button
                               className={cn(
-                                'inline-flex h-full items-center justify-center px-2 text-xs transition-all border rounded-r-full',
+                                'inline-flex h-full items-center justify-center px-1.5 text-xs transition-all border rounded-r-full',
                                 'bg-primary text-primary-foreground border-primary hover:bg-primary/90',
                                 isSubFiltered && 'ring-1 ring-primary-foreground/40'
                               )}
@@ -304,10 +307,13 @@ export function FiltrosFila({
                       ) : (
                         <button
                           type="button"
-                          aria-disabled="true"
+                          onClick={() => {
+                            onSelectStatus(key);
+                            if (key !== selectedStatus) onSubFiltroAgenteChange?.(null);
+                          }}
                           className={cn(
-                            'inline-flex h-full items-center justify-center px-2 text-xs transition-all border rounded-r-full',
-                            'bg-muted/50 text-muted-foreground border-border opacity-60 cursor-not-allowed'
+                            'inline-flex h-full items-center justify-center px-1.5 text-xs transition-all border rounded-r-full',
+                            'bg-muted/50 text-muted-foreground border-border hover:bg-muted'
                           )}
                         >
                           <ChevronDown className="w-3 h-3" />
