@@ -236,6 +236,7 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
                 conversa.status === 'fila_humano' &&
                 conversa.agente_responsavel_id === currentUser?.id;
               const isLast = index === filteredConversas.length - 1;
+              const isAdmin = currentUser?.tipo_usuario === 'adm';
 
               return (
                 <div key={conversa.conversa_id} className="relative group">
@@ -244,8 +245,8 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
                       conversa={conversa}
                       isSelected={selectedConversaId === conversa.conversa_id}
                       onClick={() => onSelectConversa(conversa)}
-                      showBadge={selectedStatus === 'todos'}
-                      showAgentName={currentUser?.tipo_usuario === 'adm'}
+                      showBadge={isAdmin || selectedStatus === 'todos'}
+                      showAgentName={isAdmin}
                       selectionMode={selectionMode}
                       isChecked={selectedIds.has(conversa.conversa_id!)}
                       onToggleCheck={() => toggleSelectId(conversa.conversa_id!)}
