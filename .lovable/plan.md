@@ -1,26 +1,43 @@
 
 
-## Plano: Passos pós-commit para suporte a documentos
+## Problema: Mensagem de campanha enviada em duplicidade
 
-### 1. Aplicar migration no banco
-Executar a migration `20260306120000_add_document_media_to_mensagens_ativas.sql` via ferramenta de migração para criar as colunas `media_url`, `media_kind`, `media_filename` e `media_mime` na tabela `mensagens_ativas`.
+### Causa raiz
 
-### 2. Corrigir erro de build em `create-user-auth/index.ts`
-O erro `TS18046: 'err' is of type 'unknown'` na linha 98. Corrigir com cast:
-```typescript
-} catch (err) {
-  const message = err instanceof Error ? err.message : 'Erro desconhecido';
-  return new Response(JSON.stringify({ error: message }), { ... });
-}
+O `run-campaigns` está enviando cada mensagem **duas vezes**:
+
+1. **Linha 122** - Chama `whapi-send-message` diretamente (envia no WhatsApp)
+2. **Linha 142** - Chama `start-conversation`, que **internamente também chama** `whapi-send-message` (envia no WhatsApp de novo) e registra em `mensagens_ativas`
+
+Resultado: o contato recebe a mesma mensagem duas vezes no WhatsApp.
+
+### Solução
+
+Remover a chamada direta ao `whapi-send-message` (linhas 110-133) e usar **somente** o `start-conversation`, que já faz tudo:
+- Envia a mensagem via WhatsApp (com marcador de `human_mode`)
+- Registra em `mensagens_ativas`
+- Cria/reutiliza conversa
+- Atribui agente se necessário
+
+### Alteração no `run-campaigns/index.ts`
+
+Substituir o fluxo atual (send + start-conversation separados) por uma única chamada ao `start-conversation`, verificando o resultado para marcar o destinatário como `enviado` ou `erro_envio`. Basicamente:
+
+```
+// ANTES (duplicado):
+// 1. fetch(whapi-send-message) → envia WhatsApp
+// 2. fetch(start-conversation) → envia WhatsApp DE NOVO + cria conversa
+
+// DEPOIS (correto):
+// 1. fetch(start-conversation) → envia WhatsApp + cria conversa (tudo em um)
 ```
 
-### 3. Validar payload Whapi para documentos
-A interface `WhapiMessage` já define `document?: { filename?: string; link?: string }` (linha 24-27) e a função `extractDocumentFromMessage` já usa `message.document?.link` e `message.document?.filename`. Isso está alinhado com a documentação do Whapi. Nenhuma alteração necessária.
+O loop do `for (const dest of destinatarios)` ficará:
+- Marca destinatário como `enviando`
+- Chama `start-conversation` com `empresa_id`, `contato_id`, `mensagem_inicial`, `origem_inicial: 'campanha'`, `origem_final`, `campanha_id`
+- Se sucesso: marca `enviado` e salva `conversa_id` retornado
+- Se erro: marca `erro_envio`
 
-### 4. Tipos TypeScript
-Os tipos são gerados automaticamente pelo Lovable Cloud após a migration. O arquivo `src/integrations/supabase/types.ts` será atualizado automaticamente — não precisa de ação manual.
-
-### Arquivos alterados
-- **Migration**: `20260306120000_add_document_media_to_mensagens_ativas.sql` (executar no banco)
-- **`supabase/functions/create-user-auth/index.ts`**: fix do erro TypeScript na linha 98
+### Arquivo alterado
+- `supabase/functions/run-campaigns/index.ts`
 
