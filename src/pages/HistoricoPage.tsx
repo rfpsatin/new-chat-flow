@@ -135,6 +135,8 @@ export default function HistoricoPage() {
               filtros={filtros}
               onFiltrosChange={handleFiltrosChange}
               operadores={operadores}
+              onAplicar={handleAplicar}
+              hasApplied={hasApplied}
             />
           </ResizablePanel>
 
