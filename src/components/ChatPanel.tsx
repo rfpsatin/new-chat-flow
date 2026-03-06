@@ -479,6 +479,7 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
 
   const senderLabel = getSenderLabel();
   const displayContent = getDisplayContent();
+  const hasDocument = mensagem.media_kind === 'document' && !!mensagem.media_url;
 
   return (
     <div
@@ -502,6 +503,28 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
           )}>
             {senderLabel}
           </p>
+        )}
+        {hasDocument && (
+          <div className="mb-2 rounded-lg border border-border/50 bg-muted/30 p-3">
+            <div className="flex items-center gap-2">
+              <span className="text-lg" aria-hidden>📄</span>
+              <span className="truncate text-sm font-medium">
+                {mensagem.media_filename || 'Documento'}
+              </span>
+            </div>
+            <a
+              href={mensagem.media_url!}
+              target="_blank"
+              rel="noreferrer"
+              download={mensagem.media_filename ?? undefined}
+              className={cn(
+                'mt-2 inline-block text-sm font-medium underline underline-offset-2',
+                isOutgoing ? 'text-chat-outgoing-text' : 'text-primary'
+              )}
+            >
+              Baixar documento
+            </a>
+          </div>
         )}
         <FormattedMessageContent content={displayContent} isOutgoing={isOutgoing} />
         <p className={cn(

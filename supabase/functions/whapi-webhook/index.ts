@@ -352,6 +352,7 @@ Deno.serve(async (req) => {
         }
 
         // Insert message (always in/cliente at this point)
+        const doc = extractDocumentFromMessage(message)
         const { error: msgError } = await supabase
           .from('mensagens_ativas')
           .insert({
@@ -362,6 +363,10 @@ Deno.serve(async (req) => {
             tipo_remetente: 'cliente',
             conteudo: conteudo,
             payload: message,
+            media_url: doc.mediaUrl ?? null,
+            media_kind: doc.mediaKind ?? null,
+            media_filename: doc.mediaFilename ?? null,
+            media_mime: doc.mediaMime ?? null,
           })
 
         if (msgError) {
@@ -672,5 +677,22 @@ function extractMessageContent(message: WhapiMessage): string {
     }
     default:
       return `[${message.type || 'mensagem'}]`
+  }
+}
+
+function extractDocumentFromMessage(message: WhapiMessage): {
+  mediaUrl?: string
+  mediaKind?: 'document'
+  mediaFilename?: string
+  mediaMime?: string
+} {
+  if (message.type !== 'document' || !message.document?.link) {
+    return {}
+  }
+  return {
+    mediaUrl: message.document.link,
+    mediaKind: 'document',
+    mediaFilename: message.document.filename ?? undefined,
+    mediaMime: undefined,
   }
 }

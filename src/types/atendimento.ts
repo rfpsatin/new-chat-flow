@@ -74,6 +74,11 @@ export interface MensagemAtiva {
   conteudo: string | null;
   payload: Record<string, unknown> | null;
   criado_em: string;
+  /** URL do documento no Whapi (preenchido quando media_kind === 'document') */
+  media_url?: string | null;
+  media_kind?: string | null;
+  media_filename?: string | null;
+  media_mime?: string | null;
 }
 
 export interface MotivoEncerramento {
