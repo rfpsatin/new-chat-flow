@@ -14,9 +14,10 @@ interface Props {
   onFiltrosChange: (filtros: FiltrosType) => void;
   operadores: { id: string; nome: string }[];
   ocultarOperador?: boolean;
+  onAplicar: () => void;
 }
 
-export function FiltrosHistorico({ filtros, onFiltrosChange, operadores, ocultarOperador = false }: Props) {
+export function FiltrosHistorico({ filtros, onFiltrosChange, operadores, ocultarOperador = false, onAplicar }: Props) {
   const handleClearFiltros = () => {
     onFiltrosChange({
       busca: '',
@@ -112,18 +113,28 @@ export function FiltrosHistorico({ filtros, onFiltrosChange, operadores, ocultar
         </Popover>
       </div>
 
-      {/* Limpar filtros */}
-      {hasFilters && (
+      {/* Ações */}
+      <div className="flex gap-2">
         <Button
-          variant="ghost"
           size="sm"
-          className="w-full h-8 text-muted-foreground"
-          onClick={handleClearFiltros}
+          className="flex-1 h-8"
+          onClick={onAplicar}
         >
-          <X className="w-3 h-3 mr-1" />
-          Limpar filtros
+          <Search className="w-3 h-3 mr-1" />
+          Consultar
         </Button>
-      )}
+        {hasFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-muted-foreground"
+            onClick={handleClearFiltros}
+          >
+            <X className="w-3 h-3 mr-1" />
+            Limpar
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
