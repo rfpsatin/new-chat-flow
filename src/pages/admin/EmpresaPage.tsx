@@ -3,6 +3,7 @@ import { MainLayout } from '@/components/MainLayout';
 import { AdminGuard } from '@/components/AdminGuard';
 import { useApp } from '@/contexts/AppContext';
 import { useEmpresa, EmpresaFormData } from '@/hooks/useEmpresa';
+import { useGoogleDriveIntegracao } from '@/hooks/useGoogleDriveIntegracao';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +15,7 @@ export default function EmpresaPage() {
   const empresaId = currentUser?.empresa_id ?? '';
 
   const { empresa, isLoading, salvarEmpresa } = useEmpresa(empresaId);
+  const { status: driveStatus, isLoadingStatus, iniciarConexao, atualizarStatus } = useGoogleDriveIntegracao(empresaId);
 
   const [form, setForm] = useState<EmpresaFormData>({
     razao_social: '',
@@ -70,7 +72,8 @@ export default function EmpresaPage() {
           </div>
 
           <div className="flex-1 overflow-auto p-6">
-            <Card className="max-w-2xl">
+            <div className="max-w-2xl space-y-6">
+            <Card>
               <CardHeader>
                 <CardTitle>Cadastro da empresa</CardTitle>
               </CardHeader>
@@ -145,6 +148,59 @@ export default function EmpresaPage() {
                 )}
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Google Drive da empresa</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {isLoadingStatus ? (
+                  <p className="text-muted-foreground">Verificando conexao com Google Drive...</p>
+                ) : (
+                  <>
+                    <div className="text-sm space-y-1">
+                      <p>
+                        <span className="text-muted-foreground">Status:</span>{' '}
+                        {driveStatus?.connected ? 'Conectado' : 'Nao conectado'}
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Conta Google:</span>{' '}
+                        {driveStatus?.config?.google_user_email || '-'}
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Pasta raiz (ID):</span>{' '}
+                        {driveStatus?.config?.google_drive_root_folder_id || '-'}
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Ultima atualizacao:</span>{' '}
+                        {driveStatus?.config?.updated_at
+                          ? new Date(driveStatus.config.updated_at).toLocaleString('pt-BR')
+                          : '-'}
+                      </p>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        onClick={() => iniciarConexao.mutate()}
+                        disabled={iniciarConexao.isPending || !empresaId}
+                      >
+                        {driveStatus?.connected ? 'Reconectar Google Drive' : 'Conectar Google Drive'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={atualizarStatus}
+                        disabled={!empresaId}
+                      >
+                        Atualizar status
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+            </div>
           </div>
         </div>
       </AdminGuard>
