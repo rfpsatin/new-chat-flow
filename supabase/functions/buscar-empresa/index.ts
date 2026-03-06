@@ -11,10 +11,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { telefone } = await req.json()
+    const url = new URL(req.url)
+    const telefone = url.searchParams.get('telefone')
 
     if (!telefone) {
-      return new Response(JSON.stringify({ error: 'Missing telefone' }), {
+      return new Response(JSON.stringify({ error: 'Missing telefone parameter' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
