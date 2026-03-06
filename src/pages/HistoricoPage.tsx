@@ -93,6 +93,13 @@ export default function HistoricoPage() {
     setFiltros(novosFiltros);
   };
 
+  const handleAplicar = () => {
+    setAppliedFiltros({ ...filtros });
+    setHasApplied(true);
+    setItemSelecionadoId(null);
+    setSessoesAbertasIds([]);
+  };
+
   const handleToggleSessao = (conversaId: string) => {
     setSessoesAbertasIds((prev) => {
       if (prev.includes(conversaId)) {
