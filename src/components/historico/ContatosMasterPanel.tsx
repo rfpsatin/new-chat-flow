@@ -1,5 +1,5 @@
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Users, MessageSquare, UserCog } from 'lucide-react';
+import { Users, MessageSquare, UserCog, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ContatoComHistorico, AtendenteComHistorico, FiltrosHistorico as FiltrosType } from '@/types/atendimento';
 import { FiltrosHistorico } from './FiltrosHistorico';
@@ -14,6 +14,8 @@ interface Props {
   filtros: FiltrosType;
   onFiltrosChange: (filtros: FiltrosType) => void;
   operadores: { id: string; nome: string }[];
+  onAplicar: () => void;
+  hasApplied: boolean;
 }
 
 export function ContatosMasterPanel({
@@ -26,6 +28,8 @@ export function ContatosMasterPanel({
   filtros,
   onFiltrosChange,
   operadores,
+  onAplicar,
+  hasApplied,
 }: Props) {
   const isAtendentes = modo === 'atendentes';
   const items = isAtendentes ? atendentes : contatos;
@@ -58,10 +62,18 @@ export function ContatosMasterPanel({
         onFiltrosChange={onFiltrosChange}
         operadores={operadores}
         ocultarOperador={isAtendentes}
+        onAplicar={onAplicar}
       />
 
       <ScrollArea className="flex-1">
-        {isLoading ? (
+        {!hasApplied ? (
+          <div className="p-4 text-center">
+            <Search className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">
+              Defina os filtros e clique em <strong>Consultar</strong>
+            </p>
+          </div>
+        ) : isLoading ? (
           <div className="p-4 text-center text-sm text-muted-foreground">
             Carregando...
           </div>

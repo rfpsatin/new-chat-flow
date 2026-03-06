@@ -72,7 +72,7 @@ export function useSessoesAtendente(empresaId: string, agenteId: string | null, 
 }
 
 // Lista contatos com histórico (usado quando há filtro de busca)
-export function useContatosComHistorico(empresaId: string, filtros: FiltrosHistorico) {
+export function useContatosComHistorico(empresaId: string, filtros: FiltrosHistorico, enabled = true) {
   return useQuery({
     queryKey: ['contatos-historico', empresaId, filtros],
     queryFn: async () => {
@@ -81,17 +81,12 @@ export function useContatosComHistorico(empresaId: string, filtros: FiltrosHisto
         .select('contato_id, contato_nome, whatsapp_numero, agente_responsavel_id')
         .eq('empresa_id', empresaId);
 
-      // Filtro por busca (nome ou telefone)
       if (filtros.busca) {
         query = query.or(`contato_nome.ilike.%${filtros.busca}%,whatsapp_numero.ilike.%${filtros.busca}%`);
       }
-
-      // Filtro por operador
       if (filtros.operadorId) {
         query = query.eq('agente_responsavel_id', filtros.operadorId);
       }
-
-      // Filtro por período
       if (filtros.dataInicio) {
         query = query.gte('iniciado_em', startOfDay(filtros.dataInicio).toISOString());
       }
@@ -100,15 +95,11 @@ export function useContatosComHistorico(empresaId: string, filtros: FiltrosHisto
       }
 
       const { data, error } = await query;
-
       if (error) throw error;
 
-      // Agrupar por contato e contar sessões
       const contatosMap = new Map<string, ContatoComHistorico>();
-      
       data?.forEach((item) => {
         if (!item.contato_id) return;
-        
         const existing = contatosMap.get(item.contato_id);
         if (existing) {
           existing.total_sessoes += 1;
@@ -124,7 +115,7 @@ export function useContatosComHistorico(empresaId: string, filtros: FiltrosHisto
 
       return Array.from(contatosMap.values()).sort((a, b) => b.total_sessoes - a.total_sessoes);
     },
-    enabled: !!empresaId,
+    enabled: !!empresaId && enabled,
   });
 }
 
