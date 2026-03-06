@@ -1,5 +1,5 @@
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Users, MessageSquare, UserCog } from 'lucide-react';
+import { Users, MessageSquare, UserCog, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ContatoComHistorico, AtendenteComHistorico, FiltrosHistorico as FiltrosType } from '@/types/atendimento';
 import { FiltrosHistorico } from './FiltrosHistorico';
