@@ -8,7 +8,7 @@ const corsHeaders = {
 }
 
 interface StartConversationRequest {
-  empresa_id: string
+  empresa_id?: string
   contato_id: string
   mensagem_inicial: string
   midia_url?: string
@@ -17,6 +17,51 @@ interface StartConversationRequest {
   origem_final?: 'agente' | 'atendente'
   campanha_id?: string
   remetente_id?: string // usuario que iniciou (agente)
+}
+
+type CallerTenant = {
+  usuarioId: string
+  empresaId: string
+  tipoUsuario: 'adm' | 'sup' | 'opr'
+}
+
+async function getCallerTenant(req: Request, supabaseUrl: string, serviceRoleKey: string): Promise<CallerTenant> {
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader) {
+    throw new Error('Nao autorizado')
+  }
+
+  const callerClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+  const { data: { user }, error: userError } = await callerClient.auth.getUser()
+  if (userError || !user) {
+    throw new Error('Nao autorizado')
+  }
+
+  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+  const { data: usuario, error: usuarioError } = await adminClient
+    .from('usuarios')
+    .select('id, empresa_id, tipo_usuario, ativo')
+    .eq('auth_user_id', user.id)
+    .maybeSingle()
+
+  if (usuarioError) throw new Error(usuarioError.message)
+  if (!usuario || !usuario.ativo || !usuario.empresa_id) {
+    throw new Error('Usuario sem empresa ativa')
+  }
+  if (!['adm', 'sup', 'opr'].includes(usuario.tipo_usuario)) {
+    throw new Error('Perfil sem permissao para iniciar conversa')
+  }
+
+  return {
+    usuarioId: usuario.id,
+    empresaId: usuario.empresa_id,
+    tipoUsuario: usuario.tipo_usuario as 'adm' | 'sup' | 'opr',
+  }
 }
 
 Deno.serve(async (req) => {
@@ -36,12 +81,12 @@ Deno.serve(async (req) => {
 
   try {
     const body: StartConversationRequest = await req.json()
-    const { empresa_id, contato_id, mensagem_inicial, link, origem_inicial, origem_final, campanha_id, remetente_id } = body
+    const { contato_id, mensagem_inicial, link, origem_inicial, origem_final, campanha_id, remetente_id } = body
 
-    if (!empresa_id || !contato_id || !mensagem_inicial?.trim()) {
+    if (!contato_id || !mensagem_inicial?.trim()) {
       return new Response(JSON.stringify({
         error: 'Missing required fields',
-        required: ['empresa_id', 'contato_id', 'mensagem_inicial'],
+        required: ['contato_id', 'mensagem_inicial'],
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -50,6 +95,17 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const callerTenant = await getCallerTenant(req, supabaseUrl, supabaseServiceKey)
+    const empresa_id = callerTenant.empresaId
+    const remetenteEfetivoId = callerTenant.usuarioId
+
+    if (remetente_id && remetente_id !== remetenteEfetivoId) {
+      return new Response(JSON.stringify({ error: 'remetente_id invalido para o usuario autenticado' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Buscar contato
@@ -164,7 +220,7 @@ Deno.serve(async (req) => {
     const sendRes = await fetch(sendUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${supabaseServiceKey}`,
+        'Authorization': req.headers.get('Authorization') || '',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -192,19 +248,19 @@ Deno.serve(async (req) => {
       conversa_id: conversaId,
       contato_id,
       direcao: 'out',
-      tipo_remetente: remetente_id ? 'agente' : 'sistema',
-      remetente_id: remetente_id || null,
+      tipo_remetente: remetenteEfetivoId ? 'agente' : 'sistema',
+      remetente_id: remetenteEfetivoId || null,
       conteudo: messageText,
     })
 
     // Se origem_final === 'atendente' e há remetente: atribui agente e coloca em atendimento humano
     // Se origem_final === 'agente': status já é 'bot', não atribui agente
-    if (remetente_id && origem_final !== 'agente') {
+    if (remetenteEfetivoId && origem_final !== 'agente') {
       const { error: atribuirError } = await supabase
         .from('conversas')
         .update({
           status: 'em_atendimento_humano',
-          agente_responsavel_id: remetente_id,
+          agente_responsavel_id: remetenteEfetivoId,
           updated_at: new Date().toISOString(),
         })
         .eq('id', conversaId)
@@ -212,7 +268,7 @@ Deno.serve(async (req) => {
       if (atribuirError) {
         console.error(`[${requestId}] Error atribuindo agente:`, atribuirError)
       } else {
-        console.log(`[${requestId}] Conversa atribuída ao agente ${remetente_id} em atendimento humano`)
+        console.log(`[${requestId}] Conversa atribuída ao agente ${remetenteEfetivoId} em atendimento humano`)
       }
     }
     

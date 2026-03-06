@@ -82,31 +82,18 @@ export function useEnviarMensagem() {
       }
 
       // 2. Send message via Whapi API
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      
-      const functionUrl = `${supabaseUrl}/functions/v1/whapi-send-message`;
-
       const isHuman = humanMode === true;
       const whapiBody = `#\"human_mode=${isHuman ? 'true' : 'false'}\"# ${conteudo}`;
-      
-      const whapiResponse = await fetch(functionUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${supabaseAnonKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+
+      const { error: whapiError } = await supabase.functions.invoke('whapi-send-message', {
+        body: {
           empresa_id: empresaId,
           to: contato.whatsapp_numero,
           message: whapiBody,
-        }),
+        },
       });
 
-      if (!whapiResponse.ok) {
-        const errorData = await whapiResponse.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Erro ao enviar mensagem via Whapi');
-      }
+      if (whapiError) throw new Error(whapiError.message || 'Erro ao enviar mensagem via Whapi');
 
       // Inserir mensagem diretamente no banco (webhook ignora from_me=true)
       await supabase.from('mensagens_ativas').insert({

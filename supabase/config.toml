@@ -4,22 +4,25 @@ project_id = "hyizldxjiwjeruxqrqbv"
 verify_jwt = false
 
 [functions.whapi-send-message]
-verify_jwt = false
+verify_jwt = true
 
 [functions.check-attendance-mode]
-verify_jwt = false
+verify_jwt = true
 
 [functions.close-service]
-verify_jwt = false
+verify_jwt = true
 
 [functions.n8n-webhook-cinemkt]
 verify_jwt = false
 
 [functions.n8n-reset-human-mode]
-verify_jwt = false
+verify_jwt = true
 
 [functions.start-conversation]
-verify_jwt = false
+verify_jwt = true
 
 [functions.run-campaigns]
+verify_jwt = false
+
+[functions.whapi-connection-webhook]
 verify_jwt = false

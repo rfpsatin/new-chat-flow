@@ -11,10 +11,47 @@ const N8N_WEBHOOK_URL = 'https://n8n.maringaai.com.br/webhook/whatsapp_cinemkt'
 const HUMAN_MODE_MARKER = /^#"human_mode=(true|false)"#\s*/
 
 interface SendMessageRequest {
-  empresa_id: string
+  empresa_id?: string
   to: string
   message: string
   human_mode?: boolean
+}
+
+type CallerTenant = {
+  empresaId: string
+  tipoUsuario: 'adm' | 'sup' | 'opr'
+}
+
+async function getCallerTenant(req: Request, supabaseUrl: string, serviceRoleKey: string): Promise<CallerTenant> {
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader) throw new Error('Nao autorizado')
+
+  const callerClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+  const { data: { user }, error: userError } = await callerClient.auth.getUser()
+  if (userError || !user) throw new Error('Nao autorizado')
+
+  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+  const { data: usuario, error: usuarioError } = await adminClient
+    .from('usuarios')
+    .select('empresa_id, tipo_usuario, ativo')
+    .eq('auth_user_id', user.id)
+    .maybeSingle()
+
+  if (usuarioError) throw new Error(usuarioError.message)
+  if (!usuario || !usuario.ativo || !usuario.empresa_id) throw new Error('Usuario sem empresa ativa')
+  if (!['adm', 'sup', 'opr'].includes(usuario.tipo_usuario)) {
+    throw new Error('Perfil sem permissao para enviar mensagem')
+  }
+
+  return {
+    empresaId: usuario.empresa_id,
+    tipoUsuario: usuario.tipo_usuario as 'adm' | 'sup' | 'opr',
+  }
 }
 
 Deno.serve(async (req) => {
@@ -42,13 +79,13 @@ Deno.serve(async (req) => {
     const body: SendMessageRequest = await req.json()
     console.log(`[${requestId}] Request body:`, JSON.stringify(body, null, 2))
 
-    const { empresa_id, to, message, human_mode } = body
+    const { to, message, human_mode } = body
 
-    if (!empresa_id || !to || !message) {
+    if (!to || !message) {
       console.error(`[${requestId}] ERROR: Missing required fields`)
       return new Response(JSON.stringify({ 
         error: 'Missing required fields',
-        required: ['empresa_id', 'to', 'message']
+        required: ['to', 'message']
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -58,6 +95,8 @@ Deno.serve(async (req) => {
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const callerTenant = await getCallerTenant(req, supabaseUrl, supabaseServiceKey)
+    const empresa_id = callerTenant.empresaId
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Get empresa and whapi_token

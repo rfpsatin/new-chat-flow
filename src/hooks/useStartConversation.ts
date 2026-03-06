@@ -1,7 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+import { supabase } from '@/integrations/supabase/client';
 
 interface StartConversationParams {
   empresa_id: string;
@@ -27,19 +25,10 @@ export function useStartConversation() {
     mutationFn: async (
       params: StartConversationParams
     ): Promise<StartConversationResult> => {
-      const url = `${SUPABASE_URL}/functions/v1/start-conversation`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(params),
+      const { data, error } = await supabase.functions.invoke('start-conversation', {
+        body: params,
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || 'Falha ao iniciar conversa');
-      }
+      if (error) throw new Error(error.message || 'Falha ao iniciar conversa');
       if (!data.success) {
         throw new Error(data.error || 'Falha ao iniciar conversa');
       }

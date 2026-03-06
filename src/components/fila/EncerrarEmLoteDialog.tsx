@@ -72,8 +72,6 @@ export function EncerrarEmLoteDialog({
 
   const executarEncerramento = async (enviarAvaliacao: boolean) => {
     setIsProcessing(true);
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
     let sucesso = 0;
     let erros = 0;
@@ -91,17 +89,12 @@ export function EncerrarEmLoteDialog({
             if (conversa.whatsapp_numero) {
               try {
                 await withTimeout(() =>
-                  fetch(`${supabaseUrl}/functions/v1/whapi-send-message`, {
-                    method: 'POST',
-                    headers: {
-                      'Authorization': `Bearer ${supabaseAnonKey}`,
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
+                  supabase.functions.invoke('whapi-send-message', {
+                    body: {
                       empresa_id: empresaId,
                       to: conversa.whatsapp_numero,
                       message: MENSAGEM_PESQUISA,
-                    }),
+                    },
                   })
                 );
 
@@ -132,10 +125,8 @@ export function EncerrarEmLoteDialog({
 
               if (isN8n) {
                 await withTimeout(() =>
-                  fetch(`${supabaseUrl}/functions/v1/n8n-reset-human-mode`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${supabaseAnonKey}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ conversa_id: conversa.conversa_id, empresa_id: empresaId }),
+                  supabase.functions.invoke('n8n-reset-human-mode', {
+                    body: { conversa_id: conversa.conversa_id, empresa_id: empresaId },
                   })
                 ).catch(console.error);
               } else {
@@ -149,10 +140,8 @@ export function EncerrarEmLoteDialog({
 
                 if (contato) {
                   await withTimeout(() =>
-                    fetch(`${supabaseUrl}/functions/v1/close-service`, {
-                      method: 'POST',
-                      headers: { 'Authorization': `Bearer ${supabaseAnonKey}`, 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ conversa_id: conversa.conversa_id, empresa_id: empresaId, chat_id: contato.whatsapp_numero }),
+                    supabase.functions.invoke('close-service', {
+                      body: { conversa_id: conversa.conversa_id, empresa_id: empresaId, chat_id: contato.whatsapp_numero },
                     })
                   ).catch(console.error);
                 }

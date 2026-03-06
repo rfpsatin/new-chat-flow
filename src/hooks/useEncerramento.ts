@@ -62,24 +62,16 @@ export function useEncerrarConversa() {
       }
 
       // 2. Enviar mensagem de pesquisa via WhatsApp
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-      const whapiResponse = await fetch(`${supabaseUrl}/functions/v1/whapi-send-message`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${supabaseAnonKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const { error: whapiError } = await supabase.functions.invoke('whapi-send-message', {
+        body: {
           empresa_id: empresaId,
           to: contato.whatsapp_numero,
           message: MENSAGEM_PESQUISA,
-        }),
+        },
       });
 
-      if (!whapiResponse.ok) {
-        console.error('Erro ao enviar pesquisa via WhatsApp:', await whapiResponse.text());
+      if (whapiError) {
+        console.error('Erro ao enviar pesquisa via WhatsApp:', whapiError.message);
         // Continuar mesmo se falhar o envio - não bloquear encerramento
       }
 
@@ -113,20 +105,15 @@ export function useEncerrarConversa() {
       // 5a. Se for conversa do novo webhook n8n, resetar human_mode
       if (isN8nCinemktConversa) {
         try {
-          const resetResponse = await fetch(`${supabaseUrl}/functions/v1/n8n-reset-human-mode`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${supabaseAnonKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
+          const { error: resetError } = await supabase.functions.invoke('n8n-reset-human-mode', {
+            body: {
               conversa_id: conversaId,
               empresa_id: empresaId,
-            }),
+            },
           });
 
-          if (!resetResponse.ok) {
-            console.error('Erro ao resetar human_mode no n8n:', await resetResponse.text());
+          if (resetError) {
+            console.error('Erro ao resetar human_mode no n8n:', resetError.message);
           }
         } catch (resetError) {
           console.error('Erro ao resetar human_mode no n8n:', resetError);
@@ -136,21 +123,16 @@ export function useEncerrarConversa() {
       // 5b. Se for conversa do webhook antigo, chamar close-service (comportamento original)
       if (!isN8nCinemktConversa) {
         try {
-          const closeResponse = await fetch(`${supabaseUrl}/functions/v1/close-service`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${supabaseAnonKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
+          const { error: closeError } = await supabase.functions.invoke('close-service', {
+            body: {
               conversa_id: conversaId,
               empresa_id: empresaId,
               chat_id: contato.whatsapp_numero,
-            }),
+            },
           });
 
-          if (!closeResponse.ok) {
-            console.error('Erro ao chamar close-service:', await closeResponse.text());
+          if (closeError) {
+            console.error('Erro ao chamar close-service:', closeError.message);
           }
         } catch (closeError) {
           console.error('Erro ao chamar close-service:', closeError);

@@ -9,16 +9,59 @@ const corsHeaders = {
 
 const N8N_WEBHOOK_URL = 'https://n8n.maringaai.com.br/webhook/whatsapp_cinemkt'
 
+type CallerTenant = {
+  empresaId: string
+  tipoUsuario: 'adm' | 'sup' | 'opr'
+}
+
+async function getCallerTenant(req: Request): Promise<CallerTenant> {
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader) throw new Error('Nao autorizado')
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+
+  const callerClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+  const { data: { user }, error: userError } = await callerClient.auth.getUser()
+  if (userError || !user) throw new Error('Nao autorizado')
+
+  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+  const { data: usuario, error: usuarioError } = await adminClient
+    .from('usuarios')
+    .select('empresa_id, tipo_usuario, ativo')
+    .eq('auth_user_id', user.id)
+    .maybeSingle()
+
+  if (usuarioError) throw new Error(usuarioError.message)
+  if (!usuario || !usuario.ativo || !usuario.empresa_id) throw new Error('Usuario sem empresa ativa')
+  if (!['adm', 'sup', 'opr'].includes(usuario.tipo_usuario)) {
+    throw new Error('Perfil sem permissao para resetar human_mode')
+  }
+
+  return {
+    empresaId: usuario.empresa_id,
+    tipoUsuario: usuario.tipo_usuario as 'adm' | 'sup' | 'opr',
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const { conversa_id, empresa_id } = await req.json()
+    const { conversa_id } = await req.json()
+    const callerTenant = await getCallerTenant(req)
+    const empresa_id = callerTenant.empresaId
 
-    if (!conversa_id || !empresa_id) {
-      return new Response(JSON.stringify({ error: 'Missing conversa_id or empresa_id' }), {
+    if (!conversa_id) {
+      return new Response(JSON.stringify({ error: 'Missing conversa_id' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -35,6 +78,7 @@ Deno.serve(async (req) => {
       .from('conversas')
       .select('n8n_webhook_id, origem, channel, contato_id, human_mode, origem_final')
       .eq('id', conversa_id)
+      .eq('empresa_id', empresa_id)
       .single()
 
     if (convError || !conversa) {
@@ -76,6 +120,7 @@ Deno.serve(async (req) => {
       .from('conversas')
       .update({ human_mode: false, updated_at: new Date().toISOString() })
       .eq('id', conversa_id)
+      .eq('empresa_id', empresa_id)
 
     // Enviar ao n8n no formato que o Code node espera (Whapi-like)
     // para que o Redis seja atualizado corretamente.
