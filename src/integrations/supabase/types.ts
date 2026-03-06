@@ -418,6 +418,10 @@ export type Database = {
           direcao: string
           empresa_id: string
           id: number
+          media_filename: string | null
+          media_kind: string | null
+          media_mime: string | null
+          media_url: string | null
           payload: Json | null
           remetente_id: string | null
           tipo_remetente: string
@@ -430,6 +434,10 @@ export type Database = {
           direcao: string
           empresa_id: string
           id?: number
+          media_filename?: string | null
+          media_kind?: string | null
+          media_mime?: string | null
+          media_url?: string | null
           payload?: Json | null
           remetente_id?: string | null
           tipo_remetente: string
@@ -442,6 +450,10 @@ export type Database = {
           direcao?: string
           empresa_id?: string
           id?: number
+          media_filename?: string | null
+          media_kind?: string | null
+          media_mime?: string | null
+          media_url?: string | null
           payload?: Json | null
           remetente_id?: string | null
           tipo_remetente?: string
