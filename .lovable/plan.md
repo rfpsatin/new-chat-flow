@@ -1,43 +1,50 @@
 
 
-## Problema: Mensagem de campanha enviada em duplicidade
+## Plano: Histórico com filtros manuais (sem carregamento automático)
 
-### Causa raiz
+### Comportamento atual
+- Ao abrir `/historico`, a lista de contatos carrega automaticamente todos os dados
+- Filtros são aplicados em tempo real (cada digitação/seleção dispara nova query)
 
-O `run-campaigns` está enviando cada mensagem **duas vezes**:
+### Novo comportamento
+1. Ao abrir a tela, **nenhum dado é carregado** — exibe mensagem orientando o usuário a definir filtros
+2. Filtros passam a ser **draft** (rascunho) — alterações nos campos NÃO disparam queries
+3. Botão **"Consultar"** ao lado de "Limpar filtros" aplica os filtros manualmente
+4. Somente após clicar "Consultar" os dados são buscados
 
-1. **Linha 122** - Chama `whapi-send-message` diretamente (envia no WhatsApp)
-2. **Linha 142** - Chama `start-conversation`, que **internamente também chama** `whapi-send-message` (envia no WhatsApp de novo) e registra em `mensagens_ativas`
+### Arquivos alterados
 
-Resultado: o contato recebe a mesma mensagem duas vezes no WhatsApp.
+**1. `src/pages/HistoricoPage.tsx`**
+- Adicionar estado `appliedFiltros` (filtros efetivamente aplicados) separado de `filtros` (draft)
+- Adicionar flag `hasApplied` (inicia `false`) — controla se já houve consulta
+- Passar `appliedFiltros` para os hooks de query (`useContatosComHistorico`, `useSessoesAtendente`, `useSessoesContato`)
+- Passar `filtros` (draft) para o componente de filtros (UI)
+- Criar handler `handleAplicar` que copia `filtros` → `appliedFiltros` e seta `hasApplied = true`
+- Passar `onAplicar` para `ContatosMasterPanel`
+- Quando `!hasApplied`, exibir mensagem placeholder no painel master em vez dos dados
 
-### Solução
+**2. `src/components/historico/FiltrosHistorico.tsx`**
+- Adicionar prop `onAplicar: () => void`
+- Adicionar botão **"Consultar"** ao lado do botão "Limpar filtros"
+- Botão aparece sempre (não só quando há filtros), para permitir consulta sem filtros também — ou aparece junto com "Limpar"
 
-Remover a chamada direta ao `whapi-send-message` (linhas 110-133) e usar **somente** o `start-conversation`, que já faz tudo:
-- Envia a mensagem via WhatsApp (com marcador de `human_mode`)
-- Registra em `mensagens_ativas`
-- Cria/reutiliza conversa
-- Atribui agente se necessário
+**3. `src/components/historico/ContatosMasterPanel.tsx`**
+- Receber e repassar prop `onAplicar` para `FiltrosHistorico`
+- Receber prop `hasApplied` — quando `false`, exibir card placeholder "Defina os filtros e clique em Consultar"
 
-### Alteração no `run-campaigns/index.ts`
+**4. `src/hooks/useHistorico.ts`**
+- `useContatosComHistorico`: adicionar parâmetro `enabled` ou flag `hasApplied` para não executar query quando não houve consulta
+- Alternativa mais simples: controlar via `enabled` no `HistoricoPage` passando queries com `enabled: hasApplied`
 
-Substituir o fluxo atual (send + start-conversation separados) por uma única chamada ao `start-conversation`, verificando o resultado para marcar o destinatário como `enviado` ou `erro_envio`. Basicamente:
-
+### Fluxo
+```text
+Abre /historico
+  → filtros = draft (vazio), appliedFiltros = null, hasApplied = false
+  → Painel master: "Defina os filtros e clique em Consultar"
+  → Usuário preenche filtros (não dispara query)
+  → Clica "Consultar"
+  → appliedFiltros = cópia de filtros, hasApplied = true
+  → Queries executam com appliedFiltros
+  → Lista de contatos/atendentes aparece
 ```
-// ANTES (duplicado):
-// 1. fetch(whapi-send-message) → envia WhatsApp
-// 2. fetch(start-conversation) → envia WhatsApp DE NOVO + cria conversa
-
-// DEPOIS (correto):
-// 1. fetch(start-conversation) → envia WhatsApp + cria conversa (tudo em um)
-```
-
-O loop do `for (const dest of destinatarios)` ficará:
-- Marca destinatário como `enviando`
-- Chama `start-conversation` com `empresa_id`, `contato_id`, `mensagem_inicial`, `origem_inicial: 'campanha'`, `origem_final`, `campanha_id`
-- Se sucesso: marca `enviado` e salva `conversa_id` retornado
-- Se erro: marca `erro_envio`
-
-### Arquivo alterado
-- `supabase/functions/run-campaigns/index.ts`
 
