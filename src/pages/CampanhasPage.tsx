@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { MainLayout } from '@/components/MainLayout';
 import {
@@ -19,6 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -31,6 +32,7 @@ import {
   ChevronRight,
   Tag,
   Info,
+  ArrowUpDown,
 } from 'lucide-react';
 import { Campanha, CampanhaStats, StatusCampanha } from '@/types/atendimento';
 import { toast } from 'sonner';
@@ -50,19 +52,69 @@ export default function CampanhasPage() {
   const { data: stats, isLoading } = useCampanhasStats(empresaId);
   const [selectedCampanhaId, setSelectedCampanhaId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [sortBy, setSortBy] = useState<'oldest' | 'newest' | 'name-asc' | 'name-desc'>('newest');
+
+  const sortedStats = useMemo(() => {
+    if (!stats) return [];
+
+    const getDateValue = (c: CampanhaStats) => {
+      const source = c.created_at ?? c.agendado_para ?? c.iniciada_em ?? c.finalizada_em;
+      return source ? new Date(source).getTime() : 0;
+    };
+
+    return [...stats].sort((a, b) => {
+      switch (sortBy) {
+        case 'oldest':
+          return getDateValue(a) - getDateValue(b);
+        case 'newest':
+          return getDateValue(b) - getDateValue(a);
+        case 'name-asc':
+          return a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' });
+        case 'name-desc':
+          return b.nome.localeCompare(a.nome, 'pt-BR', { sensitivity: 'base' });
+        default:
+          return 0;
+      }
+    });
+  }, [stats, sortBy]);
 
   return (
     <MainLayout>
       <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Megaphone className="w-7 h-7" />
             Campanhas
           </h1>
-          <Button onClick={() => setShowCreate(true)} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Nova campanha
-          </Button>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-1.5">
+                  <ArrowUpDown className="w-4 h-4" />
+                  Ordenar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setSortBy('oldest')}>
+                  Mais antigo → mais recente
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSortBy('newest')}>
+                  Mais recente → mais antigo
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSortBy('name-asc')}>
+                  Nome (A → Z)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSortBy('name-desc')}>
+                  Nome (Z → A)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Button onClick={() => setShowCreate(true)} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Nova campanha
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -81,7 +133,7 @@ export default function CampanhasPage() {
           </Card>
         ) : (
           <div className="grid gap-4">
-            {stats.map((s) => (
+            {sortedStats.map((s) => (
               <Card
                 key={s.campanha_id}
                 className="cursor-pointer hover:bg-accent/50 transition-colors"

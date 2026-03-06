@@ -51,6 +51,7 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('todos');
+  const [subFiltroAgenteId, setSubFiltroAgenteId] = useState<string | null>(null);
 
   // Selection mode states
   const [selectionMode, setSelectionMode] = useState(false);
@@ -132,12 +133,32 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
     };
   }, [fila]);
 
+  // Derive unique agents from visible conversations (for adm/sup sub-filter)
+  const isAdmOrSupGlobal = currentUser?.tipo_usuario === 'adm' || currentUser?.tipo_usuario === 'sup';
+  const agentesDisponiveis = useMemo(() => {
+    if (!isAdmOrSupGlobal) return [];
+    const map = new Map<string, string>();
+    conversasVisiveis.forEach(c => {
+      if (c.agente_responsavel_id && c.agente_nome) {
+        map.set(c.agente_responsavel_id, c.agente_nome);
+      }
+    });
+    return Array.from(map.entries())
+      .map(([id, nome]) => ({ id, nome }))
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [conversasVisiveis, isAdmOrSupGlobal]);
+
   // Filter conversations
   const filteredConversas = useMemo(() => {
     return conversasVisiveis
       .filter(conversa => {
         // Filter by status
         if (selectedStatus !== 'todos' && conversa.status !== selectedStatus) return false;
+
+        // Sub-filter by agent (only for fila_humano / em_atendimento_humano)
+        if (subFiltroAgenteId && (selectedStatus === 'fila_humano' || selectedStatus === 'em_atendimento_humano')) {
+          if (conversa.agente_responsavel_id !== subFiltroAgenteId) return false;
+        }
 
         // Filter by search query
         if (searchQuery.trim()) {
@@ -154,7 +175,7 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
         const dateB = new Date(b.last_message_at || 0).getTime();
         return dateB - dateA;
       });
-  }, [conversasVisiveis, selectedStatus, searchQuery]);
+  }, [conversasVisiveis, selectedStatus, searchQuery, subFiltroAgenteId]);
 
   // Atendente assumes conversation designated to them
   const handleAssumirConversa = async (conversa: FilaAtendimento, e: React.MouseEvent) => {
@@ -213,6 +234,9 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
           isSelectionMode={selectionMode}
           onToggleSelectionMode={toggleSelectionMode}
           showSelectionOption={selectedStatus === 'bot'}
+          agentesDisponiveis={agentesDisponiveis}
+          subFiltroAgenteId={subFiltroAgenteId}
+          onSubFiltroAgenteChange={setSubFiltroAgenteId}
         />
       </div>
 
@@ -236,6 +260,7 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
                 conversa.status === 'fila_humano' &&
                 conversa.agente_responsavel_id === currentUser?.id;
               const isLast = index === filteredConversas.length - 1;
+              const isAdmOrSup = currentUser?.tipo_usuario === 'adm' || currentUser?.tipo_usuario === 'sup';
 
               return (
                 <div key={conversa.conversa_id} className="relative group">
@@ -244,8 +269,8 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
                       conversa={conversa}
                       isSelected={selectedConversaId === conversa.conversa_id}
                       onClick={() => onSelectConversa(conversa)}
-                      showBadge={selectedStatus === 'todos'}
-                      showAgentName={currentUser?.tipo_usuario !== 'opr'}
+                      showBadge={isAdmOrSup || selectedStatus === 'todos'}
+                      showAgentName={isAdmOrSup}
                       selectionMode={selectionMode}
                       isChecked={selectedIds.has(conversa.conversa_id!)}
                       onToggleCheck={() => toggleSelectId(conversa.conversa_id!)}

@@ -206,4 +206,6 @@ export interface CampanhaStats {
   erros: number;
   entregues: number;
   conversas_abertas: number;
+  /** Data de criação da campanha (opcional, depende da view). */
+  created_at?: string;
 }
