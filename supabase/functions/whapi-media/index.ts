@@ -39,8 +39,8 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Fetch media from Whapi API
-    const whapiUrl = `https://gate.whapi.cloud/messages/media/${encodeURIComponent(messageId)}`
+    // Fetch media from Whapi API using media ID (document.id, image.id, etc.)
+    const whapiUrl = `https://gate.whapi.cloud/media/${encodeURIComponent(mediaId)}`
     const whapiResponse = await fetch(whapiUrl, {
       method: 'GET',
       headers: {
