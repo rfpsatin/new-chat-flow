@@ -22,25 +22,34 @@ export default function HistoricoPage() {
     dataInicio: null,
     dataFim: null,
   });
+
+  const [appliedFiltros, setAppliedFiltros] = useState<FiltrosHistorico>({
+    busca: '',
+    operadorId: null,
+    dataInicio: null,
+    dataFim: null,
+  });
+
+  const [hasApplied, setHasApplied] = useState(false);
   
   const [itemSelecionadoId, setItemSelecionadoId] = useState<string | null>(null);
   const [sessoesAbertasIds, setSessoesAbertasIds] = useState<string[]>([]);
 
   // Detectar modo baseado nos filtros - modo atendentes só quando operador selecionado
-  const modoAtendentes = !!filtros.operadorId;
+  const modoAtendentes = !!appliedFiltros.operadorId;
 
   // Queries
   const { data: atendentes = [], isLoading: loadingAtendentes } = useAtendentesComHistorico(empresaId);
-  const { data: contatos = [], isLoading: loadingContatos } = useContatosComHistorico(empresaId, filtros);
+  const { data: contatos = [], isLoading: loadingContatos } = useContatosComHistorico(empresaId, appliedFiltros, hasApplied);
   const { data: sessoesAtendente = [], isLoading: loadingSessoesAtendente } = useSessoesAtendente(
     empresaId, 
     modoAtendentes ? itemSelecionadoId : null, 
-    filtros
+    appliedFiltros
   );
   const { data: sessoesContato = [], isLoading: loadingSessoesContato } = useSessoesContato(
     empresaId, 
     !modoAtendentes ? itemSelecionadoId : null, 
-    filtros
+    appliedFiltros
   );
   const { data: operadores = [] } = useOperadoresHistorico(empresaId);
 
@@ -82,6 +91,13 @@ export default function HistoricoPage() {
     }
     
     setFiltros(novosFiltros);
+  };
+
+  const handleAplicar = () => {
+    setAppliedFiltros({ ...filtros });
+    setHasApplied(true);
+    setItemSelecionadoId(null);
+    setSessoesAbertasIds([]);
   };
 
   const handleToggleSessao = (conversaId: string) => {
@@ -126,6 +142,8 @@ export default function HistoricoPage() {
               filtros={filtros}
               onFiltrosChange={handleFiltrosChange}
               operadores={operadores}
+              onAplicar={handleAplicar}
+              hasApplied={hasApplied}
             />
           </ResizablePanel>
 

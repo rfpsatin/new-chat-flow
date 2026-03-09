@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.whapi-connection-webhook]
 verify_jwt = false
+
+[functions.buscar-empresa]
+verify_jwt = false

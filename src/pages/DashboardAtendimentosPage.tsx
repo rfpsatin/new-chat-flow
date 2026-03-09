@@ -131,11 +131,11 @@ export default function DashboardAtendimentosPage() {
             onSomenteEmAndamentoChange={(value) => setDraftFilters((prev) => ({ ...prev, somenteEmAndamento: value }))}
           />
 
-          {!hasAppliedFilters && activeFilters.activeTab !== 'campanhas' ? (
+          {!hasAppliedFilters && draftFilters.activeTab !== 'campanhas' ? (
             <Card className="p-8 text-center text-muted-foreground">
               Defina os filtros e clique em <strong>Aplicar filtros</strong> para carregar os dados do dashboard.
             </Card>
-          ) : activeFilters.activeTab === 'atendimentos' ? (
+          ) : draftFilters.activeTab === 'atendimentos' ? (
             <>
               {/* KPI Cards */}
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -210,7 +210,7 @@ export default function DashboardAtendimentosPage() {
                 />
               </div>
             </>
-          ) : activeFilters.activeTab === 'aberto' ? (
+          ) : draftFilters.activeTab === 'aberto' ? (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {openCards.map((card) => (
