@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
   try {
     const url = new URL(req.url)
     const empresaId = url.searchParams.get('empresa_id')
-    const messageId = url.searchParams.get('message_id')
+    const mediaId = url.searchParams.get('media_id')
 
     if (!empresaId || !messageId) {
       return new Response(JSON.stringify({ error: 'Missing empresa_id or message_id' }), {
