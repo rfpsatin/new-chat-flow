@@ -64,15 +64,6 @@ Deno.serve(async (req) => {
     })
   }
 
-  const expectedSecret = Deno.env.get('N8N_WEBHOOK_SECRET')
-  const providedSecret = req.headers.get('x-webhook-secret')
-  if (!expectedSecret || providedSecret !== expectedSecret) {
-    return new Response(JSON.stringify({ error: 'Unauthorized webhook' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
-
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
