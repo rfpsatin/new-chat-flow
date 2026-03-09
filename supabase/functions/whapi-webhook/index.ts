@@ -23,7 +23,9 @@ interface WhapiMessage {
   }
   document?: {
     filename?: string
+    file_name?: string
     link?: string
+    mime_type?: string
   }
   interactive?: {
     header?: string
@@ -343,7 +345,7 @@ Deno.serve(async (req) => {
         }
 
         // Insert message (always in/cliente at this point)
-        const doc = extractDocumentFromMessage(message)
+        const doc = extractDocumentFromMessage(message, empresaId, supabaseUrl)
         const { error: msgError } = await supabase
           .from('mensagens_ativas')
           .insert({
@@ -671,19 +673,59 @@ function extractMessageContent(message: WhapiMessage): string {
   }
 }
 
-function extractDocumentFromMessage(message: WhapiMessage): {
+function extractDocumentFromMessage(
+  message: WhapiMessage,
+  empresaId: string,
+  supabaseUrl: string
+): {
   mediaUrl?: string
-  mediaKind?: 'document'
+  mediaKind?: string
   mediaFilename?: string
   mediaMime?: string
 } {
-  if (message.type !== 'document' || !message.document?.link) {
+  if (message.type !== 'document') {
+    // Also handle image/audio/video types
+    if (message.type === 'image' && message.image?.link) {
+      return {
+        mediaUrl: message.image.link,
+        mediaKind: 'image',
+        mediaFilename: undefined,
+        mediaMime: undefined,
+      }
+    }
     return {}
   }
+
+  const doc = message.document
+  const filename = doc?.filename || doc?.file_name || undefined
+  const mime = (doc as any)?.mime_type || undefined
+
+  // If Whapi included a direct link, use it
+  if (doc?.link) {
+    return {
+      mediaUrl: doc.link,
+      mediaKind: 'document',
+      mediaFilename: filename,
+      mediaMime: mime,
+    }
+  }
+
+  // Otherwise, construct a proxy URL via our whapi-media edge function using media ID
+  const mediaId = (doc as any)?.id
+  if (!mediaId) {
+    // No media ID available, can't construct download URL
+    return {
+      mediaKind: 'document',
+      mediaFilename: filename,
+      mediaMime: mime,
+    }
+  }
+  const proxyUrl = `${supabaseUrl}/functions/v1/whapi-media?empresa_id=${encodeURIComponent(empresaId)}&media_id=${encodeURIComponent(mediaId)}&filename=${encodeURIComponent(filename || 'arquivo')}`
+
   return {
-    mediaUrl: message.document.link,
+    mediaUrl: proxyUrl,
     mediaKind: 'document',
-    mediaFilename: message.document.filename ?? undefined,
-    mediaMime: undefined,
+    mediaFilename: filename,
+    mediaMime: mime,
   }
 }
