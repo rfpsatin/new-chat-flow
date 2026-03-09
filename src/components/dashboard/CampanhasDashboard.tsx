@@ -143,7 +143,7 @@ export function CampanhasDashboard({ empresaId, periodo = 'todos', tag }: Campan
         Enviados: c.enviados || 0,
         Respostas: c.conversas_abertas || 0,
       }));
-  }, [campanhas]);
+  }, [filteredStats]);
 
   if (isLoading) {
     return (
