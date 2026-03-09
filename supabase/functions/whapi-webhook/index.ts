@@ -710,8 +710,17 @@ function extractDocumentFromMessage(
     }
   }
 
-  // Otherwise, construct a proxy URL via our whapi-media edge function
-  const proxyUrl = `${supabaseUrl}/functions/v1/whapi-media?empresa_id=${encodeURIComponent(empresaId)}&message_id=${encodeURIComponent(message.id)}&filename=${encodeURIComponent(filename || 'arquivo')}`
+  // Otherwise, construct a proxy URL via our whapi-media edge function using media ID
+  const mediaId = (doc as any)?.id
+  if (!mediaId) {
+    // No media ID available, can't construct download URL
+    return {
+      mediaKind: 'document',
+      mediaFilename: filename,
+      mediaMime: mime,
+    }
+  }
+  const proxyUrl = `${supabaseUrl}/functions/v1/whapi-media?empresa_id=${encodeURIComponent(empresaId)}&media_id=${encodeURIComponent(mediaId)}&filename=${encodeURIComponent(filename || 'arquivo')}`
 
   return {
     mediaUrl: proxyUrl,
