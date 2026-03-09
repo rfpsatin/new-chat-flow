@@ -15,8 +15,8 @@ Deno.serve(async (req) => {
     const empresaId = url.searchParams.get('empresa_id')
     const mediaId = url.searchParams.get('media_id')
 
-    if (!empresaId || !messageId) {
-      return new Response(JSON.stringify({ error: 'Missing empresa_id or message_id' }), {
+    if (!empresaId || !mediaId) {
+      return new Response(JSON.stringify({ error: 'Missing empresa_id or media_id' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
