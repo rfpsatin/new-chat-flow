@@ -343,7 +343,7 @@ Deno.serve(async (req) => {
         }
 
         // Insert message (always in/cliente at this point)
-        const doc = extractDocumentFromMessage(message)
+        const doc = extractDocumentFromMessage(message, empresaId, supabaseUrl)
         const { error: msgError } = await supabase
           .from('mensagens_ativas')
           .insert({
