@@ -120,7 +120,7 @@ export function CampanhasDashboard({ empresaId, periodo = 'todos', tag }: Campan
     const entregues = filteredStats.reduce((s, c) => s + (c.entregues || 0), 0);
     const taxa = enviados > 0 ? ((respostas / enviados) * 100).toFixed(1) + '%' : '0%';
     return { total, enviados, respostas, taxaResposta: taxa, erros, entregues };
-  }, [campanhas]);
+  }, [filteredStats]);
 
   const statusData = useMemo(() => {
     if (!filteredStats) return [];
