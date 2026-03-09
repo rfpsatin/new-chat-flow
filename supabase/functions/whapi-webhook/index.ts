@@ -23,7 +23,9 @@ interface WhapiMessage {
   }
   document?: {
     filename?: string
+    file_name?: string
     link?: string
+    mime_type?: string
   }
   interactive?: {
     header?: string
