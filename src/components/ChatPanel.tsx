@@ -506,7 +506,9 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
             </span>
           </a>
         )}
-        <FormattedMessageContent content={displayContent} isOutgoing={isOutgoing} />
+        {!hasDocument && (
+          <FormattedMessageContent content={displayContent} isOutgoing={isOutgoing} />
+        )}
         <p className={cn(
           'text-xs mt-1',
           isOutgoing ? 'text-chat-outgoing-text/60' : 'text-muted-foreground'
