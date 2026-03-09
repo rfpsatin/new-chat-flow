@@ -911,6 +911,8 @@ export type Database = {
         Args: { p_agente_id: string; p_conversa_id: string }
         Returns: undefined
       }
+      current_empresa_id: { Args: never; Returns: string }
+      current_tipo_usuario: { Args: never; Returns: string }
       encaminhar_para_atendente: {
         Args: { p_agente_id: string; p_conversa_id: string }
         Returns: undefined
