@@ -9,7 +9,7 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import { Pie, PieChart, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
-import { useCampanhasStats } from '@/hooks/useCampanhas';
+import { useCampanhas, useCampanhasStats } from '@/hooks/useCampanhas';
 import { Send, MessageCircle } from 'lucide-react';
 
 const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
@@ -41,28 +41,91 @@ const BAR_COLORS = {
 
 interface CampanhasDashboardProps {
   empresaId: string;
+  periodo?: 'todos' | '6meses' | 'mes';
+  tag?: string;
 }
 
-export function CampanhasDashboard({ empresaId }: CampanhasDashboardProps) {
-  const { data: campanhas, isLoading } = useCampanhasStats(empresaId);
+export function CampanhasDashboard({ empresaId, periodo = 'todos', tag }: CampanhasDashboardProps) {
+  const { data: stats, isLoading } = useCampanhasStats(empresaId);
+  const { data: campanhasRaw } = useCampanhas(empresaId);
+
+  const filteredStats = useMemo(() => {
+    if (!stats) return [];
+
+    const trimmedTag = (tag || '').trim().toLowerCase();
+    const hasTagFilter = trimmedTag.length > 0;
+    const hasPeriodoFilter = periodo !== 'todos';
+
+    if (!hasTagFilter && !hasPeriodoFilter) {
+      return stats;
+    }
+
+    if (!campanhasRaw || campanhasRaw.length === 0) {
+      // Sem dados brutos das campanhas, não conseguimos filtrar com segurança
+      return stats;
+    }
+
+    const now = new Date();
+    const allowedIds = new Set<string>();
+
+    campanhasRaw.forEach((campanha) => {
+      let ok = true;
+
+      if (hasTagFilter) {
+        const tagsArray = campanha.tags || [];
+        const matchesTag = tagsArray.some(
+          (t) => t.toLowerCase() === trimmedTag
+        );
+        if (!matchesTag) {
+          ok = false;
+        }
+      }
+
+      if (ok && hasPeriodoFilter) {
+        const createdAt = campanha.created_at ? new Date(campanha.created_at) : null;
+        if (createdAt) {
+          const diffMs = now.getTime() - createdAt.getTime();
+          const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+          if (periodo === 'mes' && diffDays > 31) {
+            ok = false;
+          }
+
+          if (periodo === '6meses' && diffDays > 31 * 6) {
+            ok = false;
+          }
+        }
+      }
+
+      if (ok) {
+        allowedIds.add(campanha.id);
+      }
+    });
+
+    if (allowedIds.size === 0) {
+      return [];
+    }
+
+    return stats.filter((s) => allowedIds.has(s.campanha_id));
+  }, [stats, campanhasRaw, periodo, tag]);
 
   const kpis = useMemo(() => {
-    if (!campanhas || campanhas.length === 0) {
+    if (!filteredStats || filteredStats.length === 0) {
       return { total: 0, enviados: 0, respostas: 0, taxaResposta: '0%', erros: 0, entregues: 0 };
     }
-    const total = campanhas.length;
-    const enviados = campanhas.reduce((s, c) => s + (c.enviados || 0), 0);
-    const respostas = campanhas.reduce((s, c) => s + (c.conversas_abertas || 0), 0);
-    const erros = campanhas.reduce((s, c) => s + (c.erros || 0), 0);
-    const entregues = campanhas.reduce((s, c) => s + (c.entregues || 0), 0);
+    const total = filteredStats.length;
+    const enviados = filteredStats.reduce((s, c) => s + (c.enviados || 0), 0);
+    const respostas = filteredStats.reduce((s, c) => s + (c.conversas_abertas || 0), 0);
+    const erros = filteredStats.reduce((s, c) => s + (c.erros || 0), 0);
+    const entregues = filteredStats.reduce((s, c) => s + (c.entregues || 0), 0);
     const taxa = enviados > 0 ? ((respostas / enviados) * 100).toFixed(1) + '%' : '0%';
     return { total, enviados, respostas, taxaResposta: taxa, erros, entregues };
   }, [campanhas]);
 
   const statusData = useMemo(() => {
-    if (!campanhas) return [];
+    if (!filteredStats) return [];
     const map: Record<string, number> = {};
-    campanhas.forEach((c) => {
+    filteredStats.forEach((c) => {
       const s = statusMap[c.status || '']?.label || c.status || 'Outro';
       map[s] = (map[s] || 0) + 1;
     });
@@ -70,8 +133,8 @@ export function CampanhasDashboard({ empresaId }: CampanhasDashboardProps) {
   }, [campanhas]);
 
   const barData = useMemo(() => {
-    if (!campanhas) return [];
-    return campanhas
+    if (!filteredStats) return [];
+    return filteredStats
       .filter((c) => (c.enviados || 0) > 0)
       .sort((a, b) => (b.enviados || 0) - (a.enviados || 0))
       .slice(0, 10)
@@ -106,7 +169,7 @@ export function CampanhasDashboard({ empresaId }: CampanhasDashboardProps) {
     );
   }
 
-  if (!campanhas || campanhas.length === 0) {
+  if (!filteredStats || filteredStats.length === 0) {
     return (
       <Card className="bg-card border-border p-8 text-center">
         <p className="text-muted-foreground">Nenhuma campanha encontrada.</p>
@@ -216,7 +279,7 @@ export function CampanhasDashboard({ empresaId }: CampanhasDashboardProps) {
       <div>
         <h3 className="font-semibold text-foreground mb-3">Detalhamento por Campanha</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {campanhas.map((c) => {
+          {filteredStats.map((c) => {
             const status = statusMap[c.status || ''] || { label: c.status, variant: 'outline' as const };
             const taxa = (c.enviados || 0) > 0
               ? ((c.conversas_abertas || 0) / (c.enviados || 1) * 100).toFixed(1)
