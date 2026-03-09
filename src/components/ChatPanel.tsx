@@ -453,7 +453,9 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
 
   const senderLabel = getSenderLabel();
   const displayContent = getDisplayContent();
-  const hasDocument = mensagem.media_kind === 'document' && !!mensagem.media_url;
+  const hasDocument =
+    !!mensagem.media_url &&
+    (!!mensagem.media_filename || mensagem.media_kind === 'document');
 
   return (
     <div
@@ -479,26 +481,30 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
           </p>
         )}
         {hasDocument && (
-          <div className="mb-2 rounded-lg border border-border/50 bg-muted/30 p-3">
+          <a
+            href={mensagem.media_url!}
+            target="_blank"
+            rel="noreferrer"
+            download={mensagem.media_filename ?? undefined}
+            className="mb-2 block rounded-lg border border-border/50 bg-muted/30 p-3 hover:bg-muted transition-colors"
+          >
             <div className="flex items-center gap-2">
-              <span className="text-lg" aria-hidden>📄</span>
+              <span className="text-lg" aria-hidden>
+                📄
+              </span>
               <span className="truncate text-sm font-medium">
                 {mensagem.media_filename || 'Documento'}
               </span>
             </div>
-            <a
-              href={mensagem.media_url!}
-              target="_blank"
-              rel="noreferrer"
-              download={mensagem.media_filename ?? undefined}
+            <span
               className={cn(
-                'mt-2 inline-block text-sm font-medium underline underline-offset-2',
+                'mt-1 inline-block text-xs font-medium underline underline-offset-2',
                 isOutgoing ? 'text-chat-outgoing-text' : 'text-primary'
               )}
             >
               Baixar documento
-            </a>
-          </div>
+            </span>
+          </a>
         )}
         <FormattedMessageContent content={displayContent} isOutgoing={isOutgoing} />
         <p className={cn(
