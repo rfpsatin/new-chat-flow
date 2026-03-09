@@ -120,7 +120,7 @@ export function CampanhasDashboard({ empresaId, periodo = 'todos', tag }: Campan
     const entregues = filteredStats.reduce((s, c) => s + (c.entregues || 0), 0);
     const taxa = enviados > 0 ? ((respostas / enviados) * 100).toFixed(1) + '%' : '0%';
     return { total, enviados, respostas, taxaResposta: taxa, erros, entregues };
-  }, [campanhas]);
+  }, [filteredStats]);
 
   const statusData = useMemo(() => {
     if (!filteredStats) return [];
@@ -130,7 +130,7 @@ export function CampanhasDashboard({ empresaId, periodo = 'todos', tag }: Campan
       map[s] = (map[s] || 0) + 1;
     });
     return Object.entries(map).map(([name, value]) => ({ name, value }));
-  }, [campanhas]);
+  }, [filteredStats]);
 
   const barData = useMemo(() => {
     if (!filteredStats) return [];
@@ -143,7 +143,7 @@ export function CampanhasDashboard({ empresaId, periodo = 'todos', tag }: Campan
         Enviados: c.enviados || 0,
         Respostas: c.conversas_abertas || 0,
       }));
-  }, [campanhas]);
+  }, [filteredStats]);
 
   if (isLoading) {
     return (
