@@ -130,7 +130,7 @@ export function CampanhasDashboard({ empresaId, periodo = 'todos', tag }: Campan
       map[s] = (map[s] || 0) + 1;
     });
     return Object.entries(map).map(([name, value]) => ({ name, value }));
-  }, [campanhas]);
+  }, [filteredStats]);
 
   const barData = useMemo(() => {
     if (!filteredStats) return [];
