@@ -36,6 +36,14 @@ interface WhapiMessage {
     file_name?: string
     mime_type?: string
   }
+  voice?: {
+    id?: string
+    link?: string
+    filename?: string
+    file_name?: string
+    mime_type?: string
+    seconds?: number
+  }
   video?: {
     id?: string
     link?: string
@@ -644,6 +652,7 @@ function extractMessageContent(message: WhapiMessage): string {
     case 'document':
       return `[documento: ${message.document?.filename || 'arquivo'}]`
     case 'audio':
+    case 'voice':
       return '[áudio]'
     case 'video':
       return '[vídeo]'
@@ -792,6 +801,43 @@ function extractDocumentFromMessage(
     }
 
     const mediaId = audio.id
+    if (!mediaId) {
+      return {
+        mediaKind: 'audio',
+        mediaFilename: filename,
+        mediaMime: mime,
+      }
+    }
+
+    const proxyUrl = `${supabaseUrl}/functions/v1/whapi-media?empresa_id=${encodeURIComponent(
+      empresaId,
+    )}&media_id=${encodeURIComponent(mediaId)}&filename=${encodeURIComponent(filename)}`
+
+    return {
+      mediaUrl: proxyUrl,
+      mediaKind: 'audio',
+      mediaFilename: filename,
+      mediaMime: mime,
+    }
+  }
+
+  // Handle voice (Whapi sends voice messages as type "voice" with a "voice" field)
+  if (message.type === 'voice' && message.voice) {
+    const voice = message.voice as any
+    const filename =
+      voice.filename || voice.file_name || `audio-${message.id}.ogg`
+    const mime = (voice.mime_type as string | undefined) ?? 'audio/ogg; codecs=opus'
+
+    if (voice.link) {
+      return {
+        mediaUrl: voice.link,
+        mediaKind: 'audio',
+        mediaFilename: filename,
+        mediaMime: mime,
+      }
+    }
+
+    const mediaId = voice.id
     if (!mediaId) {
       return {
         mediaKind: 'audio',
