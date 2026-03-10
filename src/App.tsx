@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { AppProvider } from "@/contexts/AppContext";
 import { SuperAdminProvider } from "@/contexts/SuperAdminContext";
 import { SuperAdminGuard } from "@/components/SuperAdminGuard";
@@ -35,17 +35,19 @@ const App = () => (
           <Route path="/superadmin" element={<SuperAdminProvider><SuperAdminGuard><SuperAdminEmpresasPage /></SuperAdminGuard></SuperAdminProvider>} />
           <Route path="/superadmin/empresas" element={<SuperAdminProvider><SuperAdminGuard><SuperAdminEmpresasPage /></SuperAdminGuard></SuperAdminProvider>} />
 
-          {/* App routes - wrapped in AppProvider (needs BrowserRouter for useNavigate) */}
-          <Route path="/" element={<AppProvider><FilaPage /></AppProvider>} />
-          <Route path="/contatos" element={<AppProvider><ContatosPage /></AppProvider>} />
-          <Route path="/historico" element={<AppProvider><HistoricoPage /></AppProvider>} />
-          <Route path="/dashboard" element={<AppProvider><DashboardAtendimentosPage /></AppProvider>} />
-          <Route path="/conexao" element={<AppProvider><ConexaoPage /></AppProvider>} />
-          <Route path="/campanhas" element={<AppProvider><CampanhasPage /></AppProvider>} />
-          <Route path="/atendentes" element={<AppProvider><UsuariosPage /></AppProvider>} />
-          <Route path="/admin/usuarios" element={<AppProvider><UsuariosPage /></AppProvider>} />
-          <Route path="/admin/motivos" element={<AppProvider><MotivosPage /></AppProvider>} />
-          <Route path="/admin/empresa" element={<AppProvider><EmpresaPage /></AppProvider>} />
+          {/* App routes - single AppProvider persists across all navigations */}
+          <Route element={<AppProvider><Outlet /></AppProvider>}>
+            <Route path="/" element={<FilaPage />} />
+            <Route path="/contatos" element={<ContatosPage />} />
+            <Route path="/historico" element={<HistoricoPage />} />
+            <Route path="/dashboard" element={<DashboardAtendimentosPage />} />
+            <Route path="/conexao" element={<ConexaoPage />} />
+            <Route path="/campanhas" element={<CampanhasPage />} />
+            <Route path="/atendentes" element={<UsuariosPage />} />
+            <Route path="/admin/usuarios" element={<UsuariosPage />} />
+            <Route path="/admin/motivos" element={<MotivosPage />} />
+            <Route path="/admin/empresa" element={<EmpresaPage />} />
+          </Route>
 
           {/* Redirect old super admin login */}
           <Route path="/superadmin/login" element={<Navigate to="/login" replace />} />

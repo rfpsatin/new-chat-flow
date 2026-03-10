@@ -17,6 +17,7 @@ export function useAtendimentosAtivos(empresaId: string) {
       if (error) throw error;
       return data;
     },
+    enabled: !!empresaId,
     refetchInterval: 5000,
   });
 
@@ -50,6 +51,7 @@ export function useFila(empresaId: string) {
       if (error) throw error;
       return data as FilaAtendimento[];
     },
+    enabled: !!empresaId,
     refetchInterval: 5000,
   });
 
