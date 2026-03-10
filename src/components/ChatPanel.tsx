@@ -17,6 +17,8 @@ import {
   MessageSquare,
   Loader2,
   Download,
+  Play,
+  Pause,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -415,6 +417,8 @@ function stripHumanModePrefix(text: string): string {
 
 function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
   const isOutgoing = mensagem.direcao === 'out';
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   
   const getSenderLabel = () => {
     switch (mensagem.tipo_remetente) {
@@ -460,7 +464,7 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
   const getMediaTitle = () => {
     switch (mensagem.media_kind) {
       case 'image':
-        return mensagem.media_filename || 'Imagem';
+        return 'Imagem';
       case 'audio':
         return 'Mensagem de voz';
       case 'document':
@@ -546,7 +550,7 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
               </a>
             )}
 
-            {/* Imagem: preview da imagem + texto "Baixar imagem"; sem nome de arquivo nem título */}
+            {/* Imagem: título "Imagem" + preview + texto "Baixar imagem" */}
             {mensagem.media_kind === 'image' && mensagem.media_url && (
               <a
                 href={mensagem.media_url}
@@ -555,6 +559,14 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
                 download={mensagem.media_filename ?? undefined}
                 className="mb-2 block rounded-lg border border-border/50 bg-muted/30 p-3 hover:bg-muted transition-colors"
               >
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="text-lg" aria-hidden>
+                    {getMediaIcon()}
+                  </span>
+                  <span className="truncate text-sm font-medium">
+                    {getMediaTitle()}
+                  </span>
+                </div>
                 <img
                   src={mensagem.media_url}
                   alt={mensagem.media_filename || 'Imagem'}
@@ -581,32 +593,58 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
                   <span className="truncate text-sm font-medium">
                     Mensagem de voz
                   </span>
-                  <div className="ml-auto flex items-center gap-2">
-                    <audio
-                      controls
-                      className="h-8 max-w-[140px]"
-                    >
-                      <source
-                        src={mensagem.media_url}
-                        type={mensagem.media_mime || 'audio/ogg'}
-                      />
-                      Seu navegador não suporta reprodução de áudio.
-                    </audio>
-                    <a
-                      href={mensagem.media_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      download={mensagem.media_filename ?? undefined}
-                      className={cn(
-                        'flex h-8 w-8 items-center justify-center rounded-full border border-border/60 hover:bg-muted transition-colors',
-                        isOutgoing ? 'text-chat-outgoing-text' : 'text-primary'
-                      )}
-                      aria-label="Baixar mensagem de voz"
-                    >
-                      <Download className="h-4 w-4" />
-                    </a>
-                  </div>
                 </div>
+                <div className="mt-1 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!audioRef.current) return;
+                      if (isAudioPlaying) {
+                        audioRef.current.pause();
+                        setIsAudioPlaying(false);
+                      } else {
+                        audioRef.current.play();
+                        setIsAudioPlaying(true);
+                      }
+                    }}
+                    className={cn(
+                      'flex h-7 w-7 items-center justify-center rounded-full border border-border/60 hover:bg-muted transition-colors',
+                      isOutgoing ? 'text-chat-outgoing-text' : 'text-primary'
+                    )}
+                    aria-label={isAudioPlaying ? 'Pausar mensagem de voz' : 'Reproduzir mensagem de voz'}
+                  >
+                    {isAudioPlaying ? (
+                      <Pause className="h-3.5 w-3.5" />
+                    ) : (
+                      <Play className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                  <div className="flex-1 h-1 rounded-full bg-border/70" />
+                  <a
+                    href={mensagem.media_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    download={mensagem.media_filename ?? undefined}
+                    className={cn(
+                      'flex h-7 w-7 items-center justify-center rounded-full border border-border/60 hover:bg-muted transition-colors',
+                      isOutgoing ? 'text-chat-outgoing-text' : 'text-primary'
+                    )}
+                    aria-label="Baixar mensagem de voz"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </a>
+                </div>
+                <audio
+                  ref={audioRef}
+                  className="hidden"
+                  onEnded={() => setIsAudioPlaying(false)}
+                  onPause={() => setIsAudioPlaying(false)}
+                >
+                  <source
+                    src={mensagem.media_url}
+                    type={mensagem.media_mime || 'audio/ogg'}
+                  />
+                </audio>
               </div>
             )}
           </>
