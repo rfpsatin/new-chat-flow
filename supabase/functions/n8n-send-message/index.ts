@@ -9,6 +9,9 @@ const corsHeaders = {
     'authorization, x-client-info, apikey, content-type, x-webhook-secret',
 }
 
+// Mesmo marcador usado em outros pontos (#"human_mode=true"# Mensagem...)
+const HUMAN_MODE_MARKER = /^#"human_mode=(true|false)"#\s*/
+
 interface N8nSendMessageRequest {
   empresa_id?: string
   to?: string
@@ -126,10 +129,21 @@ Deno.serve(async (req) => {
 
     const toWhapi = `${digits}@s.whatsapp.net`
 
+    // Strip marker de human_mode do texto antes de enviar ao cliente,
+    // para que ele nunca veja #"human_mode=..."# no WhatsApp.
+    let cleanMessage = text
+    const markerMatch = text.match(HUMAN_MODE_MARKER)
+    if (markerMatch) {
+      cleanMessage = text.replace(HUMAN_MODE_MARKER, '')
+      console.log(
+        `[${requestId}] Stripped HUMAN_MODE_MARKER from message, human_mode=${markerMatch[1]}`,
+      )
+    }
+
     const whapiUrl = 'https://gate.whapi.cloud/messages/text'
     const payload = {
       to: toWhapi,
-      body: text,
+      body: cleanMessage,
     }
 
     console.log(`[${requestId}] Calling Whapi: ${whapiUrl}`)
