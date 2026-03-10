@@ -15,6 +15,7 @@ export function useContatos(empresaId: string) {
       if (error) throw error;
       return data as Contato[];
     },
+    enabled: !!empresaId,
   });
 }
 

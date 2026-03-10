@@ -20,6 +20,36 @@ import { Search, Phone, Calendar, MessageSquare, User, Clock, Send, Loader2, Inf
 import { cn } from '@/lib/utils';
 import { useMensagensHistorico } from '@/hooks/useHistorico';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+
+type ImportRow = {
+  nome?: string | null;
+  whatsapp_numero: string;
+  email?: string | null;
+};
+
+function parseCsvLines(text: string): ImportRow[] {
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  const rows: ImportRow[] = [];
+
+  for (const line of lines) {
+    const parts = line.split(/[;,]/).map((p) => p.trim());
+    if (parts.length === 0) continue;
+    const [nome, whatsapp, email] = parts;
+    if (!whatsapp) continue;
+    rows.push({
+      nome: nome || null,
+      whatsapp_numero: whatsapp,
+      email: email || null,
+    });
+  }
+
+  return rows;
+}
 
 function MensagensDialog({ conversa, onClose }: { conversa: HistoricoConversa; onClose: () => void }) {
   const { data: mensagens, isLoading } = useMensagensHistorico(conversa.conversa_id);
@@ -173,6 +203,122 @@ function IniciarConversaDialog({
   );
 }
 
+function ImportContatosDialog({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { empresaId } = useApp();
+  const [csvText, setCsvText] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [previewCount, setPreviewCount] = useState<number | null>(null);
+
+  const handlePreview = () => {
+    const rows = parseCsvLines(csvText);
+    setPreviewCount(rows.length);
+    if (!rows.length) {
+      toast.error('Nenhuma linha válida encontrada. Verifique o formato: nome;whatsapp;email');
+    } else {
+      toast.info(`${rows.length} linha(s) reconhecidas para importação.`);
+    }
+  };
+
+  const handleImport = async () => {
+    const rows = parseCsvLines(csvText);
+    if (!rows.length) {
+      toast.error('Nenhuma linha válida para importar.');
+      return;
+    }
+    if (!empresaId) {
+      toast.error('Empresa não encontrada na sessão.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('import-contacts', {
+        body: { rows },
+      });
+      if (error) {
+        throw new Error(error.message || 'Falha ao importar contatos');
+      }
+      if (!data?.success) {
+        toast.error(data?.error || 'Erro ao importar contatos');
+      } else {
+        toast.success(`Importação concluída. ${data.imported} importado(s), ${data.invalid} inválido(s).`);
+      }
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao importar contatos');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    const content = 'nome;whatsapp_numero;email\nJoão da Silva;5544999999999;joao@exemplo.com\n';
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'modelo_contatos.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-xl max-h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Importar contatos</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 text-sm">
+          <p className="text-muted-foreground">
+            Cole abaixo as linhas da planilha no formato:
+            <br />
+            <code className="text-xs bg-muted px-1 py-0.5 rounded">
+              nome;whatsapp_numero;email
+            </code>
+          </p>
+          <div className="flex justify-between items-center">
+            <Button type="button" variant="outline" size="sm" onClick={handleDownloadTemplate}>
+              Baixar modelo CSV
+            </Button>
+            {previewCount !== null && (
+              <span className="text-xs text-muted-foreground">
+                {previewCount} linha(s) reconhecidas
+              </span>
+            )}
+          </div>
+          <textarea
+            value={csvText}
+            onChange={(e) => setCsvText(e.target.value)}
+            className="mt-1 w-full min-h-[180px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
+            placeholder={'Exemplo:\nJoão da Silva;5544999999999;joao@exemplo.com\nMaria Souza;5544988887777;'}
+          />
+          <div className="flex justify-between items-center pt-1">
+            <Button type="button" variant="outline" size="sm" onClick={handlePreview}>
+              Pré-visualizar linhas
+            </Button>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancelar
+              </Button>
+              <Button type="button" onClick={handleImport} disabled={isSubmitting || !csvText.trim()}>
+                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                Importar
+              </Button>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function ContatosPage() {
   const navigate = useNavigate();
   const { empresaId } = useApp();
@@ -182,6 +328,7 @@ export default function ContatosPage() {
   const { data: historico } = useHistoricoContato(selectedContato?.id || null);
   const [selectedHistorico, setSelectedHistorico] = useState<HistoricoConversa | null>(null);
   const [contatoParaIniciar, setContatoParaIniciar] = useState<Contato | null>(null);
+  const [showImport, setShowImport] = useState(false);
 
   const filteredContatos = contatos?.filter(contato =>
     contato.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -207,7 +354,12 @@ export default function ContatosPage() {
         {/* Left panel - Contact list */}
         <div className="w-[380px] border-r bg-card flex flex-col">
           <div className="p-4 border-b space-y-3">
-            <h2 className="font-semibold text-lg">Contatos</h2>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-semibold text-lg">Contatos</h2>
+              <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
+                Importar
+              </Button>
+            </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -370,6 +522,13 @@ export default function ContatosPage() {
             setContatoParaIniciar(null);
             navigate(`/?conversa_id=${conversaId}`);
           }}
+        />
+      )}
+
+      {showImport && (
+        <ImportContatosDialog
+          open={showImport}
+          onClose={() => setShowImport(false)}
         />
       )}
     </MainLayout>
