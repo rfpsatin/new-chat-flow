@@ -1,43 +1,23 @@
 
 
-## Problema: Mensagem de campanha enviada em duplicidade
+## Plano: Garantir deploy de `conversation-attendance-status` e `n8n-send-message`
 
-### Causa raiz
+### Problema
+Ambas as funções existem no código mas **não estão registradas** no `supabase/config.toml`, o que impede o deploy automático.
 
-O `run-campaigns` está enviando cada mensagem **duas vezes**:
+### Ação
 
-1. **Linha 122** - Chama `whapi-send-message` diretamente (envia no WhatsApp)
-2. **Linha 142** - Chama `start-conversation`, que **internamente também chama** `whapi-send-message` (envia no WhatsApp de novo) e registra em `mensagens_ativas`
+Adicionar ao `supabase/config.toml`:
 
-Resultado: o contato recebe a mesma mensagem duas vezes no WhatsApp.
+```toml
+[functions.conversation-attendance-status]
+verify_jwt = false
 
-### Solução
-
-Remover a chamada direta ao `whapi-send-message` (linhas 110-133) e usar **somente** o `start-conversation`, que já faz tudo:
-- Envia a mensagem via WhatsApp (com marcador de `human_mode`)
-- Registra em `mensagens_ativas`
-- Cria/reutiliza conversa
-- Atribui agente se necessário
-
-### Alteração no `run-campaigns/index.ts`
-
-Substituir o fluxo atual (send + start-conversation separados) por uma única chamada ao `start-conversation`, verificando o resultado para marcar o destinatário como `enviado` ou `erro_envio`. Basicamente:
-
-```
-// ANTES (duplicado):
-// 1. fetch(whapi-send-message) → envia WhatsApp
-// 2. fetch(start-conversation) → envia WhatsApp DE NOVO + cria conversa
-
-// DEPOIS (correto):
-// 1. fetch(start-conversation) → envia WhatsApp + cria conversa (tudo em um)
+[functions.n8n-send-message]
+verify_jwt = false
 ```
 
-O loop do `for (const dest of destinatarios)` ficará:
-- Marca destinatário como `enviando`
-- Chama `start-conversation` com `empresa_id`, `contato_id`, `mensagem_inicial`, `origem_inicial: 'campanha'`, `origem_final`, `campanha_id`
-- Se sucesso: marca `enviado` e salva `conversa_id` retornado
-- Se erro: marca `erro_envio`
+Ambas usam `verify_jwt = false` porque são chamadas externamente (n8n/webhooks) e já validam autenticação via `x-webhook-secret` no próprio código.
 
-### Arquivo alterado
-- `supabase/functions/run-campaigns/index.ts`
+Após a atualização do config, executar o deploy das duas funções.
 
