@@ -20,11 +20,27 @@ interface WhapiMessage {
   image?: {
     caption?: string
     link?: string
+    // Whapi may include an ID for media download
+    id?: string
   }
   document?: {
     filename?: string
     file_name?: string
     link?: string
+    mime_type?: string
+  }
+  audio?: {
+    id?: string
+    link?: string
+    filename?: string
+    file_name?: string
+    mime_type?: string
+  }
+  video?: {
+    id?: string
+    link?: string
+    filename?: string
+    file_name?: string
     mime_type?: string
   }
   interactive?: {
@@ -683,49 +699,119 @@ function extractDocumentFromMessage(
   mediaFilename?: string
   mediaMime?: string
 } {
-  if (message.type !== 'document') {
-    // Also handle image/audio/video types
-    if (message.type === 'image' && message.image?.link) {
+  // Handle document
+  if (message.type === 'document') {
+    const doc = message.document
+    const filename = doc?.filename || doc?.file_name || undefined
+    const mime = (doc as any)?.mime_type || undefined
+
+    // If Whapi included a direct link, use it
+    if (doc?.link) {
+      return {
+        mediaUrl: doc.link,
+        mediaKind: 'document',
+        mediaFilename: filename,
+        mediaMime: mime,
+      }
+    }
+
+    // Otherwise, construct a proxy URL via our whapi-media edge function using media ID
+    const mediaId = (doc as any)?.id
+    if (!mediaId) {
+      // No media ID available, can't construct download URL
+      return {
+        mediaKind: 'document',
+        mediaFilename: filename,
+        mediaMime: mime,
+      }
+    }
+    const proxyUrl = `${supabaseUrl}/functions/v1/whapi-media?empresa_id=${encodeURIComponent(
+      empresaId,
+    )}&media_id=${encodeURIComponent(mediaId)}&filename=${encodeURIComponent(filename || 'arquivo')}`
+
+    return {
+      mediaUrl: proxyUrl,
+      mediaKind: 'document',
+      mediaFilename: filename,
+      mediaMime: mime,
+    }
+  }
+
+  // Handle image
+  if (message.type === 'image' && message.image) {
+    const img = message.image as any
+    const filename =
+      img.filename || img.file_name || message.image.caption || `imagem-${message.id}.jpg`
+
+    // Direct link from Whapi
+    if (message.image.link) {
       return {
         mediaUrl: message.image.link,
         mediaKind: 'image',
-        mediaFilename: undefined,
-        mediaMime: undefined,
+        mediaFilename: filename,
+        mediaMime: (img.mime_type as string | undefined) ?? undefined,
       }
     }
-    return {}
+
+    // Fallback to proxy download by media ID
+    const mediaId = img.id
+    if (!mediaId) {
+      return {
+        mediaKind: 'image',
+        mediaFilename: filename,
+        mediaMime: (img.mime_type as string | undefined) ?? undefined,
+      }
+    }
+
+    const proxyUrl = `${supabaseUrl}/functions/v1/whapi-media?empresa_id=${encodeURIComponent(
+      empresaId,
+    )}&media_id=${encodeURIComponent(mediaId)}&filename=${encodeURIComponent(filename)}`
+
+    return {
+      mediaUrl: proxyUrl,
+      mediaKind: 'image',
+      mediaFilename: filename,
+      mediaMime: (img.mime_type as string | undefined) ?? undefined,
+    }
   }
 
-  const doc = message.document
-  const filename = doc?.filename || doc?.file_name || undefined
-  const mime = (doc as any)?.mime_type || undefined
+  // Handle audio
+  if (message.type === 'audio' && message.audio) {
+    const audio = message.audio as any
+    const filename =
+      audio.filename || audio.file_name || `audio-${message.id}.ogg`
+    const mime = (audio.mime_type as string | undefined) ?? undefined
 
-  // If Whapi included a direct link, use it
-  if (doc?.link) {
+    if (audio.link) {
+      return {
+        mediaUrl: audio.link,
+        mediaKind: 'audio',
+        mediaFilename: filename,
+        mediaMime: mime,
+      }
+    }
+
+    const mediaId = audio.id
+    if (!mediaId) {
+      return {
+        mediaKind: 'audio',
+        mediaFilename: filename,
+        mediaMime: mime,
+      }
+    }
+
+    const proxyUrl = `${supabaseUrl}/functions/v1/whapi-media?empresa_id=${encodeURIComponent(
+      empresaId,
+    )}&media_id=${encodeURIComponent(mediaId)}&filename=${encodeURIComponent(filename)}`
+
     return {
-      mediaUrl: doc.link,
-      mediaKind: 'document',
+      mediaUrl: proxyUrl,
+      mediaKind: 'audio',
       mediaFilename: filename,
       mediaMime: mime,
     }
   }
 
-  // Otherwise, construct a proxy URL via our whapi-media edge function using media ID
-  const mediaId = (doc as any)?.id
-  if (!mediaId) {
-    // No media ID available, can't construct download URL
-    return {
-      mediaKind: 'document',
-      mediaFilename: filename,
-      mediaMime: mime,
-    }
-  }
-  const proxyUrl = `${supabaseUrl}/functions/v1/whapi-media?empresa_id=${encodeURIComponent(empresaId)}&media_id=${encodeURIComponent(mediaId)}&filename=${encodeURIComponent(filename || 'arquivo')}`
-
-  return {
-    mediaUrl: proxyUrl,
-    mediaKind: 'document',
-    mediaFilename: filename,
-    mediaMime: mime,
-  }
+  // Other types (including video) currently do not expose download in the Hub UI
+  return {}
 }

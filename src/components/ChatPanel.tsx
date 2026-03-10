@@ -453,9 +453,32 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
 
   const senderLabel = getSenderLabel();
   const displayContent = getDisplayContent();
-  const hasDocument =
-    !!mensagem.media_url &&
-    (!!mensagem.media_filename || mensagem.media_kind === 'document');
+
+  const hasMedia = !!mensagem.media_url && !!mensagem.media_kind;
+
+  const getMediaIcon = () => {
+    switch (mensagem.media_kind) {
+      case 'image':
+        return '🖼';
+      case 'audio':
+        return '🔊';
+      case 'document':
+      default:
+        return '📄';
+    }
+  };
+
+  const getMediaLabel = () => {
+    switch (mensagem.media_kind) {
+      case 'image':
+        return 'Baixar imagem';
+      case 'audio':
+        return 'Baixar áudio';
+      case 'document':
+      default:
+        return 'Baixar documento';
+    }
+  };
 
   return (
     <div
@@ -480,7 +503,7 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
             {senderLabel}
           </p>
         )}
-        {hasDocument && (
+        {hasMedia && (
           <a
             href={mensagem.media_url!}
             target="_blank"
@@ -490,23 +513,47 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
           >
             <div className="flex items-center gap-2">
               <span className="text-lg" aria-hidden>
-                📄
+                {getMediaIcon()}
               </span>
               <span className="truncate text-sm font-medium">
-                {mensagem.media_filename || 'Documento'}
+                {mensagem.media_filename || 'Arquivo'}
               </span>
             </div>
+
+            {mensagem.media_kind === 'image' && mensagem.media_url && (
+              <img
+                src={mensagem.media_url}
+                alt={mensagem.media_filename || 'Imagem'}
+                className="mt-3 max-h-64 w-full rounded-md object-contain bg-black/10"
+              />
+            )}
+
+            {mensagem.media_kind === 'audio' && mensagem.media_url && (
+              <div className="mt-3">
+                <audio
+                  controls
+                  className="w-full"
+                >
+                  <source
+                    src={mensagem.media_url}
+                    type={mensagem.media_mime || 'audio/ogg'}
+                  />
+                  Seu navegador não suporta reprodução de áudio.
+                </audio>
+              </div>
+            )}
+
             <span
               className={cn(
-                'mt-1 inline-block text-xs font-medium underline underline-offset-2',
+                'mt-2 inline-block text-xs font-medium underline underline-offset-2',
                 isOutgoing ? 'text-chat-outgoing-text' : 'text-primary'
               )}
             >
-              Baixar documento
+              {getMediaLabel()}
             </span>
           </a>
         )}
-        {!hasDocument && (
+        {!hasMedia && (
           <FormattedMessageContent content={displayContent} isOutgoing={isOutgoing} />
         )}
         <p className={cn(
