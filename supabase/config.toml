@@ -29,3 +29,9 @@ verify_jwt = false
 
 [functions.buscar-empresa]
 verify_jwt = false
+
+[functions.conversation-attendance-status]
+verify_jwt = false
+
+[functions.n8n-send-message]
+verify_jwt = false
