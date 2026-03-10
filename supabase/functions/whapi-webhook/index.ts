@@ -36,6 +36,14 @@ interface WhapiMessage {
     file_name?: string
     mime_type?: string
   }
+  voice?: {
+    id?: string
+    link?: string
+    filename?: string
+    file_name?: string
+    mime_type?: string
+    seconds?: number
+  }
   video?: {
     id?: string
     link?: string
