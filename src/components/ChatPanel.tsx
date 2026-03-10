@@ -456,6 +456,18 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
 
   const hasMedia = !!mensagem.media_url && !!mensagem.media_kind;
 
+  const getMediaTitle = () => {
+    switch (mensagem.media_kind) {
+      case 'image':
+        return 'Foto';
+      case 'audio':
+        return 'Mensagem de voz';
+      case 'document':
+      default:
+        return mensagem.media_filename || 'Documento';
+    }
+  };
+
   const getMediaIcon = () => {
     switch (mensagem.media_kind) {
       case 'image':
@@ -516,7 +528,7 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
                 {getMediaIcon()}
               </span>
               <span className="truncate text-sm font-medium">
-                {mensagem.media_filename || 'Arquivo'}
+                {getMediaTitle()}
               </span>
             </div>
 
