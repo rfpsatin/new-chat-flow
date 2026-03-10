@@ -12,10 +12,10 @@ Deno.serve(async (req) => {
 
   try {
     const url = new URL(req.url)
-    const telefone = url.searchParams.get('telefone')
+    const channel_id = url.searchParams.get('channel_id')
 
-    if (!telefone) {
-      return new Response(JSON.stringify({ error: 'Missing telefone parameter' }), {
+    if (!channel_id) {
+      return new Response(JSON.stringify({ error: 'Missing channel_id parameter' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -26,30 +26,14 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
 
-    // Buscar contato pelo número de WhatsApp
-    const { data: contato, error: contatoErr } = await supabase
-      .from('contatos')
-      .select('empresa_id')
-      .eq('whatsapp_numero', telefone)
-      .limit(1)
-      .maybeSingle()
-
-    if (contatoErr || !contato) {
-      return new Response(JSON.stringify({ error: 'Contato não encontrado para este telefone' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    // Buscar empresa pelo id encontrado
     const { data: empresa, error: empresaErr } = await supabase
       .from('empresas')
       .select('id, razao_social, nome_fantasia')
-      .eq('id', contato.empresa_id)
-      .single()
+      .eq('whapi_channel_name', channel_id)
+      .maybeSingle()
 
     if (empresaErr || !empresa) {
-      return new Response(JSON.stringify({ error: 'Empresa não encontrada' }), {
+      return new Response(JSON.stringify({ error: 'Empresa não encontrada para este channel_id' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
