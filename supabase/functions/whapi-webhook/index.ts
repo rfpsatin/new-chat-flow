@@ -652,6 +652,7 @@ function extractMessageContent(message: WhapiMessage): string {
     case 'document':
       return `[documento: ${message.document?.filename || 'arquivo'}]`
     case 'audio':
+    case 'voice':
       return '[áudio]'
     case 'video':
       return '[vídeo]'
