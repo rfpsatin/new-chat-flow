@@ -315,7 +315,7 @@ function ImportContatosDialog({
       const err = validateRow(row.whatsapp_numero);
       return {
         ...row,
-        status: err ? 'invalid' : 'valid',
+        status: (err ? 'invalid' : 'valid') as 'invalid' | 'pending' | 'valid',
         reason: err || undefined,
       };
     });

@@ -65,6 +65,7 @@ export type Database = {
           contato_id: string
           conversa_id: string | null
           created_at: string
+          erro_envio_msg: string | null
           id: string
           mensagem_id_whatsapp: string | null
           status_envio: string
@@ -77,6 +78,7 @@ export type Database = {
           contato_id: string
           conversa_id?: string | null
           created_at?: string
+          erro_envio_msg?: string | null
           id?: string
           mensagem_id_whatsapp?: string | null
           status_envio?: string
@@ -89,6 +91,7 @@ export type Database = {
           contato_id?: string
           conversa_id?: string | null
           created_at?: string
+          erro_envio_msg?: string | null
           id?: string
           mensagem_id_whatsapp?: string | null
           status_envio?: string
