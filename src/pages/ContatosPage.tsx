@@ -25,7 +25,6 @@ import { supabase } from '@/integrations/supabase/client';
 type ImportRow = {
   nome?: string | null;
   whatsapp_numero: string;
-  email?: string | null;
 };
 
 function stripQuotes(value: string): string {
