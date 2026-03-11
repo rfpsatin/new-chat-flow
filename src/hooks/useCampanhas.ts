@@ -202,7 +202,6 @@ export function useReagendarErrosCampanha() {
         .from('campanha_destinatarios')
         .update({
           status_envio: 'pendente',
-          updated_at: nowIso,
         })
         .eq('campanha_id', campanhaId)
         .eq('status_envio', 'erro_envio');
