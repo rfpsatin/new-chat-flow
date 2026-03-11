@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/contexts/AppContext';
 import { useContatos, useHistoricoContato } from '@/hooks/useContatos';
@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { useMensagensHistorico } from '@/hooks/useHistorico';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 type ImportRow = {
   nome?: string | null;
@@ -584,12 +585,16 @@ export default function ContatosPage() {
   const navigate = useNavigate();
   const { empresaId } = useApp();
   const { data: contatos, isLoading } = useContatos(empresaId);
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedContato, setSelectedContato] = useState<Contato | null>(null);
   const { data: historico } = useHistoricoContato(selectedContato?.id || null);
   const [selectedHistorico, setSelectedHistorico] = useState<HistoricoConversa | null>(null);
   const [contatoParaIniciar, setContatoParaIniciar] = useState<Contato | null>(null);
   const [showImport, setShowImport] = useState(false);
+  const [editNome, setEditNome] = useState('');
+  const [editWhatsapp, setEditWhatsapp] = useState('');
+  const [savingContato, setSavingContato] = useState(false);
 
   const filteredContatos = contatos?.filter(contato =>
     contato.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -607,6 +612,52 @@ export default function ContatosPage() {
       return `+${cleaned.slice(0, 2)} (${cleaned.slice(2, 4)}) ${cleaned.slice(4, 9)}-${cleaned.slice(9)}`;
     }
     return phone;
+  };
+
+  useEffect(() => {
+    if (selectedContato) {
+      setEditNome(selectedContato.nome ?? '');
+      setEditWhatsapp(selectedContato.whatsapp_numero ?? '');
+    } else {
+      setEditNome('');
+      setEditWhatsapp('');
+    }
+  }, [selectedContato]);
+
+  const handleSalvarContato = async () => {
+    if (!selectedContato) return;
+    const nome = editNome.trim() || null;
+    const digits = editWhatsapp.replace(/\D/g, '');
+    if (!digits) {
+      toast.error('Informe um número de WhatsApp válido.');
+      return;
+    }
+    setSavingContato(true);
+    try {
+      const { error } = await supabase
+        .from('contatos')
+        .update({
+          nome,
+          whatsapp_numero: digits,
+        })
+        .eq('id', selectedContato.id);
+
+      if (error) throw error;
+
+      // Atualiza seleção local e refaz cache de contatos
+      const updated: Contato = {
+        ...selectedContato,
+        nome,
+        whatsapp_numero: digits,
+      };
+      setSelectedContato(updated);
+      queryClient.invalidateQueries({ queryKey: ['contatos', empresaId] });
+      toast.success('Contato atualizado com sucesso.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao salvar contato');
+    } finally {
+      setSavingContato(false);
+    }
   };
 
   return (
@@ -680,13 +731,28 @@ export default function ContatosPage() {
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
-                      <h2 className="text-xl font-bold text-foreground">
-                        {selectedContato.nome || 'Sem nome'}
-                      </h2>
+                      <div className="space-y-1">
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground">Nome</label>
+                          <Input
+                            value={editNome}
+                            onChange={(e) => setEditNome(e.target.value)}
+                            className="mt-0.5 h-8 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground">WhatsApp</label>
+                          <Input
+                            value={editWhatsapp}
+                            onChange={(e) => setEditWhatsapp(e.target.value)}
+                            className="mt-0.5 h-8 text-sm"
+                          />
+                        </div>
+                      </div>
                       <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Phone className="w-4 h-4" />
-                          {formatPhone(selectedContato.whatsapp_numero)}
+                          {formatPhone(editWhatsapp)}
                         </span>
                         <span className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
@@ -694,13 +760,25 @@ export default function ContatosPage() {
                         </span>
                       </div>
                     </div>
-                    <Button
-                      onClick={() => setContatoParaIniciar(selectedContato)}
-                      className="gap-2"
-                    >
-                      <MessageSquare className="w-4 h-4" />
-                      Iniciar conversa
-                    </Button>
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSalvarContato}
+                        disabled={savingContato}
+                      >
+                        {savingContato ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                        Salvar contato
+                      </Button>
+                      <Button
+                        onClick={() => setContatoParaIniciar(selectedContato)}
+                        className="gap-2"
+                        size="sm"
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                        Iniciar conversa
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
