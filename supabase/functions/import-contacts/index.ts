@@ -126,7 +126,6 @@ Deno.serve(async (req) => {
         empresa_id: empresaId,
         nome: r.nome?.trim() || null,
         whatsapp_numero: normalized,
-        email: r.email?.trim() || null,
       })
     }
 
