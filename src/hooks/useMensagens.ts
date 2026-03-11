@@ -113,6 +113,90 @@ export function useEnviarMensagem() {
   });
 }
 
+export function useEnviarArquivo() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      empresaId,
+      conversaId,
+      contato_id,
+      remetenteId,
+      file,
+      humanMode, // reservado para evoluções futuras
+    }: {
+      empresaId: string;
+      conversaId: string;
+      contato_id: string;
+      remetenteId: string;
+      file: File;
+      humanMode?: boolean;
+    }) => {
+      // 1. Buscar contato para obter número do WhatsApp
+      const { data: contato, error: contatoError } = await supabase
+        .from('contatos')
+        .select('whatsapp_numero')
+        .eq('id', contato_id)
+        .single();
+
+      if (contatoError || !contato) {
+        throw new Error('Contato não encontrado');
+      }
+
+      // 2. Fazer upload do arquivo para o storage para gerar uma URL pública
+      //    Bucket esperado: "chat-media" (precisa existir no projeto Supabase)
+      const bucket = 'chat-media';
+      const path = `${empresaId}/${conversaId}/${Date.now()}-${file.name}`;
+
+      const { error: uploadError } = await supabase.storage.from(bucket).upload(path, file);
+
+      if (uploadError) {
+        throw new Error(uploadError.message || 'Erro ao fazer upload do arquivo');
+      }
+
+      const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(path);
+      const mediaUrl = publicUrlData?.publicUrl;
+
+      if (!mediaUrl) {
+        throw new Error('Não foi possível obter a URL pública do arquivo');
+      }
+
+      // 3. Determinar o tipo de mídia a partir do MIME type
+      const mime = file.type || '';
+      let mediaKind: 'document' | 'image' | 'audio' = 'document';
+
+      if (mime.startsWith('image/')) {
+        mediaKind = 'image';
+      } else if (mime.startsWith('audio/')) {
+        mediaKind = 'audio';
+      }
+
+      // 4. Chamar a edge function para enviar a mídia via Whapi e registrar em mensagens_ativas
+      const { error: whapiError } = await supabase.functions.invoke('whapi-send-media', {
+        body: {
+          empresa_id: empresaId,
+          to: contato.whatsapp_numero,
+          media_url: mediaUrl,
+          media_kind: mediaKind,
+          filename: file.name,
+          mime_type: mime || undefined,
+          conversa_id: conversaId,
+          contato_id,
+          remetente_id: remetenteId,
+        },
+      });
+
+      if (whapiError) {
+        throw new Error(whapiError.message || 'Erro ao enviar arquivo via Whapi');
+      }
+    },
+    onSuccess: (_, { conversaId }) => {
+      queryClient.invalidateQueries({ queryKey: ['mensagens', conversaId] });
+      queryClient.invalidateQueries({ queryKey: ['fila'] });
+    },
+  });
+}
+
 export function useMensagensHistorico(conversaId: string | null) {
   return useQuery({
     queryKey: ['mensagens-historico', conversaId],

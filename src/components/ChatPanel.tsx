@@ -19,13 +19,14 @@ import {
   Download,
   Play,
   Pause,
+  Paperclip,
 } from 'lucide-react';
-import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { EncerrarDialog } from '@/components/EncerrarDialog';
 import { AtribuirAtendentePopover } from '@/components/AtribuirAtendentePopover';
 import { HistoricoClienteCollapsible } from '@/components/HistoricoClienteCollapsible';
 import { ConversaTags } from '@/components/ConversaTags';
+import { UploadArquivoDialog } from '@/components/UploadArquivoDialog';
 
 interface ChatPanelProps {
   conversa: FilaAtendimento | null;
@@ -39,6 +40,7 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
   
   const [mensagemInput, setMensagemInput] = useState('');
   const [showEncerrar, setShowEncerrar] = useState(false);
+  const [showUpload, setShowUpload] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -263,6 +265,16 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
           onSubmit={(e) => { e.preventDefault(); handleEnviar(); }}
           className="flex items-center gap-3"
         >
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            className="h-11 w-11"
+            disabled={!canRespond}
+            onClick={() => setShowUpload(true)}
+          >
+            <Paperclip className="w-5 h-5" />
+          </Button>
           <Input
             value={mensagemInput}
             onChange={(e) => setMensagemInput(e.target.value)}
@@ -291,6 +303,17 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
         <EncerrarDialog
           conversa={conversa}
           onClose={() => setShowEncerrar(false)}
+        />
+      )}
+      {currentUser && conversaDetalhes && (
+        <UploadArquivoDialog
+          open={showUpload}
+          onOpenChange={setShowUpload}
+          empresaId={empresaId}
+          conversaId={conversa.conversa_id}
+          contatoId={conversaDetalhes.contato_id}
+          remetenteId={currentUser.id}
+          canRespond={canRespond}
         />
       )}
     </div>
