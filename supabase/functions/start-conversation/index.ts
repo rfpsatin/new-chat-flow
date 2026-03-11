@@ -95,6 +95,7 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     const authHeader = req.headers.get('Authorization') || ''
     const bearer = authHeader.replace(/^Bearer\s+/i, '')
@@ -102,23 +103,35 @@ Deno.serve(async (req) => {
 
     let empresa_id: string
     let remetenteEfetivoId: string | null = null
+    let contato: { id: string; empresa_id: string; whatsapp_numero: string; nome: string | null } | null = null
 
     if (isServiceCaller) {
       // Chamada interna (ex: worker de campanhas) usando service role:
-      // confiar em empresa_id vindo no body e ignorar remetente_id.
-      if (!bodyEmpresaId) {
-        return new Response(
-          JSON.stringify({
-            error: 'empresa_id obrigatorio para chamadas internas',
-          }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          },
+      // Deriva empresa_id a partir do contato para garantir alinhamento com o número/token.
+      const { data: contatoRow, error: contatoError } = await supabase
+        .from('contatos')
+        .select('id, empresa_id, whatsapp_numero, nome')
+        .eq('id', contato_id)
+        .maybeSingle()
+
+      if (contatoError || !contatoRow) {
+        console.error(`[${requestId}] Contato not found (service caller):`, contatoError)
+        return new Response(JSON.stringify({ error: 'Contato não encontrado para campanha' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      empresa_id = contatoRow.empresa_id
+      remetenteEfetivoId = null
+      contato = contatoRow
+
+      if (bodyEmpresaId && bodyEmpresaId !== empresa_id) {
+        console.warn(
+          `[${requestId}] Aviso: campanha enviada com empresa_id=${bodyEmpresaId}, ` +
+            `mas o contato pertence à empresa_id=${empresa_id}. Usando empresa do contato.`,
         )
       }
-      empresa_id = bodyEmpresaId
-      remetenteEfetivoId = null
     } else {
       // Chamada normal via Hub: autentica usuário e descobre empresa / remetente
       const callerTenant = await getCallerTenant(req, supabaseUrl, supabaseServiceKey)
@@ -134,24 +147,24 @@ Deno.serve(async (req) => {
           },
         )
       }
-    }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+      // Buscar contato limitado à empresa do usuário
+      const { data: contatoRow, error: contatoError } = await supabase
+        .from('contatos')
+        .select('id, empresa_id, whatsapp_numero, nome')
+        .eq('id', contato_id)
+        .eq('empresa_id', empresa_id)
+        .maybeSingle()
 
-    // Buscar contato
-    const { data: contato, error: contatoError } = await supabase
-      .from('contatos')
-      .select('id, empresa_id, whatsapp_numero, nome')
-      .eq('id', contato_id)
-      .eq('empresa_id', empresa_id)
-      .maybeSingle()
+      if (contatoError || !contatoRow) {
+        console.error(`[${requestId}] Contato not found:`, contatoError)
+        return new Response(JSON.stringify({ error: 'Contato não encontrado ou não pertence à empresa' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
 
-    if (contatoError || !contato) {
-      console.error(`[${requestId}] Contato not found:`, contatoError)
-      return new Response(JSON.stringify({ error: 'Contato não encontrado ou não pertence à empresa' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      contato = contatoRow
     }
 
     const whatsappNumero = contato.whatsapp_numero.replace(/@(s\.whatsapp\.net|c\.us)$/, '').trim()
