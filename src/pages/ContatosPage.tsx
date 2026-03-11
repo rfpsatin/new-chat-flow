@@ -92,11 +92,9 @@ function parseCsvLines(text: string): ImportRow[] {
     const idxMiddle = headers.indexOf('Middle Name');
     const idxLast = headers.indexOf('Last Name');
     const idxOrg = headers.indexOf('Organization Name');
-    const idxEmail = headers.indexOf('E-mail 1 - Value'); // pode não existir
-
     for (let i = 1; i < rawLines.length; i++) {
       const line = rawLines[i];
-      const cols = line.split(','); // no exemplo, não há vírgulas dentro de campos
+      const cols = line.split(',');
       if (idxPhone === -1 || !cols[idxPhone]) continue;
 
       const phoneRaw = normalizePhoneField(cols[idxPhone] ?? '');
@@ -109,13 +107,10 @@ function parseCsvLines(text: string): ImportRow[] {
       if (!nome && idxOrg >= 0) {
         nome = normalizeNameField(cols[idxOrg] ?? '');
       }
-      const email =
-        idxEmail >= 0 ? (stripQuotes(cols[idxEmail] ?? '') || null) : null;
 
       rows.push({
         nome: nome || null,
         whatsapp_numero: phoneRaw,
-        email,
       });
     }
 
