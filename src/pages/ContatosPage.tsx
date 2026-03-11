@@ -399,7 +399,6 @@ function ImportContatosDialog({
       const payloadRows = ready.map((r) => ({
         nome: r.nome || null,
         whatsapp_numero: r.whatsapp_numero,
-        email: r.email || null,
       }));
 
       const { data, error } = await supabase.functions.invoke('import-contacts', {
