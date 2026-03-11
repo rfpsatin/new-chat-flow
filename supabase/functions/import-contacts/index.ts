@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
 
       validRows.push({
         empresa_id: empresaId,
-        nome: r.nome?.trim() || null,
+        nome: sanitizeName(r.nome) || null,
         whatsapp_numero: normalized,
       })
     }
