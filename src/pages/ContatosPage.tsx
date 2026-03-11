@@ -335,7 +335,6 @@ function ImportContatosDialog({
         id: idx,
         nome: r.nome ?? '',
         whatsapp_numero: r.whatsapp_numero,
-        email: r.email ?? '',
         status: 'pending' as const,
       }));
       setRows(nextRows);
