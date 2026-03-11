@@ -1,4 +1,4 @@
-// @version 5 — deploy target: hyizldxjiwjeruxqrqbv
+// @version 6 — deploy target: hyizldxjiwjeruxqrqbv
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
