@@ -100,8 +100,13 @@ export function useEnviarMensagem() {
 
       if (whapiError) throw new Error(whapiError.message || 'Erro ao enviar mensagem via Whapi');
 
-      // Capturar o whatsapp_message_id retornado pelo Whapi
-      const whapiMessageId = sendResult?.message_id ?? null;
+      const whapiMessageId =
+        sendResult?.message_id ??
+        sendResult?.response?.message?.id ??
+        sendResult?.response?.message?.message_id ??
+        sendResult?.response?.messages?.[0]?.id ??
+        sendResult?.response?.messages?.[0]?.message_id ??
+        null;
 
       // Inserir mensagem diretamente no banco (webhook ignora from_me=true)
       await supabase.from('mensagens_ativas').insert({

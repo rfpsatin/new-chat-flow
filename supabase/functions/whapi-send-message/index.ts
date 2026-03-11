@@ -261,7 +261,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ 
       success: true,
-      message_id: whapiData.messages?.[0]?.id,
+      message_id: whapiMessageId,
       response: whapiData
     }), {
       status: 200,
