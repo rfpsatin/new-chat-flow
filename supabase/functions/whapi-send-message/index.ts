@@ -230,8 +230,9 @@ Deno.serve(async (req) => {
       })
     }
 
+    const whapiMessageId = extractWhapiMessageId(whapiData)
     console.log(`[${requestId}] Message sent successfully`)
-    console.log(`[${requestId}] Message ID: ${whapiData.messages?.[0]?.id || 'unknown'}`)
+    console.log(`[${requestId}] Message ID: ${whapiMessageId || 'unknown'}`)
 
     // If human_mode=true was detected, notify n8n to set Redis
     // (fire-and-forget, don't block the response)
