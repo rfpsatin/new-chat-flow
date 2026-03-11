@@ -4,7 +4,7 @@ project_id = "hyizldxjiwjeruxqrqbv"
 verify_jwt = false
 
 [functions.whapi-send-message]
-verify_jwt = true
+verify_jwt = false
 
 [functions.check-attendance-mode]
 verify_jwt = true
@@ -19,7 +19,7 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.start-conversation]
-verify_jwt = true
+verify_jwt = false
 
 [functions.run-campaigns]
 verify_jwt = false
