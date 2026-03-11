@@ -64,9 +64,19 @@ interface WhapiMessage {
     label?: string
     sections?: Array<{ title: string; rows: Array<{ id: string; title: string; description?: string }> }>
   }
-  // Campos adicionais que podem existir em replies/contexto
-  quoted?: string | { id?: string; message_id?: string }
-  context?: { id?: string; message_id?: string }
+  // Campos adicionais que podem existir em replies/contexto (dependendo da versão do Whapi)
+  quotedMsg?: {
+    id?: string
+    message_id?: string
+  } | string
+  quoted?: {
+    id?: string
+    message_id?: string
+  } | string
+  context?: {
+    id?: string
+    message_id?: string
+  }
 }
 
 interface WhapiEvent {
@@ -373,13 +383,20 @@ Deno.serve(async (req) => {
         }
 
         // Insert message (always in/cliente at this point)
-        // Detect reply / quoted message
+        // Detect reply / quoted message (cliente respondeu uma mensagem específica)
         let replyToWhatsappId: string | null = null
-        const rawQuoted: any = (message as any).quoted ?? (message as any).context
-        if (typeof rawQuoted === 'string') {
-          replyToWhatsappId = rawQuoted
-        } else if (rawQuoted && typeof rawQuoted === 'object') {
-          replyToWhatsappId = rawQuoted.id ?? rawQuoted.message_id ?? null
+        const rawQuotedAny: any =
+          (message as any).quotedMsg ??
+          (message as any).quoted ??
+          (message as any).context
+
+        if (typeof rawQuotedAny === 'string') {
+          replyToWhatsappId = rawQuotedAny
+        } else if (rawQuotedAny && typeof rawQuotedAny === 'object') {
+          replyToWhatsappId =
+            rawQuotedAny.id ??
+            rawQuotedAny.message_id ??
+            null
         }
 
         let replyToMessageId: number | null = null
