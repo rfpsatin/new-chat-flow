@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import { useMensagens, useEnviarMensagem } from '@/hooks/useMensagens';
+import { useMensagens, useEnviarMensagem, useEnviarArquivo } from '@/hooks/useMensagens';
 import { useConversa } from '@/hooks/useFila';
 import { MensagemAtiva, FilaAtendimento } from '@/types/atendimento';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -19,14 +19,22 @@ import {
   Download,
   Play,
   Pause,
-  Paperclip,
+  Plus,
+  Smile,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EncerrarDialog } from '@/components/EncerrarDialog';
 import { AtribuirAtendentePopover } from '@/components/AtribuirAtendentePopover';
 import { HistoricoClienteCollapsible } from '@/components/HistoricoClienteCollapsible';
 import { ConversaTags } from '@/components/ConversaTags';
-import { UploadArquivoDialog } from '@/components/UploadArquivoDialog';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { useToast } from '@/hooks/use-toast';
 
 interface ChatPanelProps {
   conversa: FilaAtendimento | null;
@@ -37,17 +45,107 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
   const { data: mensagens, isLoading: mensagensLoading } = useMensagens(conversa?.conversa_id || null);
   const { data: conversaDetalhes } = useConversa(conversa?.conversa_id || null);
   const enviarMensagem = useEnviarMensagem();
+  const enviarArquivo = useEnviarArquivo();
+  const { toast } = useToast();
   
   const [mensagemInput, setMensagemInput] = useState('');
   const [showEncerrar, setShowEncerrar] = useState(false);
-  const [showUpload, setShowUpload] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const documentosInputRef = useRef<HTMLInputElement | null>(null);
+  const midiaInputRef = useRef<HTMLInputElement | null>(null);
+  const messageInputRef = useRef<HTMLInputElement | null>(null);
+  const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
+
+  const emojiCategories = [
+    {
+      id: 'smileys',
+      icon: '😊',
+      emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '😘', '😗', '😙', '😚', '😋', '😜', '🤪', '😝', '🤗', '🤔'],
+    },
+    {
+      id: 'animals',
+      icon: '🐻',
+      emojis: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵'],
+    },
+    {
+      id: 'objects',
+      icon: '⚽',
+      emojis: ['⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🎱', '🏓', '🎯', '🎮', '🎲', '🎵', '🎧'],
+    },
+    {
+      id: 'symbols',
+      icon: '❤️',
+      emojis: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '💖', '✨', '⭐', '🔥', '💯'],
+    },
+  ] as const;
+  const [activeEmojiCategoryId, setActiveEmojiCategoryId] = useState<string>(emojiCategories[0]?.id ?? 'smileys');
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [mensagens]);
+
+  const handleFilesUpload = async (files: FileList | null) => {
+    if (!files || !conversa || !currentUser || !conversaDetalhes || !empresaId || !canRespond) return;
+
+    for (const file of Array.from(files)) {
+      try {
+        await enviarArquivo.mutateAsync({
+          empresaId,
+          conversaId: conversa.conversa_id,
+          contato_id: conversaDetalhes.contato_id,
+          remetenteId: currentUser.id,
+          file,
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Erro ao enviar arquivo';
+        toast({
+          title: 'Erro ao enviar arquivo',
+          description: `${file.name}: ${message}`,
+          variant: 'destructive',
+        });
+      }
+    }
+  };
+
+  const handleDocumentosChange: React.ChangeEventHandler<HTMLInputElement> = async (event) => {
+    const files = event.target.files;
+    await handleFilesUpload(files);
+    if (event.target) {
+      event.target.value = '';
+    }
+  };
+
+  const handleMidiaChange: React.ChangeEventHandler<HTMLInputElement> = async (event) => {
+    const files = event.target.files;
+    await handleFilesUpload(files);
+    if (event.target) {
+      event.target.value = '';
+    }
+  };
+
+  const handleEmojiInsert = (emoji: string) => {
+    let start = mensagemInput.length;
+    let end = mensagemInput.length;
+    if (selection) {
+      start = selection.start;
+      end = selection.end;
+    }
+    const before = mensagemInput.slice(0, start);
+    const after = mensagemInput.slice(end);
+    const next = `${before}${emoji}${after}`;
+    setMensagemInput(next);
+    if (messageInputRef.current) {
+      const cursorPos = start + emoji.length;
+      requestAnimationFrame(() => {
+        messageInputRef.current?.focus();
+        messageInputRef.current?.setSelectionRange(cursorPos, cursorPos);
+      });
+    }
+  };
 
   const handleEnviar = async () => {
     if (!mensagemInput.trim() || !conversa || !currentUser || !conversaDetalhes) return;
@@ -265,19 +363,109 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
           onSubmit={(e) => { e.preventDefault(); handleEnviar(); }}
           className="flex items-center gap-3"
         >
-          <Button
-            type="button"
-            size="icon"
-            variant="outline"
-            className="h-11 w-11"
-            disabled={!canRespond}
-            onClick={() => setShowUpload(true)}
-          >
-            <Paperclip className="w-5 h-5" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                className="h-11 w-11"
+                disabled={!canRespond}
+              >
+                <Plus className="w-5 h-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem
+                onSelect={(event) => {
+                  event.preventDefault();
+                  if (!canRespond) return;
+                  documentosInputRef.current?.click();
+                }}
+              >
+                Documentos
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={(event) => {
+                  event.preventDefault();
+                  if (!canRespond) return;
+                  midiaInputRef.current?.click();
+                }}
+              >
+                Fotos e vídeos
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-11 w-11"
+                disabled={!canRespond}
+              >
+                <Smile className="w-5 h-5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              side="top"
+              align="start"
+              className="w-64 p-2"
+            >
+              <div className="flex gap-1 border-b pb-1 mb-2">
+                {emojiCategories.map((category) => (
+                  <button
+                    key={category.id}
+                    type="button"
+                    className={cn(
+                      'flex h-7 w-7 items-center justify-center rounded-md text-base',
+                      activeEmojiCategoryId === category.id
+                        ? 'bg-primary/20'
+                        : 'bg-transparent hover:bg-muted'
+                    )}
+                    onClick={() => setActiveEmojiCategoryId(category.id)}
+                  >
+                    {category.icon}
+                  </button>
+                ))}
+              </div>
+              <div className="max-h-64 overflow-y-auto">
+                <div className="grid grid-cols-8 gap-1 text-lg">
+                  {emojiCategories
+                    .find((c) => c.id === activeEmojiCategoryId)
+                    ?.emojis.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        className="flex h-7 w-7 items-center justify-center rounded-md hover:bg-muted"
+                        onClick={() => handleEmojiInsert(emoji)}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
           <Input
+            ref={messageInputRef}
             value={mensagemInput}
             onChange={(e) => setMensagemInput(e.target.value)}
+            onClick={(e) => {
+              const target = e.target as HTMLInputElement;
+              setSelection({
+                start: target.selectionStart ?? target.value.length,
+                end: target.selectionEnd ?? target.value.length,
+              });
+            }}
+            onKeyUp={(e) => {
+              const target = e.target as HTMLInputElement;
+              setSelection({
+                start: target.selectionStart ?? target.value.length,
+                end: target.selectionEnd ?? target.value.length,
+              });
+            }}
             placeholder={canRespond 
               ? "Digite sua mensagem..." 
               : "Você não é o responsável por esta conversa"}
@@ -298,22 +486,26 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
           </Button>
         </form>
       </div>
+      <input
+        ref={documentosInputRef}
+        type="file"
+        multiple
+        hidden
+        onChange={handleDocumentosChange}
+      />
+      <input
+        ref={midiaInputRef}
+        type="file"
+        multiple
+        accept="image/*,video/*"
+        hidden
+        onChange={handleMidiaChange}
+      />
       
       {showEncerrar && (
         <EncerrarDialog
           conversa={conversa}
           onClose={() => setShowEncerrar(false)}
-        />
-      )}
-      {currentUser && conversaDetalhes && (
-        <UploadArquivoDialog
-          open={showUpload}
-          onOpenChange={setShowUpload}
-          empresaId={empresaId}
-          conversaId={conversa.conversa_id}
-          contatoId={conversaDetalhes.contato_id}
-          remetenteId={currentUser.id}
-          canRespond={canRespond}
         />
       )}
     </div>
