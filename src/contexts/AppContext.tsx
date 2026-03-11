@@ -113,8 +113,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!currentUserRef.current) return;
 
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error || !session) {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error || !user) {
           console.warn('Session expired while tab was in background');
           clearSessionAndRedirect();
         }
@@ -135,8 +135,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!currentUserRef.current) return;
 
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error || !session) {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error || !user) {
           console.warn('Session heartbeat: session no longer valid');
           clearSessionAndRedirect();
         }
@@ -148,12 +148,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => window.clearInterval(id);
   }, [clearSessionAndRedirect]);
 
-  const logout = async () => {
-    await supabase.auth.signOut();
+  const logout = useCallback(async () => {
     setCurrentUser(null);
     setSelectedConversa(null);
     navigate('/login', { replace: true });
-  };
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.warn('signOut API call failed (session may already be expired):', err);
+    }
+  }, [navigate]);
 
   const empresaId = currentUser?.empresa_id ?? '';
 

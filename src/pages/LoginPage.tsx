@@ -19,53 +19,51 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
 
-    const { error, data: authData } = await supabase.auth.signInWithPassword({ email, password });
+    try {
+      const { error, data: authData } = await supabase.auth.signInWithPassword({ email, password });
 
-    if (error) {
-      toast({ title: 'Erro ao fazer login', description: error.message, variant: 'destructive' });
+      if (error) {
+        toast({ title: 'Erro ao fazer login', description: error.message, variant: 'destructive' });
+        return;
+      }
+
+      const userId = authData.user?.id;
+      if (!userId) {
+        toast({ title: 'Erro', description: 'Usuário não encontrado', variant: 'destructive' });
+        return;
+      }
+
+      const { data: superAdmin } = await supabase
+        .from('super_admins')
+        .select('id')
+        .eq('auth_user_id', userId)
+        .maybeSingle();
+
+      if (superAdmin) {
+        navigate('/superadmin', { replace: true });
+        return;
+      }
+
+      const { data: usuario } = await supabase
+        .from('usuarios')
+        .select('id')
+        .eq('auth_user_id', userId)
+        .eq('ativo', true)
+        .maybeSingle();
+
+      if (usuario) {
+        navigate('/', { replace: true });
+        return;
+      }
+
+      await supabase.auth.signOut();
+      toast({ title: 'Acesso negado', description: 'Seu usuário não possui acesso ao sistema.', variant: 'destructive' });
+    } catch (err) {
+      console.error('Login failed:', err);
+      toast({ title: 'Erro ao fazer login', description: 'Falha na comunicação com o servidor. Tente novamente.', variant: 'destructive' });
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const userId = authData.user?.id;
-    if (!userId) {
-      toast({ title: 'Erro', description: 'Usuário não encontrado', variant: 'destructive' });
-      setLoading(false);
-      return;
-    }
-
-    // Check if super admin
-    const { data: superAdmin } = await supabase
-      .from('super_admins')
-      .select('id')
-      .eq('auth_user_id', userId)
-      .maybeSingle();
-
-    if (superAdmin) {
-      navigate('/superadmin', { replace: true });
-      setLoading(false);
-      return;
-    }
-
-    // Check if regular user (operator/supervisor)
-    const { data: usuario } = await supabase
-      .from('usuarios')
-      .select('id')
-      .eq('auth_user_id', userId)
-      .eq('ativo', true)
-      .maybeSingle();
-
-    if (usuario) {
-      // AppContext will pick up the session via onAuthStateChange
-      navigate('/', { replace: true });
-      setLoading(false);
-      return;
-    }
-
-    // No access
-    await supabase.auth.signOut();
-    toast({ title: 'Acesso negado', description: 'Seu usuário não possui acesso ao sistema.', variant: 'destructive' });
-    setLoading(false);
   };
 
   return (
