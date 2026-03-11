@@ -823,7 +823,7 @@ function MessageBubble({
           </div>
         )}
         {repliedMessage && (
-          <div className="mb-1 rounded-md bg-black/5 px-2 py-1 text-[11px] border-l-2 border-border/60">
+          <div className="mb-1 -mx-2 rounded-md bg-black/5 px-2 py-1 text-[11px] border-l-2 border-border/60">
             <p className="font-semibold truncate">
               {repliedMessage.tipo_remetente === 'agente'
                 ? 'Você'
