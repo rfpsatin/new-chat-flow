@@ -33,6 +33,13 @@ export default function LoginPage() {
         return;
       }
 
+      // Garantir que a sessão ainda está presente (evita race com signOut em segundo plano)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        toast({ title: 'Erro ao fazer login', description: 'Sessão perdida. Tente novamente.', variant: 'destructive' });
+        return;
+      }
+
       const { data: superAdmin } = await supabase
         .from('super_admins')
         .select('id')

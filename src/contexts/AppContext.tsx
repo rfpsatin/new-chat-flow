@@ -148,15 +148,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => window.clearInterval(id);
   }, [clearSessionAndRedirect]);
 
-  const logout = useCallback(async () => {
+  const logout = useCallback((): Promise<void> => {
     setCurrentUser(null);
     setSelectedConversa(null);
     navigate('/login', { replace: true });
-    try {
-      await supabase.auth.signOut();
-    } catch (err) {
-      console.warn('signOut API call failed (session may already be expired):', err);
-    }
+    // Não chamamos signOut() aqui para evitar condição de corrida: um signOut()
+    // assíncrono pode terminar depois do próximo login e apagar a sessão nova,
+    // deixando o botão "Entrando..." travado. O próximo signInWithPassword
+    // sobrescreve a sessão no storage; ao sair, o token antigo fica até o próximo login.
+    return Promise.resolve();
   }, [navigate]);
 
   const empresaId = currentUser?.empresa_id ?? '';
