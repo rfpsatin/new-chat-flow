@@ -114,7 +114,7 @@ Deno.serve(async (req) => {
 
     const { data: empresa, error: empresaError } = await supabase
       .from('empresas')
-      .select('id, nome_fantasia')
+      .select('id, nome_fantasia, agente_ia_ativo')
       .eq('id', empresaId)
       .maybeSingle()
 
@@ -338,6 +338,7 @@ Deno.serve(async (req) => {
           empresaId,
           contato.id,
           conteudo,
+          empresa.agente_ia_ativo === true,
           requestId
         )
 
@@ -551,6 +552,7 @@ async function findOrCreateConversa(
   empresaId: string,
   contatoId: string,
   conteudo: string,
+  agenteIaAtivo: boolean,
   requestId: string
 ) {
   console.log(`[${requestId}] Finding conversation for contact: ${contatoId}`)
@@ -601,14 +603,14 @@ async function findOrCreateConversa(
       console.log(`[${requestId}] Not a valid satisfaction response (nota: ${conteudo}, isValid: ${isNotaValida}, withinWindow: ${horasPassadas <= 24})`)
     }
 
-    // Conversa encerrada e não é pesquisa válida → nova sessão
-    console.log(`[${requestId}] Found closed conversation ${ultimaConversa.id}, creating new session...`)
+    const initialStatus = agenteIaAtivo ? 'bot' : 'esperando_tria'
+    console.log(`[${requestId}] Found closed conversation ${ultimaConversa.id}, creating new session (status=${initialStatus})...`)
     const { data: newConversa, error: createError } = await supabase
       .from('conversas')
       .insert({
         empresa_id: empresaId,
         contato_id: contatoId,
-        status: 'bot',
+        status: initialStatus,
         canal: 'whatsapp',
         iniciado_por: 'cliente',
       })
@@ -625,13 +627,14 @@ async function findOrCreateConversa(
     return ultimaConversa
   }
 
-  console.log(`[${requestId}] Creating new conversation`)
+  const initialStatus = agenteIaAtivo ? 'bot' : 'esperando_tria'
+  console.log(`[${requestId}] Creating new conversation (status=${initialStatus})`)
   const { data: newConversa, error: createError } = await supabase
     .from('conversas')
     .insert({
       empresa_id: empresaId,
       contato_id: contatoId,
-      status: 'bot',
+      status: initialStatus,
       canal: 'whatsapp',
       iniciado_por: 'cliente',
     })

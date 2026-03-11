@@ -20,6 +20,7 @@ export default function EmpresaPage() {
     nome_fantasia: '',
     cnpj: '',
     ativo: true,
+    agente_ia_ativo: false,
   });
 
   useEffect(() => {
@@ -29,6 +30,7 @@ export default function EmpresaPage() {
         nome_fantasia: empresa.nome_fantasia ?? '',
         cnpj: empresa.cnpj,
         ativo: empresa.ativo,
+        agente_ia_ativo: empresa.agente_ia_ativo ?? false,
       });
     }
   }, [empresa]);
@@ -126,6 +128,21 @@ export default function EmpresaPage() {
                         id="ativo"
                         checked={form.ativo}
                         onCheckedChange={(checked) => handleChange('ativo', checked)}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between border rounded-lg px-4 py-3">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="agente_ia_ativo">Agente de IA ativo</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Quando ativo, novas conversas do cliente vão para o Bot (agente IA).
+                          Quando desativado, vão direto para Triagem (atendimento humano).
+                        </p>
+                      </div>
+                      <Switch
+                        id="agente_ia_ativo"
+                        checked={form.agente_ia_ativo}
+                        onCheckedChange={(checked) => handleChange('agente_ia_ativo', checked)}
                       />
                     </div>
 

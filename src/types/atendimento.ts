@@ -17,6 +17,7 @@ export interface Empresa {
   nome_fantasia: string | null;
   cnpj: string;
   ativo: boolean;
+  agente_ia_ativo?: boolean;
   created_at: string;
 }
 
