@@ -190,33 +190,22 @@ export function useExcluirCampanha() {
 export function useReagendarErrosCampanha() {
   const qc = useQueryClient();
   return useMutation<
-    void,
+    { success: boolean },
     Error,
     { campanhaId: string; agendado_para: string }
   >({
     mutationFn: async ({ campanhaId, agendado_para }) => {
-      const nowIso = new Date().toISOString();
-
-      // Volta apenas os destinatários com erro_envio para pendente
-      const { error: destError } = await sb
-        .from('campanha_destinatarios')
-        .update({
-          status_envio: 'pendente',
-        })
-        .eq('campanha_id', campanhaId)
-        .eq('status_envio', 'erro_envio');
-      if (destError) throw destError;
-
-      // Reagenda a campanha
-      const { error: campError } = await sb
-        .from('campanhas')
-        .update({
-          status: 'agendada',
+      const { data, error } = await supabase.functions.invoke('reschedule-campaign-errors', {
+        body: {
+          campanha_id: campanhaId,
           agendado_para,
-          updated_at: nowIso,
-        })
-        .eq('id', campanhaId);
-      if (campError) throw campError;
+        },
+      });
+      if (error) throw new Error(error.message || 'Falha ao reagendar erros da campanha');
+      if (!data?.success) {
+        throw new Error(data?.error || 'Falha ao reagendar erros da campanha');
+      }
+      return data;
     },
     onSuccess: (_, { campanhaId }) => {
       qc.invalidateQueries({ queryKey: ['campanhas'] });
