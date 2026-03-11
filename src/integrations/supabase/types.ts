@@ -357,7 +357,6 @@ export type Database = {
       }
       empresas: {
         Row: {
-          agente_ia_ativo: boolean
           ativo: boolean
           cnpj: string
           created_at: string
@@ -376,7 +375,6 @@ export type Database = {
           whapi_work_period: string | null
         }
         Insert: {
-          agente_ia_ativo?: boolean
           ativo?: boolean
           cnpj: string
           created_at?: string
@@ -395,7 +393,6 @@ export type Database = {
           whapi_work_period?: string | null
         }
         Update: {
-          agente_ia_ativo?: boolean
           ativo?: boolean
           cnpj?: string
           created_at?: string
