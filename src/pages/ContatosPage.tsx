@@ -28,6 +28,33 @@ type ImportRow = {
   email?: string | null;
 };
 
+function stripQuotes(value: string): string {
+  let v = value.trim();
+  // Converte "" em "
+  v = v.replace(/""/g, '"');
+  // Remove aspas no início/fim
+  if (v.startsWith('"') && v.endsWith('"') && v.length >= 2) {
+    v = v.slice(1, -1);
+  }
+  return v.trim();
+}
+
+function normalizeNameField(raw: string): string {
+  const v = stripQuotes(raw);
+  // Remove acentuação
+  return v
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+function normalizePhoneField(raw: string): string {
+  let v = stripQuotes(raw);
+  // Remove sinal de +
+  v = v.replace(/\+/g, '');
+  return v.trim();
+}
+
 function parseCsvLines(text: string): ImportRow[] {
   const rawLines = text
     .split(/\r?\n/)
@@ -36,12 +63,32 @@ function parseCsvLines(text: string): ImportRow[] {
 
   if (rawLines.length === 0) return [];
 
-  const header = rawLines[0];
   const rows: ImportRow[] = [];
+
+  const header = rawLines[0];
+  const headerClean = stripQuotes(header).toLowerCase();
+
+  // Caso 0: formato simples com cabeçalho "Nome,Numero" (como no exemplo enviado)
+  if (headerClean.startsWith('nome,') && headerClean.includes('numero')) {
+    for (let i = 1; i < rawLines.length; i++) {
+      const line = rawLines[i];
+      const cols = line.split(','); // esperamos duas colunas: nome,numero
+      if (cols.length < 2) continue;
+      const nome = normalizeNameField(cols[0]);
+      const whatsapp = normalizePhoneField(cols[1]);
+      if (!whatsapp) continue;
+      rows.push({
+        nome: nome || null,
+        whatsapp_numero: whatsapp,
+        email: null,
+      });
+    }
+    return rows;
+  }
 
   // Caso 1: CSV exportado do Google Contacts (como o exemplo enviado)
   if (header.includes('Phone 1 - Value')) {
-    const headers = header.split(',').map((h) => h.trim());
+    const headers = header.split(',').map((h) => stripQuotes(h));
     const idxPhone = headers.indexOf('Phone 1 - Value');
     const idxFirst = headers.indexOf('First Name');
     const idxMiddle = headers.indexOf('Middle Name');
@@ -54,18 +101,18 @@ function parseCsvLines(text: string): ImportRow[] {
       const cols = line.split(','); // no exemplo, não há vírgulas dentro de campos
       if (idxPhone === -1 || !cols[idxPhone]) continue;
 
-      const phoneRaw = cols[idxPhone].replace(/^"|"$/g, '').trim();
+      const phoneRaw = normalizePhoneField(cols[idxPhone] ?? '');
       if (!phoneRaw) continue;
 
-      const first = idxFirst >= 0 ? cols[idxFirst]?.trim() ?? '' : '';
-      const middle = idxMiddle >= 0 ? cols[idxMiddle]?.trim() ?? '' : '';
-      const last = idxLast >= 0 ? cols[idxLast]?.trim() ?? '' : '';
+      const first = idxFirst >= 0 ? normalizeNameField(cols[idxFirst] ?? '') : '';
+      const middle = idxMiddle >= 0 ? normalizeNameField(cols[idxMiddle] ?? '') : '';
+      const last = idxLast >= 0 ? normalizeNameField(cols[idxLast] ?? '') : '';
       let nome = [first, middle, last].filter(Boolean).join(' ');
       if (!nome && idxOrg >= 0) {
-        nome = cols[idxOrg]?.trim() ?? '';
+        nome = normalizeNameField(cols[idxOrg] ?? '');
       }
       const email =
-        idxEmail >= 0 ? (cols[idxEmail]?.trim() || null) : null;
+        idxEmail >= 0 ? (stripQuotes(cols[idxEmail] ?? '') || null) : null;
 
       rows.push({
         nome: nome || null,
@@ -79,14 +126,14 @@ function parseCsvLines(text: string): ImportRow[] {
 
   // Caso 2: formato simples "nome;whatsapp;email" ou "nome,whatsapp,email"
   for (const line of rawLines) {
-    const parts = line.split(/[;,]/).map((p) => p.trim());
+    const parts = line.split(/[;,]/).map((p) => stripQuotes(p));
     if (parts.length === 0) continue;
     const [nome, whatsapp, email] = parts;
     if (!whatsapp || whatsapp === 'whatsapp_numero') continue; // ignora cabeçalho simples
     rows.push({
-      nome: nome || null,
-      whatsapp_numero: whatsapp,
-      email: email || null,
+      nome: normalizeNameField(nome || ''),
+      whatsapp_numero: normalizePhoneField(whatsapp),
+      email: email ? stripQuotes(email) : null,
     });
   }
 
