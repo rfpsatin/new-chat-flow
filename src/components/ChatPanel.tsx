@@ -21,6 +21,7 @@ import {
   Pause,
   Plus,
   Smile,
+  ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EncerrarDialog } from '@/components/EncerrarDialog';
@@ -752,33 +753,75 @@ function MessageBubble({
     }
   };
 
-  const getMediaLabel = () => {
-    switch (mensagem.media_kind) {
-      case 'image':
-        return 'Baixar imagem';
-      case 'audio':
-        return 'Baixar áudio';
-      case 'document':
-      default:
-        return 'Baixar documento';
+  const handleCopy = async () => {
+    try {
+      let textToCopy = '';
+      if (mensagem.media_kind === 'image') {
+        textToCopy = mensagem.media_url || '[imagem]';
+      } else if (mensagem.media_kind === 'audio') {
+        textToCopy = mensagem.media_url || '[áudio]';
+      } else if (mensagem.media_kind === 'document') {
+        textToCopy = mensagem.media_filename || mensagem.media_url || '[documento]';
+      } else {
+        textToCopy = displayContent || '';
+      }
+      if (!textToCopy) return;
+      await navigator.clipboard.writeText(textToCopy);
+    } catch (error) {
+      console.error('Erro ao copiar mensagem', error);
     }
   };
 
   return (
     <div
       className={cn(
-        'flex animate-fade-in',
+        'flex animate-fade-in group',
         isOutgoing ? 'justify-end' : 'justify-start'
       )}
     >
       <div
         className={cn(
-          'max-w-[75%] rounded-2xl px-4 py-2.5',
+          'relative max-w-[75%] rounded-2xl px-4 py-2.5',
           isOutgoing
             ? 'bg-chat-outgoing text-chat-outgoing-text rounded-br-md'
             : 'bg-chat-incoming text-foreground rounded-bl-md'
         )}
       >
+        {onReply && (
+          <div className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    'h-5 w-5 flex items-center justify-center rounded-full bg-black/5 hover:bg-black/10',
+                    isOutgoing ? 'text-chat-outgoing-text/70' : 'text-muted-foreground'
+                  )}
+                >
+                  <ChevronDown className="h-3 w-3" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align={isOutgoing ? 'end' : 'start'} className="w-32">
+                <DropdownMenuItem
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    onReply(mensagem);
+                  }}
+                >
+                  Responder
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    void handleCopy();
+                  }}
+                >
+                  Copiar
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
         {repliedMessage && (
           <div className="mb-1 rounded-md bg-black/5 px-2 py-1 text-[11px] border-l-2 border-border/60">
             <p className="font-semibold truncate">
@@ -790,15 +833,26 @@ function MessageBubble({
                 ? 'Sistema'
                 : 'Cliente'}
             </p>
-            <p className="truncate">
-              {repliedMessage.media_kind === 'image'
-                ? '[imagem]'
-                : repliedMessage.media_kind === 'audio'
-                ? '[áudio]'
-                : repliedMessage.media_kind === 'document'
-                ? repliedMessage.media_filename || '[documento]'
-                : repliedMessage.conteudo || ''}
-            </p>
+            {repliedMessage.media_kind === 'image' && repliedMessage.media_url ? (
+              <div className="mt-1 flex items-center gap-2">
+                <div className="h-8 w-8 overflow-hidden rounded-sm bg-black/10">
+                  <img
+                    src={repliedMessage.media_url}
+                    alt={repliedMessage.media_filename || 'Imagem'}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <p className="truncate">[imagem]</p>
+              </div>
+            ) : (
+              <p className="truncate">
+                {repliedMessage.media_kind === 'audio'
+                  ? '[áudio]'
+                  : repliedMessage.media_kind === 'document'
+                  ? repliedMessage.media_filename || '[documento]'
+                  : repliedMessage.conteudo || ''}
+              </p>
+            )}
           </div>
         )}
         {senderLabel && (
@@ -940,18 +994,6 @@ function MessageBubble({
         )}
         {!hasMedia && (
           <FormattedMessageContent content={displayContent} isOutgoing={isOutgoing} />
-        )}
-        {onReply && (
-          <button
-            type="button"
-            className={cn(
-              'mt-1 text-[11px] underline underline-offset-2',
-              isOutgoing ? 'text-chat-outgoing-text/70' : 'text-muted-foreground'
-            )}
-            onClick={() => onReply(mensagem)}
-          >
-            Responder
-          </button>
         )}
         <p className={cn(
           'text-xs mt-1',
