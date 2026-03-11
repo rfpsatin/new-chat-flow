@@ -25,6 +25,8 @@ interface DashboardFilterState {
   atendimentoAgenteId: string;
 }
 
+type CampanhaPeriodoFiltro = 'todos' | '6meses' | 'mes';
+
 function formatDuration(seconds: number) {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -42,9 +44,27 @@ export default function DashboardAtendimentosPage() {
     atendimentoAgenteId: 'todos',
   });
   const [appliedFilters, setAppliedFilters] = useState<DashboardFilterState | null>(null);
+  const [campanhasDraftFilters, setCampanhasDraftFilters] = useState<{
+    periodo: CampanhaPeriodoFiltro;
+    tag: string;
+  }>({
+    periodo: 'todos',
+    tag: '',
+  });
+  const [campanhasAppliedFilters, setCampanhasAppliedFilters] = useState<{
+    periodo: CampanhaPeriodoFiltro;
+    tag: string;
+  } | null>(null);
+
   const hasAppliedFilters = !!appliedFilters;
+  const hasCampanhasAppliedFilters = !!campanhasAppliedFilters;
+
   const isDirty = JSON.stringify(draftFilters) !== JSON.stringify(appliedFilters);
+  const campanhasIsDirty =
+    JSON.stringify(campanhasDraftFilters) !== JSON.stringify(campanhasAppliedFilters);
+
   const activeFilters = appliedFilters ?? draftFilters;
+  const activeCampanhasFilters = campanhasAppliedFilters ?? campanhasDraftFilters;
 
   const handleTabChange = (tab: 'atendimentos' | 'aberto' | 'campanhas') => {
     setDraftFilters((prev) => ({
@@ -55,7 +75,11 @@ export default function DashboardAtendimentosPage() {
   };
 
   const handleApplyFilters = () => {
-    setAppliedFilters(draftFilters);
+    if (draftFilters.activeTab === 'campanhas') {
+      setCampanhasAppliedFilters(campanhasDraftFilters);
+    } else {
+      setAppliedFilters(draftFilters);
+    }
   };
 
   const { stats, isLoading } = useDashboardStats(empresaId, activeFilters.periodo, hasAppliedFilters);
@@ -118,8 +142,16 @@ export default function DashboardAtendimentosPage() {
             onRefresh={handleRefresh}
             onApply={handleApplyFilters}
             isLoading={isLoading}
-            hasAppliedFilters={hasAppliedFilters}
-            isDirty={isDirty}
+            hasAppliedFilters={
+              draftFilters.activeTab === 'campanhas'
+                ? hasCampanhasAppliedFilters
+                : hasAppliedFilters
+            }
+            isDirty={
+              draftFilters.activeTab === 'campanhas'
+                ? campanhasIsDirty
+                : isDirty
+            }
             activeTab={draftFilters.activeTab}
             onTabChange={handleTabChange}
             agentes={agentes}
@@ -129,9 +161,18 @@ export default function DashboardAtendimentosPage() {
             onAtendimentoAgenteChange={(value) => setDraftFilters((prev) => ({ ...prev, atendimentoAgenteId: value }))}
             somenteEmAndamento={draftFilters.somenteEmAndamento}
             onSomenteEmAndamentoChange={(value) => setDraftFilters((prev) => ({ ...prev, somenteEmAndamento: value }))}
+            campanhaPeriodo={campanhasDraftFilters.periodo}
+            onCampanhaPeriodoChange={(periodo) =>
+              setCampanhasDraftFilters((prev) => ({ ...prev, periodo }))
+            }
+            campanhaTag={campanhasDraftFilters.tag}
+            onCampanhaTagChange={(tag) =>
+              setCampanhasDraftFilters((prev) => ({ ...prev, tag }))
+            }
           />
 
-          {!hasAppliedFilters && draftFilters.activeTab !== 'campanhas' ? (
+          {((draftFilters.activeTab === 'campanhas' && !hasCampanhasAppliedFilters) ||
+            (draftFilters.activeTab !== 'campanhas' && !hasAppliedFilters)) ? (
             <Card className="p-8 text-center text-muted-foreground">
               Defina os filtros e clique em <strong>Aplicar filtros</strong> para carregar os dados do dashboard.
             </Card>
@@ -240,7 +281,11 @@ export default function DashboardAtendimentosPage() {
               />
             </>
           ) : (
-            <CampanhasDashboard empresaId={empresaId} />
+            <CampanhasDashboard
+              empresaId={empresaId}
+              periodo={activeCampanhasFilters.periodo}
+              tag={activeCampanhasFilters.tag}
+            />
           )}
         </div>
       </ScrollArea>

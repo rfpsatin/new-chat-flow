@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
 
   try {
     const body: StartConversationRequest = await req.json()
-    const { contato_id, mensagem_inicial, link, origem_inicial, origem_final, campanha_id, remetente_id } = body
+    const { contato_id, mensagem_inicial, link, origem_inicial, origem_final, campanha_id, remetente_id, empresa_id: bodyEmpresaId } = body
 
     if (!contato_id || !mensagem_inicial?.trim()) {
       return new Response(JSON.stringify({
@@ -95,15 +95,45 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const callerTenant = await getCallerTenant(req, supabaseUrl, supabaseServiceKey)
-    const empresa_id = callerTenant.empresaId
-    const remetenteEfetivoId = callerTenant.usuarioId
 
-    if (remetente_id && remetente_id !== remetenteEfetivoId) {
-      return new Response(JSON.stringify({ error: 'remetente_id invalido para o usuario autenticado' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    const authHeader = req.headers.get('Authorization') || ''
+    const bearer = authHeader.replace(/^Bearer\s+/i, '')
+    const isServiceCaller = bearer === supabaseServiceKey
+
+    let empresa_id: string
+    let remetenteEfetivoId: string | null = null
+
+    if (isServiceCaller) {
+      // Chamada interna (ex: worker de campanhas) usando service role:
+      // confiar em empresa_id vindo no body e ignorar remetente_id.
+      if (!bodyEmpresaId) {
+        return new Response(
+          JSON.stringify({
+            error: 'empresa_id obrigatorio para chamadas internas',
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        )
+      }
+      empresa_id = bodyEmpresaId
+      remetenteEfetivoId = null
+    } else {
+      // Chamada normal via Hub: autentica usuário e descobre empresa / remetente
+      const callerTenant = await getCallerTenant(req, supabaseUrl, supabaseServiceKey)
+      empresa_id = callerTenant.empresaId
+      remetenteEfetivoId = callerTenant.usuarioId
+
+      if (remetente_id && remetente_id !== remetenteEfetivoId) {
+        return new Response(
+          JSON.stringify({ error: 'remetente_id invalido para o usuario autenticado' }),
+          {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        )
+      }
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)

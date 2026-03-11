@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
       // Destinatários pendentes
       const { data: destinatarios, error: destError } = await supabase
         .from('campanha_destinatarios')
-        .select('id, contato_id, whatsapp_numero, tentativas')
+        .select('id, contato_id, whatsapp_numero, tentativas, erro_envio_msg')
         .eq('campanha_id', campanha.id)
         .eq('status_envio', 'pendente')
         .limit(batchSize)
@@ -174,9 +174,16 @@ Deno.serve(async (req) => {
               `[${requestId}] start-conversation failed for dest ${dest.id}:`,
               data
             )
+            const errorMessage =
+              (data && (data.error || data.details)) ||
+              `HTTP ${res.status} ${res.statusText}` ||
+              JSON.stringify(data).substring(0, 200)
             await supabase
               .from('campanha_destinatarios')
-              .update({ status_envio: 'erro_envio' })
+              .update({
+                status_envio: 'erro_envio',
+                erro_envio_msg: errorMessage,
+              })
               .eq('id', dest.id)
             erros++
           }
@@ -185,9 +192,13 @@ Deno.serve(async (req) => {
             `[${requestId}] Error calling start-conversation for dest ${dest.id}:`,
             err
           )
+          const msg = err instanceof Error ? err.message : String(err)
           await supabase
             .from('campanha_destinatarios')
-            .update({ status_envio: 'erro_envio' })
+            .update({
+              status_envio: 'erro_envio',
+              erro_envio_msg: msg.substring(0, 200),
+            })
             .eq('id', dest.id)
           erros++
         }

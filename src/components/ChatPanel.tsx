@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { useMensagens, useEnviarMensagem } from '@/hooks/useMensagens';
-import { useConversa, useForcarAtendimentoHumano } from '@/hooks/useFila';
+import { useConversa } from '@/hooks/useFila';
 import { MensagemAtiva, FilaAtendimento } from '@/types/atendimento';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,9 @@ import {
   XCircle,
   MessageSquare,
   Loader2,
-  UserCheck
+  Download,
+  Play,
+  Pause,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -34,7 +36,6 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
   const { data: mensagens, isLoading: mensagensLoading } = useMensagens(conversa?.conversa_id || null);
   const { data: conversaDetalhes } = useConversa(conversa?.conversa_id || null);
   const enviarMensagem = useEnviarMensagem();
-  const forcarHumano = useForcarAtendimentoHumano();
   
   const [mensagemInput, setMensagemInput] = useState('');
   const [showEncerrar, setShowEncerrar] = useState(false);
@@ -152,19 +153,6 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
   const canTransfer = conversa.status === 'em_atendimento_humano' &&
     ['adm', 'sup'].includes(currentUser?.tipo_usuario || '');
 
-  const canForcarHumano = conversa.status === 'bot' &&
-    ['adm', 'sup'].includes(currentUser?.tipo_usuario || '');
-
-  const handleForcarHumano = async () => {
-    if (!conversa.conversa_id) return;
-    try {
-      await forcarHumano.mutateAsync(conversa.conversa_id);
-      toast.success('Conversa enviada para triagem');
-    } catch {
-      toast.error('Erro ao forçar atendimento humano');
-    }
-  };
-
   return (
     <div className="absolute inset-0 flex flex-col bg-background">
       {/* Header */}
@@ -200,17 +188,6 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
           <div className="flex flex-col items-end gap-1">
             <div className="flex items-center gap-3">
               <StatusBadge status={conversa.status} />
-              {canForcarHumano && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleForcarHumano}
-                  disabled={forcarHumano.isPending}
-                >
-                  <UserCheck className="w-4 h-4 mr-1" />
-                  Forçar humano
-                </Button>
-              )}
               {canRespond && (
                 <Button
                   variant="destructive"
@@ -440,6 +417,8 @@ function stripHumanModePrefix(text: string): string {
 
 function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
   const isOutgoing = mensagem.direcao === 'out';
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   
   const getSenderLabel = () => {
     switch (mensagem.tipo_remetente) {
@@ -479,7 +458,44 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
 
   const senderLabel = getSenderLabel();
   const displayContent = getDisplayContent();
-  const hasDocument = mensagem.media_kind === 'document' && !!mensagem.media_url;
+
+  const hasMedia = !!mensagem.media_url && !!mensagem.media_kind;
+
+  const getMediaTitle = () => {
+    switch (mensagem.media_kind) {
+      case 'image':
+        return 'Imagem';
+      case 'audio':
+        return 'Mensagem de voz';
+      case 'document':
+      default:
+        return mensagem.media_filename || 'Documento';
+    }
+  };
+
+  const getMediaIcon = () => {
+    switch (mensagem.media_kind) {
+      case 'image':
+        return '🖼';
+      case 'audio':
+        return '🔊';
+      case 'document':
+      default:
+        return '📄';
+    }
+  };
+
+  const getMediaLabel = () => {
+    switch (mensagem.media_kind) {
+      case 'image':
+        return 'Baixar imagem';
+      case 'audio':
+        return 'Baixar áudio';
+      case 'document':
+      default:
+        return 'Baixar documento';
+    }
+  };
 
   return (
     <div
@@ -504,29 +520,138 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
             {senderLabel}
           </p>
         )}
-        {hasDocument && (
-          <div className="mb-2 rounded-lg border border-border/50 bg-muted/30 p-3">
-            <div className="flex items-center gap-2">
-              <span className="text-lg" aria-hidden>📄</span>
-              <span className="truncate text-sm font-medium">
-                {mensagem.media_filename || 'Documento'}
-              </span>
-            </div>
-            <a
-              href={mensagem.media_url!}
-              target="_blank"
-              rel="noreferrer"
-              download={mensagem.media_filename ?? undefined}
-              className={cn(
-                'mt-2 inline-block text-sm font-medium underline underline-offset-2',
-                isOutgoing ? 'text-chat-outgoing-text' : 'text-primary'
-              )}
-            >
-              Baixar documento
-            </a>
-          </div>
+        {hasMedia && (
+          <>
+            {/* Documento: card com ícone, nome do arquivo e texto "Baixar documento" */}
+            {mensagem.media_kind === 'document' && mensagem.media_url && (
+              <a
+                href={mensagem.media_url}
+                target="_blank"
+                rel="noreferrer"
+                download={mensagem.media_filename ?? undefined}
+                className="mb-2 block rounded-lg border border-border/50 bg-muted/30 p-3 hover:bg-muted transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-lg" aria-hidden>
+                    {getMediaIcon()}
+                  </span>
+                  <span className="truncate text-sm font-medium">
+                    {getMediaTitle()}
+                  </span>
+                </div>
+                <span
+                  className={cn(
+                    'mt-2 inline-block text-xs font-medium underline underline-offset-2',
+                    isOutgoing ? 'text-chat-outgoing-text' : 'text-primary'
+                  )}
+                >
+                  Baixar documento
+                </span>
+              </a>
+            )}
+
+            {/* Imagem: título "Imagem" + preview + texto "Baixar imagem" */}
+            {mensagem.media_kind === 'image' && mensagem.media_url && (
+              <a
+                href={mensagem.media_url}
+                target="_blank"
+                rel="noreferrer"
+                download={mensagem.media_filename ?? undefined}
+                className="mb-2 block rounded-lg border border-border/50 bg-muted/30 p-3 hover:bg-muted transition-colors"
+              >
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="text-lg" aria-hidden>
+                    {getMediaIcon()}
+                  </span>
+                  <span className="truncate text-sm font-medium">
+                    {getMediaTitle()}
+                  </span>
+                </div>
+                <img
+                  src={mensagem.media_url}
+                  alt={mensagem.media_filename || 'Imagem'}
+                  className="max-h-64 w-full rounded-md object-contain bg-black/10"
+                />
+                <span
+                  className={cn(
+                    'mt-2 inline-block text-xs font-medium underline underline-offset-2',
+                    isOutgoing ? 'text-chat-outgoing-text' : 'text-primary'
+                  )}
+                >
+                  Baixar imagem
+                </span>
+              </a>
+            )}
+
+            {/* Áudio: card compacto, altura semelhante ao documento */}
+            {mensagem.media_kind === 'audio' && mensagem.media_url && (
+              <div className="mb-2 rounded-lg border border-border/50 bg-muted/30 px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg" aria-hidden>
+                    {getMediaIcon()}
+                  </span>
+                  <span className="truncate text-sm font-medium">
+                    Mensagem de voz
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!audioRef.current) return;
+                      if (isAudioPlaying) {
+                        audioRef.current.pause();
+                        setIsAudioPlaying(false);
+                      } else {
+                        audioRef.current.play();
+                        setIsAudioPlaying(true);
+                      }
+                    }}
+                    className={cn(
+                      'flex h-7 w-7 items-center justify-center rounded-full border border-border/60 hover:bg-muted transition-colors',
+                      isOutgoing ? 'text-chat-outgoing-text' : 'text-primary'
+                    )}
+                    aria-label={isAudioPlaying ? 'Pausar mensagem de voz' : 'Reproduzir mensagem de voz'}
+                  >
+                    {isAudioPlaying ? (
+                      <Pause className="h-3.5 w-3.5" />
+                    ) : (
+                      <Play className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                  <div className="flex-1 h-1 rounded-full bg-border/70" />
+                  <a
+                    href={mensagem.media_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    download={mensagem.media_filename ?? undefined}
+                    className={cn(
+                      'flex h-7 w-7 items-center justify-center rounded-full border border-border/60 hover:bg-muted transition-colors',
+                      isOutgoing ? 'text-chat-outgoing-text' : 'text-primary'
+                    )}
+                    aria-label="Baixar mensagem de voz"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </a>
+                </div>
+                <audio
+                  ref={audioRef}
+                  className="hidden"
+                  onEnded={() => setIsAudioPlaying(false)}
+                  onPause={() => setIsAudioPlaying(false)}
+                >
+                  <source
+                    src={mensagem.media_url}
+                    type={mensagem.media_mime || 'audio/ogg'}
+                  />
+                </audio>
+              </div>
+            )}
+          </>
         )}
-        <FormattedMessageContent content={displayContent} isOutgoing={isOutgoing} />
+        {!hasMedia && (
+          <FormattedMessageContent content={displayContent} isOutgoing={isOutgoing} />
+        )}
         <p className={cn(
           'text-xs mt-1',
           isOutgoing ? 'text-chat-outgoing-text/60' : 'text-muted-foreground'

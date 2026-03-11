@@ -168,3 +168,50 @@ export function useAdicionarDestinatarios() {
     },
   });
 }
+
+export function useExcluirCampanha() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, { id: string }>({
+    mutationFn: async ({ id }) => {
+      const { error } = await sb
+        .from('campanhas')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: ['campanhas'] });
+      qc.invalidateQueries({ queryKey: ['campanha', id] });
+      qc.invalidateQueries({ queryKey: ['campanhas-stats'] });
+    },
+  });
+}
+
+export function useReagendarErrosCampanha() {
+  const qc = useQueryClient();
+  return useMutation<
+    { success: boolean },
+    Error,
+    { campanhaId: string; agendado_para: string }
+  >({
+    mutationFn: async ({ campanhaId, agendado_para }) => {
+      const { data, error } = await supabase.functions.invoke('reschedule-campaign-errors', {
+        body: {
+          campanha_id: campanhaId,
+          agendado_para,
+        },
+      });
+      if (error) throw new Error(error.message || 'Falha ao reagendar erros da campanha');
+      if (!data?.success) {
+        throw new Error(data?.error || 'Falha ao reagendar erros da campanha');
+      }
+      return data;
+    },
+    onSuccess: (_, { campanhaId }) => {
+      qc.invalidateQueries({ queryKey: ['campanhas'] });
+      qc.invalidateQueries({ queryKey: ['campanha', campanhaId] });
+      qc.invalidateQueries({ queryKey: ['campanha-destinatarios', campanhaId] });
+      qc.invalidateQueries({ queryKey: ['campanhas-stats'] });
+    },
+  });
+}

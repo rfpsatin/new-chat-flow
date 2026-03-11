@@ -8,6 +8,8 @@ import {
   useCriarCampanha,
   useAgendarCampanha,
   useAdicionarDestinatarios,
+  useExcluirCampanha,
+  useReagendarErrosCampanha,
 } from '@/hooks/useCampanhas';
 import { useContatos } from '@/hooks/useContatos';
 import { Button } from '@/components/ui/button';
@@ -200,7 +202,10 @@ function CampanhaDetailDialog({
   const { data: campanha } = useCampanha(campanhaId);
   const { data: destinatarios } = useCampanhaDestinatarios(campanhaId);
   const agendar = useAgendarCampanha();
+  const excluir = useExcluirCampanha();
+  const reagendarErros = useReagendarErrosCampanha();
   const [agendadoPara, setAgendadoPara] = useState('');
+  const [novoAgendamentoErros, setNovoAgendamentoErros] = useState('');
 
   const pendentes = destinatarios?.filter((d) => d.status_envio === 'pendente').length ?? 0;
   const enviados = destinatarios?.filter((d) => d.status_envio === 'enviado').length ?? 0;
@@ -217,13 +222,69 @@ function CampanhaDetailDialog({
     }
   };
 
+  const handleExcluir = async () => {
+    const total = destinatarios?.length ?? 0;
+    if (total > 0) {
+      toast.error('Só é possível remover campanhas sem destinatários.');
+      return;
+    }
+    if (!window.confirm('Tem certeza que deseja remover esta campanha?')) {
+      return;
+    }
+    try {
+      await excluir.mutateAsync({ id: campanhaId });
+      toast.success('Campanha removida.');
+      onClose();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Erro ao remover campanha');
+    }
+  };
+
+  const handleReagendarErros = async () => {
+    if (!novoAgendamentoErros.trim()) {
+      toast.error('Informe a data e hora para o novo agendamento.');
+      return;
+    }
+    if (erros === 0) {
+      toast.error('Não há destinatários com erro para reagendar.');
+      return;
+    }
+    try {
+      await reagendarErros.mutateAsync({
+        campanhaId,
+        agendado_para: new Date(novoAgendamentoErros).toISOString(),
+      });
+      toast.success('Novo agendamento criado para os destinatários com erro.');
+      onClose();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Erro ao reagendar erros');
+    }
+  };
+
   if (!campanha) return null;
 
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>{campanha.nome}</DialogTitle>
+          <DialogTitle className="flex items-center justify-between gap-4">
+            <span>{campanha.nome}</span>
+            {(destinatarios?.length ?? 0) === 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleExcluir}
+                disabled={excluir.isPending}
+              >
+                {excluir.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  'Remover campanha'
+                )}
+              </Button>
+            )}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="flex gap-4 flex-wrap">
@@ -270,17 +331,59 @@ function CampanhaDetailDialog({
               </Button>
             </div>
           )}
-          <ScrollArea className="h-[200px] rounded-md border p-2">
+          {erros > 0 && (
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <label className="text-sm font-medium">
+                  Novo agendamento apenas para os contatos com erro
+                </label>
+                <Input
+                  type="datetime-local"
+                  value={novoAgendamentoErros}
+                  onChange={(e) => setNovoAgendamentoErros(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <Button
+                type="button"
+                onClick={handleReagendarErros}
+                disabled={!novoAgendamentoErros || reagendarErros.isPending}
+              >
+                {reagendarErros.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+                Reagendar erros
+              </Button>
+            </div>
+          )}
+          <ScrollArea className="h-[220px] rounded-md border p-2">
             <div className="space-y-1">
               {destinatarios?.map((d) => (
                 <div
                   key={d.id}
-                  className="flex justify-between text-sm py-1 border-b border-border/50 last:border-0"
+                  className="py-1 border-b border-border/50 last:border-0 text-sm"
                 >
-                  <span>{d.whatsapp_numero}</span>
-                  <Badge variant={d.status_envio === 'enviado' ? 'default' : d.status_envio === 'erro_envio' ? 'destructive' : 'secondary'}>
-                    {d.status_envio}
-                  </Badge>
+                  <div className="flex justify-between items-center">
+                    <span>{d.whatsapp_numero}</span>
+                    <Badge
+                      variant={
+                        d.status_envio === 'enviado'
+                          ? 'default'
+                          : d.status_envio === 'erro_envio'
+                          ? 'destructive'
+                          : 'secondary'
+                      }
+                    >
+                      {d.status_envio}
+                    </Badge>
+                  </div>
+                  {d.status_envio === 'erro_envio' && d.erro_envio_msg && (
+                    <p className="mt-0.5 text-xs text-destructive">
+                      Motivo: {d.erro_envio_msg}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
@@ -326,6 +429,10 @@ function NovaCampanhaWizard({
   const handleCreate = async () => {
     if (!nome.trim() || !mensagemTexto.trim() || !modoResposta) {
       toast.error('Preencha nome, mensagem e modo de resposta.');
+      return;
+    }
+    if (contatoIds.size === 0) {
+      toast.error('Selecione pelo menos um destinatário para criar a campanha.');
       return;
     }
     try {

@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
     const body: SendMessageRequest = await req.json()
     console.log(`[${requestId}] Request body:`, JSON.stringify(body, null, 2))
 
-    const { to, message, human_mode } = body
+    const { to, message, human_mode, empresa_id: bodyEmpresaId } = body
 
     if (!to || !message) {
       console.error(`[${requestId}] ERROR: Missing required fields`)
@@ -95,8 +95,32 @@ Deno.serve(async (req) => {
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const callerTenant = await getCallerTenant(req, supabaseUrl, supabaseServiceKey)
-    const empresa_id = callerTenant.empresaId
+
+    const authHeader = req.headers.get('Authorization') || ''
+    const bearer = authHeader.replace(/^Bearer\s+/i, '')
+    const isServiceCaller = bearer === supabaseServiceKey
+
+    let empresa_id: string
+
+    if (isServiceCaller) {
+      if (!bodyEmpresaId) {
+        console.error(`[${requestId}] ERROR: empresa_id obrigatorio para chamada interna`)
+        return new Response(
+          JSON.stringify({
+            error: 'empresa_id obrigatorio para chamada interna',
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        )
+      }
+      empresa_id = bodyEmpresaId
+    } else {
+      const callerTenant = await getCallerTenant(req, supabaseUrl, supabaseServiceKey)
+      empresa_id = callerTenant.empresaId
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Get empresa and whapi_token

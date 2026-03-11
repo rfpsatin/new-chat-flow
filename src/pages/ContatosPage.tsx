@@ -20,6 +20,125 @@ import { Search, Phone, Calendar, MessageSquare, User, Clock, Send, Loader2, Inf
 import { cn } from '@/lib/utils';
 import { useMensagensHistorico } from '@/hooks/useHistorico';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+
+type ImportRow = {
+  nome?: string | null;
+  whatsapp_numero: string;
+  email?: string | null;
+};
+
+function stripQuotes(value: string): string {
+  let v = value.trim();
+  // Converte "" em "
+  v = v.replace(/""/g, '"');
+  // Remove aspas no início/fim
+  if (v.startsWith('"') && v.endsWith('"') && v.length >= 2) {
+    v = v.slice(1, -1);
+  }
+  return v.trim();
+}
+
+function normalizeNameField(raw: string): string {
+  const v = stripQuotes(raw);
+  // Remove acentuação
+  return v
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+function normalizePhoneField(raw: string): string {
+  let v = stripQuotes(raw);
+  // Remove sinal de +
+  v = v.replace(/\+/g, '');
+  return v.trim();
+}
+
+function parseCsvLines(text: string): ImportRow[] {
+  const rawLines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  if (rawLines.length === 0) return [];
+
+  const rows: ImportRow[] = [];
+
+  const header = rawLines[0];
+  const headerClean = stripQuotes(header).toLowerCase();
+
+  // Caso 0: formato simples com cabeçalho "Nome,Numero" (como no exemplo enviado)
+  if (headerClean.startsWith('nome,') && headerClean.includes('numero')) {
+    for (let i = 1; i < rawLines.length; i++) {
+      const line = rawLines[i];
+      const cols = line.split(','); // esperamos duas colunas: nome,numero
+      if (cols.length < 2) continue;
+      const nome = normalizeNameField(cols[0]);
+      const whatsapp = normalizePhoneField(cols[1]);
+      if (!whatsapp) continue;
+      rows.push({
+        nome: nome || null,
+        whatsapp_numero: whatsapp,
+        email: null,
+      });
+    }
+    return rows;
+  }
+
+  // Caso 1: CSV exportado do Google Contacts (como o exemplo enviado)
+  if (header.includes('Phone 1 - Value')) {
+    const headers = header.split(',').map((h) => stripQuotes(h));
+    const idxPhone = headers.indexOf('Phone 1 - Value');
+    const idxFirst = headers.indexOf('First Name');
+    const idxMiddle = headers.indexOf('Middle Name');
+    const idxLast = headers.indexOf('Last Name');
+    const idxOrg = headers.indexOf('Organization Name');
+    const idxEmail = headers.indexOf('E-mail 1 - Value'); // pode não existir
+
+    for (let i = 1; i < rawLines.length; i++) {
+      const line = rawLines[i];
+      const cols = line.split(','); // no exemplo, não há vírgulas dentro de campos
+      if (idxPhone === -1 || !cols[idxPhone]) continue;
+
+      const phoneRaw = normalizePhoneField(cols[idxPhone] ?? '');
+      if (!phoneRaw) continue;
+
+      const first = idxFirst >= 0 ? normalizeNameField(cols[idxFirst] ?? '') : '';
+      const middle = idxMiddle >= 0 ? normalizeNameField(cols[idxMiddle] ?? '') : '';
+      const last = idxLast >= 0 ? normalizeNameField(cols[idxLast] ?? '') : '';
+      let nome = [first, middle, last].filter(Boolean).join(' ');
+      if (!nome && idxOrg >= 0) {
+        nome = normalizeNameField(cols[idxOrg] ?? '');
+      }
+      const email =
+        idxEmail >= 0 ? (stripQuotes(cols[idxEmail] ?? '') || null) : null;
+
+      rows.push({
+        nome: nome || null,
+        whatsapp_numero: phoneRaw,
+        email,
+      });
+    }
+
+    return rows;
+  }
+
+  // Caso 2: formato simples "nome;whatsapp;email" ou "nome,whatsapp,email"
+  for (const line of rawLines) {
+    const parts = line.split(/[;,]/).map((p) => stripQuotes(p));
+    if (parts.length === 0) continue;
+    const [nome, whatsapp, email] = parts;
+    if (!whatsapp || whatsapp === 'whatsapp_numero') continue; // ignora cabeçalho simples
+    rows.push({
+      nome: normalizeNameField(nome || ''),
+      whatsapp_numero: normalizePhoneField(whatsapp),
+      email: email ? stripQuotes(email) : null,
+    });
+  }
+
+  return rows;
+}
 
 function MensagensDialog({ conversa, onClose }: { conversa: HistoricoConversa; onClose: () => void }) {
   const { data: mensagens, isLoading } = useMensagensHistorico(conversa.conversa_id);
@@ -173,6 +292,312 @@ function IniciarConversaDialog({
   );
 }
 
+function ImportContatosDialog({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { empresaId } = useApp();
+  const [fileName, setFileName] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rows, setRows] = useState<
+    {
+      id: number;
+      nome: string;
+      whatsapp_numero: string;
+      email: string;
+      status: 'pending' | 'valid' | 'invalid';
+      reason?: string;
+    }[]
+  >([]);
+  const [importLog, setImportLog] = useState<{
+    imported: number;
+    invalid: { nome: string | null; whatsapp_numero: string; email: string | null; reason?: string }[];
+  } | null>(null);
+
+  const normalizePhone = (raw: string) => raw.replace(/\D/g, '');
+
+  const validateRow = (whatsapp_numero: string): string | null => {
+    const digits = normalizePhone(whatsapp_numero);
+    if (!digits) return 'Número vazio';
+    if (digits.length < 10 || digits.length > 15) return 'Número inválido (esperado 10 a 15 dígitos)';
+    return null;
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    setImportLog(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result || '');
+      const parsed = parseCsvLines(text);
+      if (!parsed.length) {
+        toast.error('Nenhuma linha reconhecida no arquivo. Verifique o formato.');
+        setRows([]);
+        return;
+      }
+      const nextRows = parsed.map((r, idx) => ({
+        id: idx,
+        nome: r.nome ?? '',
+        whatsapp_numero: r.whatsapp_numero,
+        email: r.email ?? '',
+        status: 'pending' as const,
+      }));
+      setRows(nextRows);
+      toast.info(`${nextRows.length} linha(s) carregadas. Clique em "Validar" para checar os números.`);
+    };
+    reader.readAsText(file, 'utf-8');
+  };
+
+  const handleValidate = () => {
+    if (!rows.length) {
+      toast.error('Nenhuma linha carregada. Importe um arquivo primeiro.');
+      return;
+    }
+    const validated = rows.map((row) => {
+      const err = validateRow(row.whatsapp_numero);
+      return {
+        ...row,
+        status: (err ? 'invalid' : 'valid') as 'invalid' | 'pending' | 'valid',
+        reason: err || undefined,
+      };
+    });
+    setRows(validated);
+    const validCount = validated.filter((r) => r.status === 'valid').length;
+    const invalidCount = validated.filter((r) => r.status === 'invalid').length;
+    toast.success(`Validação concluída. ${validCount} válido(s), ${invalidCount} com problema.`);
+  };
+
+  const handleCellChange = (id: number, field: 'nome' | 'whatsapp_numero' | 'email', value: string) => {
+    setRows((prev) =>
+      prev.map((row) =>
+        row.id === id
+          ? {
+              ...row,
+              [field]: value,
+              status: 'pending',
+              reason: undefined,
+            }
+          : row,
+      ),
+    );
+    setImportLog(null);
+  };
+
+  const handleImport = async () => {
+    if (!empresaId) {
+      toast.error('Empresa não encontrada na sessão.');
+      return;
+    }
+    if (!rows.length) {
+      toast.error('Nenhuma linha carregada para importar.');
+      return;
+    }
+
+    const ready = rows.filter((r) => r.status === 'valid');
+    if (!ready.length) {
+      toast.error('Nenhuma linha válida. Valide e corrija os números antes de importar.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payloadRows = ready.map((r) => ({
+        nome: r.nome || null,
+        whatsapp_numero: r.whatsapp_numero,
+        email: r.email || null,
+      }));
+
+      const { data, error } = await supabase.functions.invoke('import-contacts', {
+        body: { rows: payloadRows },
+      });
+      if (error) {
+        throw new Error(error.message || 'Falha ao importar contatos');
+      }
+      if (!data?.success) {
+        toast.error(data?.error || 'Erro ao importar contatos');
+      } else {
+        const invalidFromServer =
+          (data.invalid_rows as { row: ImportRow; reason?: string }[] | undefined) ?? [];
+        setImportLog({
+          imported: data.imported ?? ready.length,
+          invalid: invalidFromServer.map((item) => ({
+            nome: item.row.nome ?? null,
+            whatsapp_numero: item.row.whatsapp_numero,
+            email: item.row.email ?? null,
+            reason: item.reason,
+          })),
+        });
+        toast.success(
+          `Importação concluída. ${data.imported ?? ready.length} importado(s), ${
+            invalidFromServer.length
+          } rejeitado(s) no servidor.`,
+        );
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao importar contatos');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    const content = 'nome;whatsapp_numero;email\nJoão da Silva;5544999999999;joao@exemplo.com\n';
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'modelo_contatos.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-xl max-h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Importar contatos</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 text-sm">
+          <p className="text-muted-foreground">
+            Importe um arquivo CSV exportado do Google Contatos ou uma planilha com as colunas
+            equivalentes. Os campos serão pré-validados e você poderá ajustar diretamente na lista
+            antes de importar.
+          </p>
+          <div className="flex items-center justify-between gap-2">
+            <Input
+              type="file"
+              accept=".csv,text/csv"
+              onChange={handleFileChange}
+              className="text-xs"
+            />
+            <Button type="button" variant="outline" size="sm" onClick={handleDownloadTemplate}>
+              Baixar modelo CSV
+            </Button>
+          </div>
+          {fileName && (
+            <p className="text-xs text-muted-foreground">
+              Arquivo: <span className="font-medium text-foreground">{fileName}</span>
+            </p>
+          )}
+          {rows.length > 0 && (
+            <>
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{rows.length} linha(s) carregadas</span>
+                <span>
+                  Válidos:{' '}
+                  {rows.filter((r) => r.status === 'valid').length} · Com problema:{' '}
+                  {rows.filter((r) => r.status === 'invalid').length}
+                </span>
+              </div>
+              <ScrollArea className="h-[260px] rounded-md border">
+                <div className="min-w-full text-xs">
+                  <div className="grid grid-cols-[2fr,2fr,2fr,1fr,2fr] gap-1 px-2 py-1 border-b bg-muted/50 font-medium">
+                    <span>Nome</span>
+                    <span>WhatsApp</span>
+                    <span>Email</span>
+                    <span>Status</span>
+                    <span>Motivo</span>
+                  </div>
+                  {rows.map((row) => (
+                    <div
+                      key={row.id}
+                      className="grid grid-cols-[2fr,2fr,2fr,1fr,2fr] gap-1 px-2 py-1 border-b last:border-b-0 items-center"
+                    >
+                      <Input
+                        value={row.nome}
+                        onChange={(e) => handleCellChange(row.id, 'nome', e.target.value)}
+                        className="h-7 text-xs"
+                      />
+                      <Input
+                        value={row.whatsapp_numero}
+                        onChange={(e) => handleCellChange(row.id, 'whatsapp_numero', e.target.value)}
+                        className="h-7 text-xs"
+                      />
+                      <Input
+                        value={row.email}
+                        onChange={(e) => handleCellChange(row.id, 'email', e.target.value)}
+                        className="h-7 text-xs"
+                      />
+                      <span
+                        className={
+                          row.status === 'valid'
+                            ? 'text-emerald-600'
+                            : row.status === 'invalid'
+                            ? 'text-destructive'
+                            : 'text-muted-foreground'
+                        }
+                      >
+                        {row.status === 'valid'
+                          ? 'OK'
+                          : row.status === 'invalid'
+                          ? 'Erro'
+                          : 'Pendente'}
+                      </span>
+                      <span className="truncate">{row.reason}</span>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </>
+          )}
+          <div className="flex justify-between items-center pt-2">
+            <Button type="button" variant="outline" size="sm" onClick={handleValidate} disabled={!rows.length}>
+              Validar
+            </Button>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={onClose}>
+                Fechar
+              </Button>
+              <Button type="button" onClick={handleImport} disabled={isSubmitting || !rows.length}>
+                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                Importar
+              </Button>
+            </div>
+          </div>
+          {importLog && (
+            <div className="mt-3 border-t pt-2 text-xs space-y-1">
+              <p className="font-medium">
+                Resultado da importação: {importLog.imported} importado(s),{' '}
+                {importLog.invalid.length} rejeitado(s) no servidor.
+              </p>
+              {importLog.invalid.length > 0 && (
+                <div>
+                  <p className="text-muted-foreground mb-1">
+                    Linhas rejeitadas (corrija na planilha de origem se necessário):
+                  </p>
+                  <ScrollArea className="h-[120px] rounded-md border">
+                    <div className="px-2 py-1 space-y-1">
+                      {importLog.invalid.map((item, idx) => (
+                        <div key={idx} className="flex flex-col">
+                          <span className="font-medium">
+                            {item.nome || '(sem nome)'} — {item.whatsapp_numero}
+                          </span>
+                          {item.reason && (
+                            <span className="text-destructive">
+                              Motivo: {item.reason}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function ContatosPage() {
   const navigate = useNavigate();
   const { empresaId } = useApp();
@@ -182,6 +607,7 @@ export default function ContatosPage() {
   const { data: historico } = useHistoricoContato(selectedContato?.id || null);
   const [selectedHistorico, setSelectedHistorico] = useState<HistoricoConversa | null>(null);
   const [contatoParaIniciar, setContatoParaIniciar] = useState<Contato | null>(null);
+  const [showImport, setShowImport] = useState(false);
 
   const filteredContatos = contatos?.filter(contato =>
     contato.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -207,7 +633,12 @@ export default function ContatosPage() {
         {/* Left panel - Contact list */}
         <div className="w-[380px] border-r bg-card flex flex-col">
           <div className="p-4 border-b space-y-3">
-            <h2 className="font-semibold text-lg">Contatos</h2>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-semibold text-lg">Contatos</h2>
+              <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
+                Importar
+              </Button>
+            </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -370,6 +801,13 @@ export default function ContatosPage() {
             setContatoParaIniciar(null);
             navigate(`/?conversa_id=${conversaId}`);
           }}
+        />
+      )}
+
+      {showImport && (
+        <ImportContatosDialog
+          open={showImport}
+          onClose={() => setShowImport(false)}
         />
       )}
     </MainLayout>

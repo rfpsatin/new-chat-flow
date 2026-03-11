@@ -74,7 +74,7 @@ export interface MensagemAtiva {
   conteudo: string | null;
   payload: Record<string, unknown> | null;
   criado_em: string;
-  /** URL do documento no Whapi (preenchido quando media_kind === 'document') */
+  /** URL da mídia no Whapi (documento, imagem, áudio, etc.) */
   media_url?: string | null;
   media_kind?: string | null;
   media_filename?: string | null;
@@ -195,6 +195,7 @@ export interface CampanhaDestinatario {
   mensagem_id_whatsapp: string | null;
   conversa_id: string | null;
   created_at: string;
+   erro_envio_msg?: string | null;
 }
 
 export interface CampanhaStats {

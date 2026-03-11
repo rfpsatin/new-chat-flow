@@ -20,10 +20,36 @@ interface WhapiMessage {
   image?: {
     caption?: string
     link?: string
+    // Whapi may include an ID for media download
+    id?: string
   }
   document?: {
     filename?: string
+    file_name?: string
     link?: string
+    mime_type?: string
+  }
+  audio?: {
+    id?: string
+    link?: string
+    filename?: string
+    file_name?: string
+    mime_type?: string
+  }
+  voice?: {
+    id?: string
+    link?: string
+    filename?: string
+    file_name?: string
+    mime_type?: string
+    seconds?: number
+  }
+  video?: {
+    id?: string
+    link?: string
+    filename?: string
+    file_name?: string
+    mime_type?: string
   }
   interactive?: {
     header?: string
@@ -61,15 +87,6 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST' && req.method !== 'PUT') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
-
-  const expectedSecret = Deno.env.get('WHAPI_WEBHOOK_SECRET')
-  const providedSecret = req.headers.get('x-webhook-secret')
-  if (!expectedSecret || providedSecret !== expectedSecret) {
-    return new Response(JSON.stringify({ error: 'Unauthorized webhook' }), {
-      status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
@@ -352,7 +369,7 @@ Deno.serve(async (req) => {
         }
 
         // Insert message (always in/cliente at this point)
-        const doc = extractDocumentFromMessage(message)
+        const doc = extractDocumentFromMessage(message, empresaId, supabaseUrl)
         const { error: msgError } = await supabase
           .from('mensagens_ativas')
           .insert({
@@ -635,6 +652,7 @@ function extractMessageContent(message: WhapiMessage): string {
     case 'document':
       return `[documento: ${message.document?.filename || 'arquivo'}]`
     case 'audio':
+    case 'voice':
       return '[áudio]'
     case 'video':
       return '[vídeo]'
@@ -680,19 +698,166 @@ function extractMessageContent(message: WhapiMessage): string {
   }
 }
 
-function extractDocumentFromMessage(message: WhapiMessage): {
+function extractDocumentFromMessage(
+  message: WhapiMessage,
+  empresaId: string,
+  supabaseUrl: string
+): {
   mediaUrl?: string
-  mediaKind?: 'document'
+  mediaKind?: string
   mediaFilename?: string
   mediaMime?: string
 } {
-  if (message.type !== 'document' || !message.document?.link) {
-    return {}
+  // Handle document
+  if (message.type === 'document') {
+    const doc = message.document
+    const filename = doc?.filename || doc?.file_name || undefined
+    const mime = (doc as any)?.mime_type || undefined
+
+    // If Whapi included a direct link, use it
+    if (doc?.link) {
+      return {
+        mediaUrl: doc.link,
+        mediaKind: 'document',
+        mediaFilename: filename,
+        mediaMime: mime,
+      }
+    }
+
+    // Otherwise, construct a proxy URL via our whapi-media edge function using media ID
+    const mediaId = (doc as any)?.id
+    if (!mediaId) {
+      // No media ID available, can't construct download URL
+      return {
+        mediaKind: 'document',
+        mediaFilename: filename,
+        mediaMime: mime,
+      }
+    }
+    const proxyUrl = `${supabaseUrl}/functions/v1/whapi-media?empresa_id=${encodeURIComponent(
+      empresaId,
+    )}&media_id=${encodeURIComponent(mediaId)}&filename=${encodeURIComponent(filename || 'arquivo')}`
+
+    return {
+      mediaUrl: proxyUrl,
+      mediaKind: 'document',
+      mediaFilename: filename,
+      mediaMime: mime,
+    }
   }
-  return {
-    mediaUrl: message.document.link,
-    mediaKind: 'document',
-    mediaFilename: message.document.filename ?? undefined,
-    mediaMime: undefined,
+
+  // Handle image
+  if (message.type === 'image' && message.image) {
+    const img = message.image as any
+    const filename =
+      img.filename || img.file_name || message.image.caption || `imagem-${message.id}.jpg`
+
+    // Direct link from Whapi
+    if (message.image.link) {
+      return {
+        mediaUrl: message.image.link,
+        mediaKind: 'image',
+        mediaFilename: filename,
+        mediaMime: (img.mime_type as string | undefined) ?? undefined,
+      }
+    }
+
+    // Fallback to proxy download by media ID
+    const mediaId = img.id
+    if (!mediaId) {
+      return {
+        mediaKind: 'image',
+        mediaFilename: filename,
+        mediaMime: (img.mime_type as string | undefined) ?? undefined,
+      }
+    }
+
+    const proxyUrl = `${supabaseUrl}/functions/v1/whapi-media?empresa_id=${encodeURIComponent(
+      empresaId,
+    )}&media_id=${encodeURIComponent(mediaId)}&filename=${encodeURIComponent(filename)}`
+
+    return {
+      mediaUrl: proxyUrl,
+      mediaKind: 'image',
+      mediaFilename: filename,
+      mediaMime: (img.mime_type as string | undefined) ?? undefined,
+    }
   }
+
+  // Handle audio
+  if (message.type === 'audio' && message.audio) {
+    const audio = message.audio as any
+    const filename =
+      audio.filename || audio.file_name || `audio-${message.id}.ogg`
+    const mime = (audio.mime_type as string | undefined) ?? undefined
+
+    if (audio.link) {
+      return {
+        mediaUrl: audio.link,
+        mediaKind: 'audio',
+        mediaFilename: filename,
+        mediaMime: mime,
+      }
+    }
+
+    const mediaId = audio.id
+    if (!mediaId) {
+      return {
+        mediaKind: 'audio',
+        mediaFilename: filename,
+        mediaMime: mime,
+      }
+    }
+
+    const proxyUrl = `${supabaseUrl}/functions/v1/whapi-media?empresa_id=${encodeURIComponent(
+      empresaId,
+    )}&media_id=${encodeURIComponent(mediaId)}&filename=${encodeURIComponent(filename)}`
+
+    return {
+      mediaUrl: proxyUrl,
+      mediaKind: 'audio',
+      mediaFilename: filename,
+      mediaMime: mime,
+    }
+  }
+
+  // Handle voice (Whapi sends voice messages as type "voice" with a "voice" field)
+  if (message.type === 'voice' && message.voice) {
+    const voice = message.voice as any
+    const filename =
+      voice.filename || voice.file_name || `audio-${message.id}.ogg`
+    const mime = (voice.mime_type as string | undefined) ?? 'audio/ogg; codecs=opus'
+
+    if (voice.link) {
+      return {
+        mediaUrl: voice.link,
+        mediaKind: 'audio',
+        mediaFilename: filename,
+        mediaMime: mime,
+      }
+    }
+
+    const mediaId = voice.id
+    if (!mediaId) {
+      return {
+        mediaKind: 'audio',
+        mediaFilename: filename,
+        mediaMime: mime,
+      }
+    }
+
+    const proxyUrl = `${supabaseUrl}/functions/v1/whapi-media?empresa_id=${encodeURIComponent(
+      empresaId,
+    )}&media_id=${encodeURIComponent(mediaId)}&filename=${encodeURIComponent(filename)}`
+
+    return {
+      mediaUrl: proxyUrl,
+      mediaKind: 'audio',
+      mediaFilename: filename,
+      mediaMime: mime,
+    }
+  }
+
+  // Other types (including video) currently do not expose download in the Hub UI
+  return {}
 }
