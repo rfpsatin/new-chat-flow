@@ -149,8 +149,9 @@ Deno.serve(async (req) => {
       })
     }
 
-    console.log(`[${requestId}] Empresa found: ${empresa.nome_fantasia || empresa.id}`)
-    console.log(`[${requestId}] Sending message to: ${to}, human_mode: ${human_mode}`)
+    const tokenPrefix = empresa.whapi_token.substring(0, 10)
+    console.log(`[${requestId}] Empresa: ${empresa.nome_fantasia || empresa.id} (id=${empresa.id}), isServiceCaller=${isServiceCaller}, token=${tokenPrefix}...`)
+    console.log(`[${requestId}] Sending to: ${to}, human_mode: ${human_mode}`)
 
     // Format phone number for Whapi API
     // Remove any existing @s.whatsapp.net or @c.us suffix
@@ -204,9 +205,9 @@ Deno.serve(async (req) => {
     console.log(`[${requestId}] Whapi API response:`, JSON.stringify(whapiData, null, 2))
 
     if (!whapiResponse.ok) {
-      console.error(`[${requestId}] ERROR: Whapi API error:`, whapiData)
+      console.error(`[${requestId}] Whapi API FAILED: status=${whapiResponse.status} empresa=${empresa.id} token=${tokenPrefix}... response=`, JSON.stringify(whapiData))
       return new Response(JSON.stringify({ 
-        error: 'Failed to send message via Whapi',
+        error: `Whapi ${whapiResponse.status}: ${JSON.stringify(whapiData).substring(0, 200)}`,
         details: whapiData
       }), {
         status: whapiResponse.status,

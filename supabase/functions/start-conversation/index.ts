@@ -272,8 +272,8 @@ Deno.serve(async (req) => {
     const isHuman = origem_final === 'atendente'
     const whapiBody = `#\"human_mode=${isHuman ? 'true' : 'false'}\"# ${messageText}`
 
-    // Enviar via Whapi (chamar Edge Function whapi-send-message)
     const sendUrl = `${supabaseUrl}/functions/v1/whapi-send-message`
+    console.log(`[${requestId}] Calling whapi-send-message: empresa_id=${empresa_id}, to=${whatsappNumero}, isServiceCaller=${isServiceCaller}`)
     const sendRes = await fetch(sendUrl, {
       method: 'POST',
       headers: {
@@ -287,12 +287,16 @@ Deno.serve(async (req) => {
       }),
     })
 
-    const sendData = await sendRes.json().catch(() => ({}))
+    let sendRawBody = ''
+    try { sendRawBody = await sendRes.text() } catch { sendRawBody = '' }
+    let sendData: Record<string, unknown> = {}
+    try { sendData = JSON.parse(sendRawBody) } catch { /* not JSON */ }
+
     if (!sendRes.ok) {
-      console.error(`[${requestId}] Whapi send failed:`, sendData)
+      console.error(`[${requestId}] whapi-send-message FAILED status=${sendRes.status} body=${sendRawBody.substring(0, 300)}`)
       return new Response(JSON.stringify({
-        error: sendData.error || 'Falha ao enviar mensagem',
-        details: sendData,
+        error: sendData?.error || `Falha ao enviar mensagem (HTTP ${sendRes.status})`,
+        details: sendData && Object.keys(sendData).length > 0 ? sendData : sendRawBody.substring(0, 200),
       }), {
         status: sendRes.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Usuario } from '@/types/atendimento';
@@ -15,21 +15,30 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const SESSION_HEARTBEAT_MS = 4 * 60 * 1000; // 4 min
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<Usuario | null>(null);
   const [selectedConversa, setSelectedConversa] = useState<import('@/types/atendimento').Conversa | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const navigate = useNavigate();
 
+  const currentUserRef = useRef<Usuario | null>(null);
+  useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
+
+  const clearSessionAndRedirect = useCallback(() => {
+    setCurrentUser(null);
+    setSelectedConversa(null);
+    navigate('/login', { replace: true });
+  }, [navigate]);
+
   useEffect(() => {
     let initialSessionHandled = false;
 
     const setLoadingDone = () => setAuthLoading(false);
 
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       try {
-        // Skip the INITIAL_SESSION event if we already handled it via getSession
         if (event === 'INITIAL_SESSION' && initialSessionHandled) return;
 
         if (session?.user) {
@@ -43,7 +52,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (usuario) {
             setCurrentUser(usuario as Usuario);
           } else {
-            // Has auth session but no active usuario record - sign out
             console.warn('Auth session found but no active usuario record, signing out');
             setCurrentUser(null);
             await supabase.auth.signOut();
@@ -52,13 +60,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         } else {
           setCurrentUser(null);
           setSelectedConversa(null);
+          if (event !== 'INITIAL_SESSION') {
+            navigate('/login', { replace: true });
+          }
         }
       } finally {
         setLoadingDone();
       }
     });
 
-    // Check existing session on mount (e.g. after F5). Always clear loading on resolve/reject.
     supabase.auth
       .getSession()
       .then(async ({ data: { session } }) => {
@@ -74,7 +84,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (usuario) {
             setCurrentUser(usuario as Usuario);
           } else {
-            // Has auth session but no active usuario - sign out and redirect
             console.warn('Stale auth session detected, signing out');
             setCurrentUser(null);
             await supabase.auth.signOut();
@@ -87,7 +96,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })
       .finally(setLoadingDone);
 
-    // Fallback: if auth never settles (e.g. network hung), stop loading after 8s so user sees login
     const timeoutId = window.setTimeout(setLoadingDone, 8000);
 
     return () => {
@@ -95,6 +103,50 @@ export function AppProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(timeoutId);
     };
   }, []);
+
+  // Re-validate session when the browser tab returns to the foreground.
+  // Browsers freeze timers in background tabs, so the Supabase auto-refresh
+  // may have missed a token renewal while the tab was hidden.
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!currentUserRef.current) return;
+
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error || !session) {
+          console.warn('Session expired while tab was in background');
+          clearSessionAndRedirect();
+        }
+      } catch (err) {
+        console.warn('visibilitychange session check failed:', err);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [clearSessionAndRedirect]);
+
+  // Periodic heartbeat: ensures the session is still alive even when the user
+  // is idle but the tab remains visible. Catches silent JWT expiry that would
+  // otherwise only surface as 401 errors on data queries.
+  useEffect(() => {
+    const id = window.setInterval(async () => {
+      if (!currentUserRef.current) return;
+
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error || !session) {
+          console.warn('Session heartbeat: session no longer valid');
+          clearSessionAndRedirect();
+        }
+      } catch (err) {
+        console.warn('Session heartbeat failed:', err);
+      }
+    }, SESSION_HEARTBEAT_MS);
+
+    return () => window.clearInterval(id);
+  }, [clearSessionAndRedirect]);
 
   const logout = async () => {
     await supabase.auth.signOut();

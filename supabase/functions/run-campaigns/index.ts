@@ -109,9 +109,9 @@ Deno.serve(async (req) => {
 
       const startConvUrl = `${supabaseUrl}/functions/v1/start-conversation`
 
+      console.log(`[${requestId}] Campanha ${campanha.id} (empresa=${campanha.empresa_id}): ${destinatarios.length} destinatários, URL=${startConvUrl}`)
+
       for (const dest of destinatarios) {
-        // Claim atômico do destinatário para evitar processamento duplicado
-        // em execuções concorrentes da função
         const { data: claimedDest, error: claimError } = await supabase
           .from('campanha_destinatarios')
           .update({
@@ -130,7 +130,6 @@ Deno.serve(async (req) => {
           continue
         }
 
-        // Se outro worker já claimou este registro, não processar novamente
         if (!claimedDest) {
           continue
         }
@@ -138,25 +137,33 @@ Deno.serve(async (req) => {
         const origemFinal = campanha.modo_resposta === 'atendente' ? 'atendente' : 'agente'
 
         try {
+          const payloadBody = {
+            empresa_id: campanha.empresa_id,
+            contato_id: dest.contato_id,
+            mensagem_inicial: messageText,
+            origem_inicial: 'campanha' as const,
+            origem_final: origemFinal,
+            campanha_id: campanha.id,
+          }
+
+          console.log(`[${requestId}] dest ${dest.id}: calling start-conversation empresa_id=${campanha.empresa_id} contato_id=${dest.contato_id}`)
+
           const res = await fetch(startConvUrl, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${supabaseServiceKey}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-              empresa_id: campanha.empresa_id,
-              contato_id: dest.contato_id,
-              mensagem_inicial: messageText,
-              origem_inicial: 'campanha',
-              origem_final: origemFinal,
-              campanha_id: campanha.id,
-            }),
+            body: JSON.stringify(payloadBody),
           })
 
-          const data = await res.json().catch(() => ({}))
+          let rawBody = ''
+          try { rawBody = await res.text() } catch { rawBody = '' }
 
-          if (res.ok && (data?.success === true)) {
+          let data: Record<string, unknown> = {}
+          try { data = JSON.parse(rawBody) } catch { /* response is not JSON */ }
+
+          if (res.ok && data?.success === true) {
             const conversaId = data.conversa_id as string | undefined
 
             await supabase
@@ -171,18 +178,27 @@ Deno.serve(async (req) => {
             totalSent++
           } else {
             console.error(
-              `[${requestId}] start-conversation failed for dest ${dest.id}:`,
-              data
+              `[${requestId}] start-conversation FAILED dest=${dest.id} status=${res.status} body=${rawBody.substring(0, 300)}`
             )
-            const errorMessage =
-              (data && (data.error || data.details)) ||
-              `HTTP ${res.status} ${res.statusText}` ||
-              JSON.stringify(data).substring(0, 200)
+
+            let errorMessage: string
+            if (data?.error) {
+              errorMessage = typeof data.error === 'string' ? data.error : JSON.stringify(data.error)
+              if (data.details) {
+                const d = typeof data.details === 'string' ? data.details : JSON.stringify(data.details)
+                errorMessage += ` | ${d.substring(0, 150)}`
+              }
+            } else if (rawBody.length > 0) {
+              errorMessage = `HTTP ${res.status}: ${rawBody.substring(0, 200)}`
+            } else {
+              errorMessage = `HTTP ${res.status} ${res.statusText}`
+            }
+
             await supabase
               .from('campanha_destinatarios')
               .update({
                 status_envio: 'erro_envio',
-                erro_envio_msg: errorMessage,
+                erro_envio_msg: errorMessage.substring(0, 500),
               })
               .eq('id', dest.id)
             erros++
@@ -197,7 +213,7 @@ Deno.serve(async (req) => {
             .from('campanha_destinatarios')
             .update({
               status_envio: 'erro_envio',
-              erro_envio_msg: msg.substring(0, 200),
+              erro_envio_msg: msg.substring(0, 500),
             })
             .eq('id', dest.id)
           erros++
