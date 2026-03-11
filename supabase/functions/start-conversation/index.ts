@@ -107,31 +107,45 @@ Deno.serve(async (req) => {
 
     if (isServiceCaller) {
       // Chamada interna (ex: worker de campanhas) usando service role:
-      // Deriva empresa_id a partir do contato para garantir alinhamento com o número/token.
+      // Usa SEMPRE a empresa da campanha (bodyEmpresaId) como fonte da verdade
+      // e garante que o contato pertence a essa empresa.
+      if (!bodyEmpresaId) {
+        return new Response(
+          JSON.stringify({
+            error: 'empresa_id obrigatorio para chamadas internas',
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        )
+      }
+
+      empresa_id = bodyEmpresaId
+      remetenteEfetivoId = null
+
       const { data: contatoRow, error: contatoError } = await supabase
         .from('contatos')
         .select('id, empresa_id, whatsapp_numero, nome')
         .eq('id', contato_id)
+        .eq('empresa_id', empresa_id)
         .maybeSingle()
 
       if (contatoError || !contatoRow) {
-        console.error(`[${requestId}] Contato not found (service caller):`, contatoError)
-        return new Response(JSON.stringify({ error: 'Contato não encontrado para campanha' }), {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
-
-      empresa_id = contatoRow.empresa_id
-      remetenteEfetivoId = null
-      contato = contatoRow
-
-      if (bodyEmpresaId && bodyEmpresaId !== empresa_id) {
-        console.warn(
-          `[${requestId}] Aviso: campanha enviada com empresa_id=${bodyEmpresaId}, ` +
-            `mas o contato pertence à empresa_id=${empresa_id}. Usando empresa do contato.`,
+        console.error(
+          `[${requestId}] Contato not found for campanha (empresa_id=${empresa_id}):`,
+          contatoError,
+        )
+        return new Response(
+          JSON.stringify({ error: 'Contato não encontrado para a empresa da campanha' }),
+          {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
         )
       }
+
+      contato = contatoRow
     } else {
       // Chamada normal via Hub: autentica usuário e descobre empresa / remetente
       const callerTenant = await getCallerTenant(req, supabaseUrl, supabaseServiceKey)
