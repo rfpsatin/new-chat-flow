@@ -417,7 +417,6 @@ function ImportContatosDialog({
           invalid: invalidFromServer.map((item) => ({
             nome: item.row.nome ?? null,
             whatsapp_numero: item.row.whatsapp_numero,
-            email: item.row.email ?? null,
             reason: item.reason,
           })),
         });
