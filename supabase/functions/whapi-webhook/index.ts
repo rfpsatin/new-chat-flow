@@ -385,10 +385,19 @@ Deno.serve(async (req) => {
         // Insert message (always in/cliente at this point)
         // Detect reply / quoted message (cliente respondeu uma mensagem específica)
         let replyToWhatsappId: string | null = null
-        const rawQuotedAny: any =
+        // Priorizar quotedMsg e quoted (indicam reply real).
+        // context só é reply quando contém .id ou .message_id (ignorar ephemeral etc.)
+        let rawQuotedAny: any =
           (message as any).quotedMsg ??
           (message as any).quoted ??
-          (message as any).context
+          null
+
+        if (!rawQuotedAny && (message as any).context) {
+          const ctx = (message as any).context
+          if (typeof ctx === 'object' && (ctx.id || ctx.message_id)) {
+            rawQuotedAny = ctx
+          }
+        }
 
         if (typeof rawQuotedAny === 'string') {
           replyToWhatsappId = rawQuotedAny
