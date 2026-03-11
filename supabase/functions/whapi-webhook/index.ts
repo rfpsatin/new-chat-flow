@@ -1,4 +1,4 @@
-// @version 5 — deploy target: hyizldxjiwjeruxqrqbv
+// @version 6 — deploy target: hyizldxjiwjeruxqrqbv
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -76,6 +76,7 @@ interface WhapiMessage {
   context?: {
     id?: string
     message_id?: string
+    quoted_id?: string
   }
 }
 
@@ -387,7 +388,7 @@ Deno.serve(async (req) => {
         // Detect reply / quoted message (cliente respondeu uma mensagem específica)
         let replyToWhatsappId: string | null = null
         // Priorizar quotedMsg e quoted (indicam reply real).
-        // context só é reply quando contém .id ou .message_id (ignorar ephemeral etc.)
+        // context só é reply quando contém .id/.message_id/.quoted_id (ignorar ephemeral etc.)
         let rawQuotedAny: any =
           (message as any).quotedMsg ??
           (message as any).quoted ??
@@ -395,7 +396,7 @@ Deno.serve(async (req) => {
 
         if (!rawQuotedAny && (message as any).context) {
           const ctx = (message as any).context
-          if (typeof ctx === 'object' && (ctx.id || ctx.message_id)) {
+          if (typeof ctx === 'object' && (ctx.id || ctx.message_id || ctx.quoted_id)) {
             rawQuotedAny = ctx
           }
         }
@@ -406,6 +407,7 @@ Deno.serve(async (req) => {
           replyToWhatsappId =
             rawQuotedAny.id ??
             rawQuotedAny.message_id ??
+            rawQuotedAny.quoted_id ??
             null
         }
 

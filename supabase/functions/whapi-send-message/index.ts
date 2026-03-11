@@ -1,4 +1,4 @@
-// @version 2 — deploy target: hyizldxjiwjeruxqrqbv
+// @version 3 — deploy target: hyizldxjiwjeruxqrqbv
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -21,6 +21,17 @@ interface SendMessageRequest {
 type CallerTenant = {
   empresaId: string
   tipoUsuario: 'adm' | 'sup' | 'opr'
+}
+
+function extractWhapiMessageId(whapiData: any): string | null {
+  return (
+    whapiData?.message?.id ??
+    whapiData?.message?.message_id ??
+    whapiData?.messages?.[0]?.id ??
+    whapiData?.messages?.[0]?.message_id ??
+    whapiData?.id ??
+    null
+  )
 }
 
 async function getCallerTenant(req: Request, supabaseUrl: string, serviceRoleKey: string): Promise<CallerTenant> {
@@ -219,8 +230,9 @@ Deno.serve(async (req) => {
       })
     }
 
+    const whapiMessageId = extractWhapiMessageId(whapiData)
     console.log(`[${requestId}] Message sent successfully`)
-    console.log(`[${requestId}] Message ID: ${whapiData.messages?.[0]?.id || 'unknown'}`)
+    console.log(`[${requestId}] Message ID: ${whapiMessageId || 'unknown'}`)
 
     // If human_mode=true was detected, notify n8n to set Redis
     // (fire-and-forget, don't block the response)
@@ -249,7 +261,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ 
       success: true,
-      message_id: whapiData.messages?.[0]?.id,
+      message_id: whapiMessageId,
       response: whapiData
     }), {
       status: 200,
