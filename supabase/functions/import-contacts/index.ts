@@ -9,7 +9,6 @@ const corsHeaders = {
 interface ImportRow {
   nome?: string | null
   whatsapp_numero: string
-  email?: string | null
 }
 
 interface ImportContactsRequest {
