@@ -1,43 +1,32 @@
 
 
-## Problema: Mensagem de campanha enviada em duplicidade
+## Redeploy de todas as Edge Functions
 
-### Causa raiz
+Vou fazer o redeploy de todas as 21 edge functions do projeto para garantir que o código mais recente (incluindo os headers `apikey` adicionados em `run-campaigns` e `start-conversation`) esteja ativo em produção.
 
-O `run-campaigns` está enviando cada mensagem **duas vezes**:
+### Funções a redeployar
+1. buscar-empresa
+2. check-attendance-mode
+3. close-service
+4. conversation-attendance-status
+5. create-user-auth
+6. import-contacts
+7. n8n-reset-human-mode
+8. n8n-send-message
+9. n8n-webhook-cinemkt
+10. reschedule-campaign-errors
+11. run-campaigns
+12. setup-super-admin
+13. start-conversation
+14. whapi-config
+15. whapi-connection-webhook
+16. whapi-media
+17. whapi-qr
+18. whapi-reconnect
+19. whapi-send-message
+20. whapi-status
+21. whapi-webhook
 
-1. **Linha 122** - Chama `whapi-send-message` diretamente (envia no WhatsApp)
-2. **Linha 142** - Chama `start-conversation`, que **internamente também chama** `whapi-send-message` (envia no WhatsApp de novo) e registra em `mensagens_ativas`
-
-Resultado: o contato recebe a mesma mensagem duas vezes no WhatsApp.
-
-### Solução
-
-Remover a chamada direta ao `whapi-send-message` (linhas 110-133) e usar **somente** o `start-conversation`, que já faz tudo:
-- Envia a mensagem via WhatsApp (com marcador de `human_mode`)
-- Registra em `mensagens_ativas`
-- Cria/reutiliza conversa
-- Atribui agente se necessário
-
-### Alteração no `run-campaigns/index.ts`
-
-Substituir o fluxo atual (send + start-conversation separados) por uma única chamada ao `start-conversation`, verificando o resultado para marcar o destinatário como `enviado` ou `erro_envio`. Basicamente:
-
-```
-// ANTES (duplicado):
-// 1. fetch(whapi-send-message) → envia WhatsApp
-// 2. fetch(start-conversation) → envia WhatsApp DE NOVO + cria conversa
-
-// DEPOIS (correto):
-// 1. fetch(start-conversation) → envia WhatsApp + cria conversa (tudo em um)
-```
-
-O loop do `for (const dest of destinatarios)` ficará:
-- Marca destinatário como `enviando`
-- Chama `start-conversation` com `empresa_id`, `contato_id`, `mensagem_inicial`, `origem_inicial: 'campanha'`, `origem_final`, `campanha_id`
-- Se sucesso: marca `enviado` e salva `conversa_id` retornado
-- Se erro: marca `erro_envio`
-
-### Arquivo alterado
-- `supabase/functions/run-campaigns/index.ts`
+### Ação
+Deploy paralelo de todas as funções usando a ferramenta de deploy.
 
