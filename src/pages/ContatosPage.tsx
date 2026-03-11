@@ -79,7 +79,6 @@ function parseCsvLines(text: string): ImportRow[] {
       rows.push({
         nome: nome || null,
         whatsapp_numero: whatsapp,
-        email: null,
       });
     }
     return rows;
