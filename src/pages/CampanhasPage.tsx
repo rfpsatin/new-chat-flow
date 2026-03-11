@@ -358,17 +358,32 @@ function CampanhaDetailDialog({
               </Button>
             </div>
           )}
-          <ScrollArea className="h-[200px] rounded-md border p-2">
+          <ScrollArea className="h-[220px] rounded-md border p-2">
             <div className="space-y-1">
               {destinatarios?.map((d) => (
                 <div
                   key={d.id}
-                  className="flex justify-between text-sm py-1 border-b border-border/50 last:border-0"
+                  className="py-1 border-b border-border/50 last:border-0 text-sm"
                 >
-                  <span>{d.whatsapp_numero}</span>
-                  <Badge variant={d.status_envio === 'enviado' ? 'default' : d.status_envio === 'erro_envio' ? 'destructive' : 'secondary'}>
-                    {d.status_envio}
-                  </Badge>
+                  <div className="flex justify-between items-center">
+                    <span>{d.whatsapp_numero}</span>
+                    <Badge
+                      variant={
+                        d.status_envio === 'enviado'
+                          ? 'default'
+                          : d.status_envio === 'erro_envio'
+                          ? 'destructive'
+                          : 'secondary'
+                      }
+                    >
+                      {d.status_envio}
+                    </Badge>
+                  </div>
+                  {d.status_envio === 'erro_envio' && d.erro_envio_msg && (
+                    <p className="mt-0.5 text-xs text-destructive">
+                      Motivo: {d.erro_envio_msg}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>

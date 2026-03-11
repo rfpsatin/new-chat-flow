@@ -195,6 +195,7 @@ export interface CampanhaDestinatario {
   mensagem_id_whatsapp: string | null;
   conversa_id: string | null;
   created_at: string;
+   erro_envio_msg?: string | null;
 }
 
 export interface CampanhaStats {
