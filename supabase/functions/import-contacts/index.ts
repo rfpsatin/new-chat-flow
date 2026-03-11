@@ -9,7 +9,6 @@ const corsHeaders = {
 interface ImportRow {
   nome?: string | null
   whatsapp_numero: string
-  email?: string | null
 }
 
 interface ImportContactsRequest {
@@ -96,7 +95,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           error: 'No rows provided',
-          example_row: { nome: 'Joao da Silva', whatsapp_numero: '5544999999999', email: 'joao@exemplo.com' },
+          example_row: { nome: 'Joao da Silva', whatsapp_numero: '5544999999999' },
         }),
         {
           status: 400,
@@ -113,7 +112,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    const validRows: { empresa_id: string; nome: string | null; whatsapp_numero: string; email: string | null }[] = []
+    const validRows: { empresa_id: string; nome: string | null; whatsapp_numero: string }[] = []
     const invalidRows: { row: ImportRow; reason: string }[] = []
 
     for (const r of rows) {
@@ -127,7 +126,6 @@ Deno.serve(async (req) => {
         empresa_id: empresaId,
         nome: r.nome?.trim() || null,
         whatsapp_numero: normalized,
-        email: r.email?.trim() || null,
       })
     }
 

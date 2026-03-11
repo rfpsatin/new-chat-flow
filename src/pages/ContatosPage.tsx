@@ -25,7 +25,6 @@ import { supabase } from '@/integrations/supabase/client';
 type ImportRow = {
   nome?: string | null;
   whatsapp_numero: string;
-  email?: string | null;
 };
 
 function stripQuotes(value: string): string {
@@ -80,7 +79,6 @@ function parseCsvLines(text: string): ImportRow[] {
       rows.push({
         nome: nome || null,
         whatsapp_numero: whatsapp,
-        email: null,
       });
     }
     return rows;
@@ -94,11 +92,9 @@ function parseCsvLines(text: string): ImportRow[] {
     const idxMiddle = headers.indexOf('Middle Name');
     const idxLast = headers.indexOf('Last Name');
     const idxOrg = headers.indexOf('Organization Name');
-    const idxEmail = headers.indexOf('E-mail 1 - Value'); // pode não existir
-
     for (let i = 1; i < rawLines.length; i++) {
       const line = rawLines[i];
-      const cols = line.split(','); // no exemplo, não há vírgulas dentro de campos
+      const cols = line.split(',');
       if (idxPhone === -1 || !cols[idxPhone]) continue;
 
       const phoneRaw = normalizePhoneField(cols[idxPhone] ?? '');
@@ -111,29 +107,25 @@ function parseCsvLines(text: string): ImportRow[] {
       if (!nome && idxOrg >= 0) {
         nome = normalizeNameField(cols[idxOrg] ?? '');
       }
-      const email =
-        idxEmail >= 0 ? (stripQuotes(cols[idxEmail] ?? '') || null) : null;
 
       rows.push({
         nome: nome || null,
         whatsapp_numero: phoneRaw,
-        email,
       });
     }
 
     return rows;
   }
 
-  // Caso 2: formato simples "nome;whatsapp;email" ou "nome,whatsapp,email"
+  // Caso 2: formato simples "nome;whatsapp" ou "nome,whatsapp"
   for (const line of rawLines) {
     const parts = line.split(/[;,]/).map((p) => stripQuotes(p));
     if (parts.length === 0) continue;
-    const [nome, whatsapp, email] = parts;
-    if (!whatsapp || whatsapp === 'whatsapp_numero') continue; // ignora cabeçalho simples
+    const [nome, whatsapp] = parts;
+    if (!whatsapp || whatsapp === 'whatsapp_numero') continue;
     rows.push({
       nome: normalizeNameField(nome || ''),
       whatsapp_numero: normalizePhoneField(whatsapp),
-      email: email ? stripQuotes(email) : null,
     });
   }
 
@@ -307,14 +299,13 @@ function ImportContatosDialog({
       id: number;
       nome: string;
       whatsapp_numero: string;
-      email: string;
       status: 'pending' | 'valid' | 'invalid';
       reason?: string;
     }[]
   >([]);
   const [importLog, setImportLog] = useState<{
     imported: number;
-    invalid: { nome: string | null; whatsapp_numero: string; email: string | null; reason?: string }[];
+    invalid: { nome: string | null; whatsapp_numero: string; reason?: string }[];
   } | null>(null);
 
   const normalizePhone = (raw: string) => raw.replace(/\D/g, '');
@@ -344,7 +335,6 @@ function ImportContatosDialog({
         id: idx,
         nome: r.nome ?? '',
         whatsapp_numero: r.whatsapp_numero,
-        email: r.email ?? '',
         status: 'pending' as const,
       }));
       setRows(nextRows);
@@ -372,7 +362,7 @@ function ImportContatosDialog({
     toast.success(`Validação concluída. ${validCount} válido(s), ${invalidCount} com problema.`);
   };
 
-  const handleCellChange = (id: number, field: 'nome' | 'whatsapp_numero' | 'email', value: string) => {
+  const handleCellChange = (id: number, field: 'nome' | 'whatsapp_numero', value: string) => {
     setRows((prev) =>
       prev.map((row) =>
         row.id === id
@@ -409,7 +399,6 @@ function ImportContatosDialog({
       const payloadRows = ready.map((r) => ({
         nome: r.nome || null,
         whatsapp_numero: r.whatsapp_numero,
-        email: r.email || null,
       }));
 
       const { data, error } = await supabase.functions.invoke('import-contacts', {
@@ -428,7 +417,6 @@ function ImportContatosDialog({
           invalid: invalidFromServer.map((item) => ({
             nome: item.row.nome ?? null,
             whatsapp_numero: item.row.whatsapp_numero,
-            email: item.row.email ?? null,
             reason: item.reason,
           })),
         });
@@ -446,7 +434,7 @@ function ImportContatosDialog({
   };
 
   const handleDownloadTemplate = () => {
-    const content = 'nome;whatsapp_numero;email\nJoão da Silva;5544999999999;joao@exemplo.com\n';
+    const content = 'nome;whatsapp_numero\nJoão da Silva;5544999999999\n';
     const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -498,17 +486,16 @@ function ImportContatosDialog({
               </div>
               <ScrollArea className="h-[260px] rounded-md border">
                 <div className="min-w-full text-xs">
-                  <div className="grid grid-cols-[2fr,2fr,2fr,1fr,2fr] gap-1 px-2 py-1 border-b bg-muted/50 font-medium">
+                  <div className="grid grid-cols-[2fr,2fr,1fr,2fr] gap-1 px-2 py-1 border-b bg-muted/50 font-medium">
                     <span>Nome</span>
                     <span>WhatsApp</span>
-                    <span>Email</span>
                     <span>Status</span>
                     <span>Motivo</span>
                   </div>
                   {rows.map((row) => (
                     <div
                       key={row.id}
-                      className="grid grid-cols-[2fr,2fr,2fr,1fr,2fr] gap-1 px-2 py-1 border-b last:border-b-0 items-center"
+                      className="grid grid-cols-[2fr,2fr,1fr,2fr] gap-1 px-2 py-1 border-b last:border-b-0 items-center"
                     >
                       <Input
                         value={row.nome}
@@ -518,11 +505,6 @@ function ImportContatosDialog({
                       <Input
                         value={row.whatsapp_numero}
                         onChange={(e) => handleCellChange(row.id, 'whatsapp_numero', e.target.value)}
-                        className="h-7 text-xs"
-                      />
-                      <Input
-                        value={row.email}
-                        onChange={(e) => handleCellChange(row.id, 'email', e.target.value)}
                         className="h-7 text-xs"
                       />
                       <span

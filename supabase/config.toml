@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.whapi-media]
 verify_jwt = false
+
+[functions.import-contacts]
+verify_jwt = true
