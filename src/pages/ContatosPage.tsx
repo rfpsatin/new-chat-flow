@@ -253,34 +253,120 @@ function ImportContatosDialog({
   onClose: () => void;
 }) {
   const { empresaId } = useApp();
-  const [csvText, setCsvText] = useState('');
+  const [fileName, setFileName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [previewCount, setPreviewCount] = useState<number | null>(null);
+  const [rows, setRows] = useState<
+    {
+      id: number;
+      nome: string;
+      whatsapp_numero: string;
+      email: string;
+      status: 'pending' | 'valid' | 'invalid';
+      reason?: string;
+    }[]
+  >([]);
+  const [importLog, setImportLog] = useState<{
+    imported: number;
+    invalid: { nome: string | null; whatsapp_numero: string; email: string | null; reason?: string }[];
+  } | null>(null);
 
-  const handlePreview = () => {
-    const rows = parseCsvLines(csvText);
-    setPreviewCount(rows.length);
+  const normalizePhone = (raw: string) => raw.replace(/\D/g, '');
+
+  const validateRow = (whatsapp_numero: string): string | null => {
+    const digits = normalizePhone(whatsapp_numero);
+    if (!digits) return 'Número vazio';
+    if (digits.length < 10 || digits.length > 15) return 'Número inválido (esperado 10 a 15 dígitos)';
+    return null;
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    setImportLog(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result || '');
+      const parsed = parseCsvLines(text);
+      if (!parsed.length) {
+        toast.error('Nenhuma linha reconhecida no arquivo. Verifique o formato.');
+        setRows([]);
+        return;
+      }
+      const nextRows = parsed.map((r, idx) => ({
+        id: idx,
+        nome: r.nome ?? '',
+        whatsapp_numero: r.whatsapp_numero,
+        email: r.email ?? '',
+        status: 'pending' as const,
+      }));
+      setRows(nextRows);
+      toast.info(`${nextRows.length} linha(s) carregadas. Clique em "Validar" para checar os números.`);
+    };
+    reader.readAsText(file, 'utf-8');
+  };
+
+  const handleValidate = () => {
     if (!rows.length) {
-      toast.error('Nenhuma linha válida encontrada. Verifique o formato: nome;whatsapp;email');
-    } else {
-      toast.info(`${rows.length} linha(s) reconhecidas para importação.`);
+      toast.error('Nenhuma linha carregada. Importe um arquivo primeiro.');
+      return;
     }
+    const validated = rows.map((row) => {
+      const err = validateRow(row.whatsapp_numero);
+      return {
+        ...row,
+        status: err ? 'invalid' : 'valid',
+        reason: err || undefined,
+      };
+    });
+    setRows(validated);
+    const validCount = validated.filter((r) => r.status === 'valid').length;
+    const invalidCount = validated.filter((r) => r.status === 'invalid').length;
+    toast.success(`Validação concluída. ${validCount} válido(s), ${invalidCount} com problema.`);
+  };
+
+  const handleCellChange = (id: number, field: 'nome' | 'whatsapp_numero' | 'email', value: string) => {
+    setRows((prev) =>
+      prev.map((row) =>
+        row.id === id
+          ? {
+              ...row,
+              [field]: value,
+              status: 'pending',
+              reason: undefined,
+            }
+          : row,
+      ),
+    );
+    setImportLog(null);
   };
 
   const handleImport = async () => {
-    const rows = parseCsvLines(csvText);
-    if (!rows.length) {
-      toast.error('Nenhuma linha válida para importar.');
-      return;
-    }
     if (!empresaId) {
       toast.error('Empresa não encontrada na sessão.');
       return;
     }
+    if (!rows.length) {
+      toast.error('Nenhuma linha carregada para importar.');
+      return;
+    }
+
+    const ready = rows.filter((r) => r.status === 'valid');
+    if (!ready.length) {
+      toast.error('Nenhuma linha válida. Valide e corrija os números antes de importar.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
+      const payloadRows = ready.map((r) => ({
+        nome: r.nome || null,
+        whatsapp_numero: r.whatsapp_numero,
+        email: r.email || null,
+      }));
+
       const { data, error } = await supabase.functions.invoke('import-contacts', {
-        body: { rows },
+        body: { rows: payloadRows },
       });
       if (error) {
         throw new Error(error.message || 'Falha ao importar contatos');
@@ -288,9 +374,23 @@ function ImportContatosDialog({
       if (!data?.success) {
         toast.error(data?.error || 'Erro ao importar contatos');
       } else {
-        toast.success(`Importação concluída. ${data.imported} importado(s), ${data.invalid} inválido(s).`);
+        const invalidFromServer =
+          (data.invalid_rows as { row: ImportRow; reason?: string }[] | undefined) ?? [];
+        setImportLog({
+          imported: data.imported ?? ready.length,
+          invalid: invalidFromServer.map((item) => ({
+            nome: item.row.nome ?? null,
+            whatsapp_numero: item.row.whatsapp_numero,
+            email: item.row.email ?? null,
+            reason: item.reason,
+          })),
+        });
+        toast.success(
+          `Importação concluída. ${data.imported ?? ready.length} importado(s), ${
+            invalidFromServer.length
+          } rejeitado(s) no servidor.`,
+        );
       }
-      onClose();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao importar contatos');
     } finally {
@@ -319,47 +419,132 @@ function ImportContatosDialog({
         </DialogHeader>
         <div className="space-y-3 text-sm">
           <p className="text-muted-foreground">
-            Você pode:
-            <br />
-            - Colar linhas no formato simples{' '}
-            <code className="text-xs bg-muted px-1 py-0.5 rounded">
-              nome;whatsapp_numero;email
-            </code>
-            , ou
-            <br />
-            - Colar diretamente o conteúdo de um CSV exportado do Google Contatos (como o arquivo
-            `contacts.csv`).
+            Importe um arquivo CSV exportado do Google Contatos ou uma planilha com as colunas
+            equivalentes. Os campos serão pré-validados e você poderá ajustar diretamente na lista
+            antes de importar.
           </p>
-          <div className="flex justify-between items-center">
+          <div className="flex items-center justify-between gap-2">
+            <Input
+              type="file"
+              accept=".csv,text/csv"
+              onChange={handleFileChange}
+              className="text-xs"
+            />
             <Button type="button" variant="outline" size="sm" onClick={handleDownloadTemplate}>
               Baixar modelo CSV
             </Button>
-            {previewCount !== null && (
-              <span className="text-xs text-muted-foreground">
-                {previewCount} linha(s) reconhecidas
-              </span>
-            )}
           </div>
-          <textarea
-            value={csvText}
-            onChange={(e) => setCsvText(e.target.value)}
-            className="mt-1 w-full min-h-[180px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
-            placeholder={'Exemplo:\nJoão da Silva;5544999999999;joao@exemplo.com\nMaria Souza;5544988887777;'}
-          />
-          <div className="flex justify-between items-center pt-1">
-            <Button type="button" variant="outline" size="sm" onClick={handlePreview}>
-              Pré-visualizar linhas
+          {fileName && (
+            <p className="text-xs text-muted-foreground">
+              Arquivo: <span className="font-medium text-foreground">{fileName}</span>
+            </p>
+          )}
+          {rows.length > 0 && (
+            <>
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{rows.length} linha(s) carregadas</span>
+                <span>
+                  Válidos:{' '}
+                  {rows.filter((r) => r.status === 'valid').length} · Com problema:{' '}
+                  {rows.filter((r) => r.status === 'invalid').length}
+                </span>
+              </div>
+              <ScrollArea className="h-[260px] rounded-md border">
+                <div className="min-w-full text-xs">
+                  <div className="grid grid-cols-[2fr,2fr,2fr,1fr,2fr] gap-1 px-2 py-1 border-b bg-muted/50 font-medium">
+                    <span>Nome</span>
+                    <span>WhatsApp</span>
+                    <span>Email</span>
+                    <span>Status</span>
+                    <span>Motivo</span>
+                  </div>
+                  {rows.map((row) => (
+                    <div
+                      key={row.id}
+                      className="grid grid-cols-[2fr,2fr,2fr,1fr,2fr] gap-1 px-2 py-1 border-b last:border-b-0 items-center"
+                    >
+                      <Input
+                        value={row.nome}
+                        onChange={(e) => handleCellChange(row.id, 'nome', e.target.value)}
+                        className="h-7 text-xs"
+                      />
+                      <Input
+                        value={row.whatsapp_numero}
+                        onChange={(e) => handleCellChange(row.id, 'whatsapp_numero', e.target.value)}
+                        className="h-7 text-xs"
+                      />
+                      <Input
+                        value={row.email}
+                        onChange={(e) => handleCellChange(row.id, 'email', e.target.value)}
+                        className="h-7 text-xs"
+                      />
+                      <span
+                        className={
+                          row.status === 'valid'
+                            ? 'text-emerald-600'
+                            : row.status === 'invalid'
+                            ? 'text-destructive'
+                            : 'text-muted-foreground'
+                        }
+                      >
+                        {row.status === 'valid'
+                          ? 'OK'
+                          : row.status === 'invalid'
+                          ? 'Erro'
+                          : 'Pendente'}
+                      </span>
+                      <span className="truncate">{row.reason}</span>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </>
+          )}
+          <div className="flex justify-between items-center pt-2">
+            <Button type="button" variant="outline" size="sm" onClick={handleValidate} disabled={!rows.length}>
+              Validar
             </Button>
             <div className="flex gap-2">
               <Button type="button" variant="outline" onClick={onClose}>
-                Cancelar
+                Fechar
               </Button>
-              <Button type="button" onClick={handleImport} disabled={isSubmitting || !csvText.trim()}>
+              <Button type="button" onClick={handleImport} disabled={isSubmitting || !rows.length}>
                 {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
                 Importar
               </Button>
             </div>
           </div>
+          {importLog && (
+            <div className="mt-3 border-t pt-2 text-xs space-y-1">
+              <p className="font-medium">
+                Resultado da importação: {importLog.imported} importado(s),{' '}
+                {importLog.invalid.length} rejeitado(s) no servidor.
+              </p>
+              {importLog.invalid.length > 0 && (
+                <div>
+                  <p className="text-muted-foreground mb-1">
+                    Linhas rejeitadas (corrija na planilha de origem se necessário):
+                  </p>
+                  <ScrollArea className="h-[120px] rounded-md border">
+                    <div className="px-2 py-1 space-y-1">
+                      {importLog.invalid.map((item, idx) => (
+                        <div key={idx} className="flex flex-col">
+                          <span className="font-medium">
+                            {item.nome || '(sem nome)'} — {item.whatsapp_numero}
+                          </span>
+                          {item.reason && (
+                            <span className="text-destructive">
+                              Motivo: {item.reason}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
