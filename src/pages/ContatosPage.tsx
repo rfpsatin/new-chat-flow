@@ -29,18 +29,60 @@ type ImportRow = {
 };
 
 function parseCsvLines(text: string): ImportRow[] {
-  const lines = text
+  const rawLines = text
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
 
+  if (rawLines.length === 0) return [];
+
+  const header = rawLines[0];
   const rows: ImportRow[] = [];
 
-  for (const line of lines) {
+  // Caso 1: CSV exportado do Google Contacts (como o exemplo enviado)
+  if (header.includes('Phone 1 - Value')) {
+    const headers = header.split(',').map((h) => h.trim());
+    const idxPhone = headers.indexOf('Phone 1 - Value');
+    const idxFirst = headers.indexOf('First Name');
+    const idxMiddle = headers.indexOf('Middle Name');
+    const idxLast = headers.indexOf('Last Name');
+    const idxOrg = headers.indexOf('Organization Name');
+    const idxEmail = headers.indexOf('E-mail 1 - Value'); // pode não existir
+
+    for (let i = 1; i < rawLines.length; i++) {
+      const line = rawLines[i];
+      const cols = line.split(','); // no exemplo, não há vírgulas dentro de campos
+      if (idxPhone === -1 || !cols[idxPhone]) continue;
+
+      const phoneRaw = cols[idxPhone].replace(/^"|"$/g, '').trim();
+      if (!phoneRaw) continue;
+
+      const first = idxFirst >= 0 ? cols[idxFirst]?.trim() ?? '' : '';
+      const middle = idxMiddle >= 0 ? cols[idxMiddle]?.trim() ?? '' : '';
+      const last = idxLast >= 0 ? cols[idxLast]?.trim() ?? '' : '';
+      let nome = [first, middle, last].filter(Boolean).join(' ');
+      if (!nome && idxOrg >= 0) {
+        nome = cols[idxOrg]?.trim() ?? '';
+      }
+      const email =
+        idxEmail >= 0 ? (cols[idxEmail]?.trim() || null) : null;
+
+      rows.push({
+        nome: nome || null,
+        whatsapp_numero: phoneRaw,
+        email,
+      });
+    }
+
+    return rows;
+  }
+
+  // Caso 2: formato simples "nome;whatsapp;email" ou "nome,whatsapp,email"
+  for (const line of rawLines) {
     const parts = line.split(/[;,]/).map((p) => p.trim());
     if (parts.length === 0) continue;
     const [nome, whatsapp, email] = parts;
-    if (!whatsapp) continue;
+    if (!whatsapp || whatsapp === 'whatsapp_numero') continue; // ignora cabeçalho simples
     rows.push({
       nome: nome || null,
       whatsapp_numero: whatsapp,
@@ -277,11 +319,16 @@ function ImportContatosDialog({
         </DialogHeader>
         <div className="space-y-3 text-sm">
           <p className="text-muted-foreground">
-            Cole abaixo as linhas da planilha no formato:
+            Você pode:
             <br />
+            - Colar linhas no formato simples{' '}
             <code className="text-xs bg-muted px-1 py-0.5 rounded">
               nome;whatsapp_numero;email
             </code>
+            , ou
+            <br />
+            - Colar diretamente o conteúdo de um CSV exportado do Google Contatos (como o arquivo
+            `contacts.csv`).
           </p>
           <div className="flex justify-between items-center">
             <Button type="button" variant="outline" size="sm" onClick={handleDownloadTemplate}>
