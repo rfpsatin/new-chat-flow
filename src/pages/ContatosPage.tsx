@@ -434,7 +434,7 @@ function ImportContatosDialog({
   };
 
   const handleDownloadTemplate = () => {
-    const content = 'nome;whatsapp_numero;email\nJoão da Silva;5544999999999;joao@exemplo.com\n';
+    const content = 'nome;whatsapp_numero\nJoão da Silva;5544999999999\n';
     const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
