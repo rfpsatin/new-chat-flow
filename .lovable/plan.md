@@ -1,43 +1,16 @@
 
 
-## Problema: Mensagem de campanha enviada em duplicidade
+## Sanitizar nomes na importação de contatos
 
-### Causa raiz
+### Alteração
 
-O `run-campaigns` está enviando cada mensagem **duas vezes**:
+Adicionar função `sanitizeName` em `supabase/functions/import-contacts/index.ts` que:
+- Remove todos os tipos de aspas: `"`, `'`, `` ` ``, `«`, `»`, `"`, `"`, `'`, `'`
+- Remove caracteres de controle (tabs, newlines, etc.)
+- Colapsa espaços múltiplos em um só
+- Trim final
 
-1. **Linha 122** - Chama `whapi-send-message` diretamente (envia no WhatsApp)
-2. **Linha 142** - Chama `start-conversation`, que **internamente também chama** `whapi-send-message` (envia no WhatsApp de novo) e registra em `mensagens_ativas`
+Aplicar na linha que monta `validRows`: `nome: sanitizeName(r.nome) || null`
 
-Resultado: o contato recebe a mesma mensagem duas vezes no WhatsApp.
-
-### Solução
-
-Remover a chamada direta ao `whapi-send-message` (linhas 110-133) e usar **somente** o `start-conversation`, que já faz tudo:
-- Envia a mensagem via WhatsApp (com marcador de `human_mode`)
-- Registra em `mensagens_ativas`
-- Cria/reutiliza conversa
-- Atribui agente se necessário
-
-### Alteração no `run-campaigns/index.ts`
-
-Substituir o fluxo atual (send + start-conversation separados) por uma única chamada ao `start-conversation`, verificando o resultado para marcar o destinatário como `enviado` ou `erro_envio`. Basicamente:
-
-```
-// ANTES (duplicado):
-// 1. fetch(whapi-send-message) → envia WhatsApp
-// 2. fetch(start-conversation) → envia WhatsApp DE NOVO + cria conversa
-
-// DEPOIS (correto):
-// 1. fetch(start-conversation) → envia WhatsApp + cria conversa (tudo em um)
-```
-
-O loop do `for (const dest of destinatarios)` ficará:
-- Marca destinatário como `enviando`
-- Chama `start-conversation` com `empresa_id`, `contato_id`, `mensagem_inicial`, `origem_inicial: 'campanha'`, `origem_final`, `campanha_id`
-- Se sucesso: marca `enviado` e salva `conversa_id` retornado
-- Se erro: marca `erro_envio`
-
-### Arquivo alterado
-- `supabase/functions/run-campaigns/index.ts`
+Redeploy da edge function.
 
