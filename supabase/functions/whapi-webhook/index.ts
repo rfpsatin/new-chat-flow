@@ -64,6 +64,9 @@ interface WhapiMessage {
     label?: string
     sections?: Array<{ title: string; rows: Array<{ id: string; title: string; description?: string }> }>
   }
+  // Campos adicionais que podem existir em replies/contexto
+  quoted?: string | { id?: string; message_id?: string }
+  context?: { id?: string; message_id?: string }
 }
 
 interface WhapiEvent {
@@ -370,6 +373,37 @@ Deno.serve(async (req) => {
         }
 
         // Insert message (always in/cliente at this point)
+        // Detect reply / quoted message
+        let replyToWhatsappId: string | null = null
+        const rawQuoted: any = (message as any).quoted ?? (message as any).context
+        if (typeof rawQuoted === 'string') {
+          replyToWhatsappId = rawQuoted
+        } else if (rawQuoted && typeof rawQuoted === 'object') {
+          replyToWhatsappId = rawQuoted.id ?? rawQuoted.message_id ?? null
+        }
+
+        let replyToMessageId: number | null = null
+        if (replyToWhatsappId) {
+          try {
+            const { data: repliedMsg } = await supabase
+              .from('mensagens_ativas')
+              .select('id')
+              .eq('empresa_id', empresaId)
+              .eq('conversa_id', conversa.id)
+              .eq('contato_id', contato.id)
+              .eq('whatsapp_message_id', replyToWhatsappId)
+              .order('criado_em', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+
+            if (repliedMsg) {
+              replyToMessageId = repliedMsg.id as number
+            }
+          } catch (replyLookupError) {
+            console.error(`[${requestId}] ERROR looking up replied message:`, replyLookupError)
+          }
+        }
+
         const doc = extractDocumentFromMessage(message, empresaId, supabaseUrl)
         const { error: msgError } = await supabase
           .from('mensagens_ativas')
@@ -385,6 +419,9 @@ Deno.serve(async (req) => {
             media_kind: doc.mediaKind ?? null,
             media_filename: doc.mediaFilename ?? null,
             media_mime: doc.mediaMime ?? null,
+            whatsapp_message_id: message.id,
+            reply_to_message_id: replyToMessageId,
+            reply_to_whatsapp_id: replyToWhatsappId,
           })
 
         if (msgError) {

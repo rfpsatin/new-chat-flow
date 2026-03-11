@@ -19,6 +19,7 @@ interface SendMediaRequest {
   conversa_id: string
   contato_id: string
   remetente_id: string
+  reply_to_whatsapp_id?: string
 }
 
 type CallerTenant = {
@@ -248,6 +249,9 @@ Deno.serve(async (req) => {
     }
     if (mime_type && mime_type.trim()) {
       payload.mime_type = mime_type.trim()
+    }
+    if (body.reply_to_whatsapp_id && body.reply_to_whatsapp_id.trim()) {
+      payload.quoted = body.reply_to_whatsapp_id.trim()
     }
 
     const whapiResponse = await fetch(whapiUrl, {

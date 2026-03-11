@@ -62,6 +62,8 @@ export function useEnviarMensagem() {
       conteudo,
       remetenteId,
       humanMode,
+      replyToMessageId,
+      replyToWhatsappId,
     }: {
       empresaId: string;
       conversaId: string;
@@ -69,6 +71,8 @@ export function useEnviarMensagem() {
       conteudo: string;
       remetenteId: string;
       humanMode?: boolean;
+      replyToMessageId?: number | null;
+      replyToWhatsappId?: string | null;
     }) => {
       // 1. Get contact to retrieve WhatsApp number
       const { data: contato, error: contatoError } = await supabase
@@ -90,6 +94,7 @@ export function useEnviarMensagem() {
           empresa_id: empresaId,
           to: contato.whatsapp_numero,
           message: whapiBody,
+          reply_to_whatsapp_id: replyToWhatsappId ?? undefined,
         },
       });
 
@@ -104,6 +109,8 @@ export function useEnviarMensagem() {
         tipo_remetente: 'agente',
         remetente_id: remetenteId,
         conteudo: conteudo,
+        reply_to_message_id: replyToMessageId ?? null,
+        reply_to_whatsapp_id: replyToWhatsappId ?? null,
       });
     },
     onSuccess: (_, { conversaId }) => {
@@ -146,7 +153,8 @@ export function useEnviarArquivo() {
       // 2. Fazer upload do arquivo para o storage para gerar uma URL pública
       //    Bucket esperado: "chat-media" (precisa existir no projeto Supabase)
       const bucket = 'chat-media';
-      const path = `${empresaId}/${conversaId}/${Date.now()}-${file.name}`;
+      const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const path = `${empresaId}/${conversaId}/${uniqueSuffix}-${file.name}`;
 
       const { error: uploadError } = await supabase.storage.from(bucket).upload(path, file);
 

@@ -80,6 +80,12 @@ export interface MensagemAtiva {
   media_kind?: string | null;
   media_filename?: string | null;
   media_mime?: string | null;
+  /** ID da mensagem no WhatsApp/Whapi (message.id) */
+  whatsapp_message_id?: string | null;
+  /** ID interno da mensagem à qual esta responde (reply) */
+  reply_to_message_id?: number | null;
+  /** ID da mensagem original no WhatsApp à qual esta responde */
+  reply_to_whatsapp_id?: string | null;
 }
 
 export interface MotivoEncerramento {

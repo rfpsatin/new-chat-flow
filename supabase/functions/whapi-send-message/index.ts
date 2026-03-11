@@ -15,6 +15,7 @@ interface SendMessageRequest {
   to: string
   message: string
   human_mode?: boolean
+  reply_to_whatsapp_id?: string
 }
 
 type CallerTenant = {
@@ -79,7 +80,7 @@ Deno.serve(async (req) => {
     const body: SendMessageRequest = await req.json()
     console.log(`[${requestId}] Request body:`, JSON.stringify(body, null, 2))
 
-    const { to, message, human_mode, empresa_id: bodyEmpresaId } = body
+    const { to, message, human_mode, empresa_id: bodyEmpresaId, reply_to_whatsapp_id } = body
 
     if (!to || !message) {
       console.error(`[${requestId}] ERROR: Missing required fields`)
@@ -189,6 +190,9 @@ Deno.serve(async (req) => {
     const payload: Record<string, unknown> = {
       to: phoneNumber,
       body: cleanMessage,
+    }
+    if (reply_to_whatsapp_id && reply_to_whatsapp_id.trim()) {
+      payload.quoted = reply_to_whatsapp_id.trim()
     }
 
     const whapiResponse = await fetch(whapiUrl, {

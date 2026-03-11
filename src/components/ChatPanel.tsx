@@ -51,6 +51,7 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
   const [mensagemInput, setMensagemInput] = useState('');
   const [showEncerrar, setShowEncerrar] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<MensagemAtiva | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const documentosInputRef = useRef<HTMLInputElement | null>(null);
   const midiaInputRef = useRef<HTMLInputElement | null>(null);
@@ -159,9 +160,12 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
       conteudo: mensagemInput.trim(),
       remetenteId: currentUser.id,
       humanMode,
+      replyToMessageId: replyingTo?.id ?? null,
+      replyToWhatsappId: (replyingTo as any)?.whatsapp_message_id ?? null,
     });
     
     setMensagemInput('');
+    setReplyingTo(null);
   };
 
   /**
@@ -348,7 +352,11 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
                     <div className="my-3 border-t border-muted-foreground/20" />
                   )}
                   <div className="py-1.5">
-                    <MessageBubble mensagem={msg} />
+                    <MessageBubble
+                      mensagem={msg}
+                      mensagens={mensagens}
+                      onReply={canRespond ? setReplyingTo : undefined}
+                    />
                   </div>
                 </div>
               );
@@ -359,6 +367,37 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
       
       {/* Input - SEMPRE VISÍVEL */}
       <div className="flex-shrink-0 p-4 border-t bg-card">
+        {replyingTo && (
+          <div className="mb-2 rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-xs flex items-start gap-2">
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold truncate">
+                {replyingTo.tipo_remetente === 'agente'
+                  ? 'Você'
+                  : replyingTo.tipo_remetente === 'bot'
+                  ? 'Bot'
+                  : replyingTo.tipo_remetente === 'sistema'
+                  ? 'Sistema'
+                  : 'Cliente'}
+              </p>
+              <p className="truncate">
+                {replyingTo.media_kind === 'image'
+                  ? '[imagem]'
+                  : replyingTo.media_kind === 'audio'
+                  ? '[áudio]'
+                  : replyingTo.media_kind === 'document'
+                  ? replyingTo.media_filename || '[documento]'
+                  : replyingTo.conteudo || ''}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="ml-2 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => setReplyingTo(null)}
+            >
+              ✕
+            </button>
+          </div>
+        )}
         <form 
           onSubmit={(e) => { e.preventDefault(); handleEnviar(); }}
           className="flex items-center gap-3"
@@ -630,7 +669,15 @@ function stripHumanModePrefix(text: string): string {
   return text;
 }
 
-function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
+function MessageBubble({
+  mensagem,
+  mensagens,
+  onReply,
+}: {
+  mensagem: MensagemAtiva;
+  mensagens: MensagemAtiva[];
+  onReply?: (mensagem: MensagemAtiva) => void;
+}) {
   const isOutgoing = mensagem.direcao === 'out';
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
@@ -675,6 +722,11 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
   const displayContent = getDisplayContent();
 
   const hasMedia = !!mensagem.media_url && !!mensagem.media_kind;
+
+  const repliedMessage =
+    mensagem.reply_to_message_id != null
+      ? mensagens.find((m) => m.id === mensagem.reply_to_message_id)
+      : null;
 
   const getMediaTitle = () => {
     switch (mensagem.media_kind) {
@@ -727,6 +779,28 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
             : 'bg-chat-incoming text-foreground rounded-bl-md'
         )}
       >
+        {repliedMessage && (
+          <div className="mb-1 rounded-md bg-black/5 px-2 py-1 text-[11px] border-l-2 border-border/60">
+            <p className="font-semibold truncate">
+              {repliedMessage.tipo_remetente === 'agente'
+                ? 'Você'
+                : repliedMessage.tipo_remetente === 'bot'
+                ? 'Bot'
+                : repliedMessage.tipo_remetente === 'sistema'
+                ? 'Sistema'
+                : 'Cliente'}
+            </p>
+            <p className="truncate">
+              {repliedMessage.media_kind === 'image'
+                ? '[imagem]'
+                : repliedMessage.media_kind === 'audio'
+                ? '[áudio]'
+                : repliedMessage.media_kind === 'document'
+                ? repliedMessage.media_filename || '[documento]'
+                : repliedMessage.conteudo || ''}
+            </p>
+          </div>
+        )}
         {senderLabel && (
           <p className={cn(
             'text-xs font-medium mb-1',
@@ -866,6 +940,18 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
         )}
         {!hasMedia && (
           <FormattedMessageContent content={displayContent} isOutgoing={isOutgoing} />
+        )}
+        {onReply && (
+          <button
+            type="button"
+            className={cn(
+              'mt-1 text-[11px] underline underline-offset-2',
+              isOutgoing ? 'text-chat-outgoing-text/70' : 'text-muted-foreground'
+            )}
+            onClick={() => onReply(mensagem)}
+          >
+            Responder
+          </button>
         )}
         <p className={cn(
           'text-xs mt-1',
