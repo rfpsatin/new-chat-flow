@@ -299,14 +299,13 @@ function ImportContatosDialog({
       id: number;
       nome: string;
       whatsapp_numero: string;
-      email: string;
       status: 'pending' | 'valid' | 'invalid';
       reason?: string;
     }[]
   >([]);
   const [importLog, setImportLog] = useState<{
     imported: number;
-    invalid: { nome: string | null; whatsapp_numero: string; email: string | null; reason?: string }[];
+    invalid: { nome: string | null; whatsapp_numero: string; reason?: string }[];
   } | null>(null);
 
   const normalizePhone = (raw: string) => raw.replace(/\D/g, '');
