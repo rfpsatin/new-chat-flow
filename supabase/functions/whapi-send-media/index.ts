@@ -286,6 +286,8 @@ Deno.serve(async (req) => {
 
     const conteudo = buildConteudoForMedia(media_kind, filename, caption)
 
+    const whapiMessageId = whapiData?.messages?.[0]?.id ?? null
+
     const { error: insertError } = await supabase.from('mensagens_ativas').insert({
       empresa_id,
       conversa_id,
@@ -298,6 +300,8 @@ Deno.serve(async (req) => {
       media_kind,
       media_filename: filename ?? null,
       media_mime: mime_type ?? null,
+      whatsapp_message_id: whapiMessageId,
+      reply_to_whatsapp_id: body.reply_to_whatsapp_id ?? null,
     })
 
     if (insertError) {

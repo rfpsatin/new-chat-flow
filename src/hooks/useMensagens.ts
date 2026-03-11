@@ -89,7 +89,7 @@ export function useEnviarMensagem() {
       const isHuman = humanMode === true;
       const whapiBody = `#\"human_mode=${isHuman ? 'true' : 'false'}\"# ${conteudo}`;
 
-      const { error: whapiError } = await supabase.functions.invoke('whapi-send-message', {
+      const { data: sendResult, error: whapiError } = await supabase.functions.invoke('whapi-send-message', {
         body: {
           empresa_id: empresaId,
           to: contato.whatsapp_numero,
@@ -100,6 +100,9 @@ export function useEnviarMensagem() {
 
       if (whapiError) throw new Error(whapiError.message || 'Erro ao enviar mensagem via Whapi');
 
+      // Capturar o whatsapp_message_id retornado pelo Whapi
+      const whapiMessageId = sendResult?.message_id ?? null;
+
       // Inserir mensagem diretamente no banco (webhook ignora from_me=true)
       await supabase.from('mensagens_ativas').insert({
         empresa_id: empresaId,
@@ -109,6 +112,7 @@ export function useEnviarMensagem() {
         tipo_remetente: 'agente',
         remetente_id: remetenteId,
         conteudo: conteudo,
+        whatsapp_message_id: whapiMessageId,
         reply_to_message_id: replyToMessageId ?? null,
         reply_to_whatsapp_id: replyToWhatsappId ?? null,
       });

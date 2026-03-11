@@ -270,6 +270,7 @@ Deno.serve(async (req) => {
               tipo_remetente: 'bot',
               conteudo: conteudoLimpo,
               payload: message,
+              whatsapp_message_id: message.id,
             })
 
           if (outMsgError) {
