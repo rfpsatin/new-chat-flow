@@ -117,16 +117,15 @@ function parseCsvLines(text: string): ImportRow[] {
     return rows;
   }
 
-  // Caso 2: formato simples "nome;whatsapp;email" ou "nome,whatsapp,email"
+  // Caso 2: formato simples "nome;whatsapp" ou "nome,whatsapp"
   for (const line of rawLines) {
     const parts = line.split(/[;,]/).map((p) => stripQuotes(p));
     if (parts.length === 0) continue;
-    const [nome, whatsapp, email] = parts;
-    if (!whatsapp || whatsapp === 'whatsapp_numero') continue; // ignora cabeçalho simples
+    const [nome, whatsapp] = parts;
+    if (!whatsapp || whatsapp === 'whatsapp_numero') continue;
     rows.push({
       nome: normalizeNameField(nome || ''),
       whatsapp_numero: normalizePhoneField(whatsapp),
-      email: email ? stripQuotes(email) : null,
     });
   }
 
