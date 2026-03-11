@@ -41,10 +41,11 @@ function stripQuotes(value: string): string {
 
 function normalizeNameField(raw: string): string {
   const v = stripQuotes(raw);
-  // Remove acentuação
   return v
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/["'`«»\u201C\u201D\u2018\u2019]/g, '') // aspas restantes
+    .replace(/[\x00-\x1F\x7F]/g, '')                  // controle
+    .replace(/[^a-zA-ZÀ-ÿ\s\-\.]/g, '')               // mantém letras (com acento), espaço, hífen, ponto
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
