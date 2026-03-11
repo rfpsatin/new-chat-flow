@@ -63,6 +63,15 @@ async function getCallerTenant(req: Request, supabaseUrl: string, serviceRoleKey
   }
 }
 
+function sanitizeName(name: string | null | undefined): string {
+  if (!name) return ''
+  return String(name)
+    .replace(/["'`«»\u201C\u201D\u2018\u2019]/g, '') // Remove all quote types
+    .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
+    .replace(/\s+/g, ' ') // Collapse multiple spaces
+    .trim()
+}
+
 function normalizePhone(raw: string | null | undefined): string | null {
   if (!raw) return null
   const digits = String(raw).replace(/\D/g, '')
@@ -124,7 +133,7 @@ Deno.serve(async (req) => {
 
       validRows.push({
         empresa_id: empresaId,
-        nome: r.nome?.trim() || null,
+        nome: sanitizeName(r.nome) || null,
         whatsapp_numero: normalized,
       })
     }
