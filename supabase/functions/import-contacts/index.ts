@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    const validRows: { empresa_id: string; nome: string | null; whatsapp_numero: string; email: string | null }[] = []
+    const validRows: { empresa_id: string; nome: string | null; whatsapp_numero: string }[] = []
     const invalidRows: { row: ImportRow; reason: string }[] = []
 
     for (const r of rows) {
