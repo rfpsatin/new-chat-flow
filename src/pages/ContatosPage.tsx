@@ -362,7 +362,7 @@ function ImportContatosDialog({
     toast.success(`Validação concluída. ${validCount} válido(s), ${invalidCount} com problema.`);
   };
 
-  const handleCellChange = (id: number, field: 'nome' | 'whatsapp_numero' | 'email', value: string) => {
+  const handleCellChange = (id: number, field: 'nome' | 'whatsapp_numero', value: string) => {
     setRows((prev) =>
       prev.map((row) =>
         row.id === id
