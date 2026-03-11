@@ -23,6 +23,17 @@ type CallerTenant = {
   tipoUsuario: 'adm' | 'sup' | 'opr'
 }
 
+function extractWhapiMessageId(whapiData: any): string | null {
+  return (
+    whapiData?.message?.id ??
+    whapiData?.message?.message_id ??
+    whapiData?.messages?.[0]?.id ??
+    whapiData?.messages?.[0]?.message_id ??
+    whapiData?.id ??
+    null
+  )
+}
+
 async function getCallerTenant(req: Request, supabaseUrl: string, serviceRoleKey: string): Promise<CallerTenant> {
   const authHeader = req.headers.get('Authorization')
   if (!authHeader) throw new Error('Nao autorizado')

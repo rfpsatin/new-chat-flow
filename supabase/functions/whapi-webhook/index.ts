@@ -76,6 +76,7 @@ interface WhapiMessage {
   context?: {
     id?: string
     message_id?: string
+    quoted_id?: string
   }
 }
 
