@@ -486,17 +486,16 @@ function ImportContatosDialog({
               </div>
               <ScrollArea className="h-[260px] rounded-md border">
                 <div className="min-w-full text-xs">
-                  <div className="grid grid-cols-[2fr,2fr,2fr,1fr,2fr] gap-1 px-2 py-1 border-b bg-muted/50 font-medium">
+                  <div className="grid grid-cols-[2fr,2fr,1fr,2fr] gap-1 px-2 py-1 border-b bg-muted/50 font-medium">
                     <span>Nome</span>
                     <span>WhatsApp</span>
-                    <span>Email</span>
                     <span>Status</span>
                     <span>Motivo</span>
                   </div>
                   {rows.map((row) => (
                     <div
                       key={row.id}
-                      className="grid grid-cols-[2fr,2fr,2fr,1fr,2fr] gap-1 px-2 py-1 border-b last:border-b-0 items-center"
+                      className="grid grid-cols-[2fr,2fr,1fr,2fr] gap-1 px-2 py-1 border-b last:border-b-0 items-center"
                     >
                       <Input
                         value={row.nome}
@@ -506,11 +505,6 @@ function ImportContatosDialog({
                       <Input
                         value={row.whatsapp_numero}
                         onChange={(e) => handleCellChange(row.id, 'whatsapp_numero', e.target.value)}
-                        className="h-7 text-xs"
-                      />
-                      <Input
-                        value={row.email}
-                        onChange={(e) => handleCellChange(row.id, 'email', e.target.value)}
                         className="h-7 text-xs"
                       />
                       <span

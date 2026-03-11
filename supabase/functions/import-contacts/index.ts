@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           error: 'No rows provided',
-          example_row: { nome: 'Joao da Silva', whatsapp_numero: '5544999999999', email: 'joao@exemplo.com' },
+          example_row: { nome: 'Joao da Silva', whatsapp_numero: '5544999999999' },
         }),
         {
           status: 400,
