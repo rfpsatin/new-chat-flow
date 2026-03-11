@@ -168,3 +168,62 @@ export function useAdicionarDestinatarios() {
     },
   });
 }
+
+export function useExcluirCampanha() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, { id: string }>({
+    mutationFn: async ({ id }) => {
+      const { error } = await sb
+        .from('campanhas')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: ['campanhas'] });
+      qc.invalidateQueries({ queryKey: ['campanha', id] });
+      qc.invalidateQueries({ queryKey: ['campanhas-stats'] });
+    },
+  });
+}
+
+export function useReagendarErrosCampanha() {
+  const qc = useQueryClient();
+  return useMutation<
+    void,
+    Error,
+    { campanhaId: string; agendado_para: string }
+  >({
+    mutationFn: async ({ campanhaId, agendado_para }) => {
+      const nowIso = new Date().toISOString();
+
+      // Volta apenas os destinatários com erro_envio para pendente
+      const { error: destError } = await sb
+        .from('campanha_destinatarios')
+        .update({
+          status_envio: 'pendente',
+          updated_at: nowIso,
+        })
+        .eq('campanha_id', campanhaId)
+        .eq('status_envio', 'erro_envio');
+      if (destError) throw destError;
+
+      // Reagenda a campanha
+      const { error: campError } = await sb
+        .from('campanhas')
+        .update({
+          status: 'agendada',
+          agendado_para,
+          updated_at: nowIso,
+        })
+        .eq('id', campanhaId);
+      if (campError) throw campError;
+    },
+    onSuccess: (_, { campanhaId }) => {
+      qc.invalidateQueries({ queryKey: ['campanhas'] });
+      qc.invalidateQueries({ queryKey: ['campanha', campanhaId] });
+      qc.invalidateQueries({ queryKey: ['campanha-destinatarios', campanhaId] });
+      qc.invalidateQueries({ queryKey: ['campanhas-stats'] });
+    },
+  });
+}
