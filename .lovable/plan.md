@@ -1,43 +1,34 @@
 
 
-## Problema: Mensagem de campanha enviada em duplicidade
+## Diagnóstico
 
-### Causa raiz
+Dois problemas encontrados:
 
-O `run-campaigns` está enviando cada mensagem **duas vezes**:
+1. **`import-contacts` não está registrada no `config.toml`** — sem registro, a função não é deployada, resultando em 500 ao invocar.
 
-1. **Linha 122** - Chama `whapi-send-message` diretamente (envia no WhatsApp)
-2. **Linha 142** - Chama `start-conversation`, que **internamente também chama** `whapi-send-message` (envia no WhatsApp de novo) e registra em `mensagens_ativas`
+2. **Campo `email` inexistente na tabela `contatos`** — a edge function tenta fazer upsert com `email`, mas a tabela não tem essa coluna, causando erro no banco.
 
-Resultado: o contato recebe a mesma mensagem duas vezes no WhatsApp.
+Além disso, o "carregando sem fim" provavelmente ocorre porque o erro 500 é capturado mas o estado `isSubmitting` pode não estar sendo resetado corretamente, ou a resposta do erro não está sendo parseada adequadamente pelo `supabase.functions.invoke`.
 
-### Solução
+## Plano
 
-Remover a chamada direta ao `whapi-send-message` (linhas 110-133) e usar **somente** o `start-conversation`, que já faz tudo:
-- Envia a mensagem via WhatsApp (com marcador de `human_mode`)
-- Registra em `mensagens_ativas`
-- Cria/reutiliza conversa
-- Atribui agente se necessário
+### 1. Atualizar `supabase/functions/import-contacts/index.ts`
+- Remover `email` da interface `ImportRow`
+- Remover `email` do objeto de upsert (`validRows`)
+- Remover `email` do exemplo de resposta 400
 
-### Alteração no `run-campaigns/index.ts`
+### 2. Atualizar `src/pages/ContatosPage.tsx`
+- Remover campo `email` do tipo `ImportRow` (linha 28)
+- Remover coluna `email` da tabela de preview e do estado `rows`
+- Remover `email` do `handleCellChange`
+- Remover `email` do payload enviado ao servidor
+- Remover `email` do template CSV de download
 
-Substituir o fluxo atual (send + start-conversation separados) por uma única chamada ao `start-conversation`, verificando o resultado para marcar o destinatário como `enviado` ou `erro_envio`. Basicamente:
-
-```
-// ANTES (duplicado):
-// 1. fetch(whapi-send-message) → envia WhatsApp
-// 2. fetch(start-conversation) → envia WhatsApp DE NOVO + cria conversa
-
-// DEPOIS (correto):
-// 1. fetch(start-conversation) → envia WhatsApp + cria conversa (tudo em um)
+### 3. Registrar no `supabase/config.toml`
+```toml
+[functions.import-contacts]
+verify_jwt = true
 ```
 
-O loop do `for (const dest of destinatarios)` ficará:
-- Marca destinatário como `enviando`
-- Chama `start-conversation` com `empresa_id`, `contato_id`, `mensagem_inicial`, `origem_inicial: 'campanha'`, `origem_final`, `campanha_id`
-- Se sucesso: marca `enviado` e salva `conversa_id` retornado
-- Se erro: marca `erro_envio`
-
-### Arquivo alterado
-- `supabase/functions/run-campaigns/index.ts`
+### 4. Deploy da edge function `import-contacts`
 
