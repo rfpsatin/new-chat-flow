@@ -430,7 +430,10 @@ export type Database = {
           media_url: string | null
           payload: Json | null
           remetente_id: string | null
+          reply_to_message_id: number | null
+          reply_to_whatsapp_id: string | null
           tipo_remetente: string
+          whatsapp_message_id: string | null
         }
         Insert: {
           contato_id: string
@@ -446,7 +449,10 @@ export type Database = {
           media_url?: string | null
           payload?: Json | null
           remetente_id?: string | null
+          reply_to_message_id?: number | null
+          reply_to_whatsapp_id?: string | null
           tipo_remetente: string
+          whatsapp_message_id?: string | null
         }
         Update: {
           contato_id?: string
@@ -462,7 +468,10 @@ export type Database = {
           media_url?: string | null
           payload?: Json | null
           remetente_id?: string | null
+          reply_to_message_id?: number | null
+          reply_to_whatsapp_id?: string | null
           tipo_remetente?: string
+          whatsapp_message_id?: string | null
         }
         Relationships: [
           {
