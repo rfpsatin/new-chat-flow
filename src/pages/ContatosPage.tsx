@@ -79,6 +79,42 @@ function normalizePhoneField(raw: string): string {
   return original;
 }
 
+type PhoneValidationResult = {
+  ok: boolean;
+  normalizedDigits: string | null;
+  reason?: string;
+};
+
+function validatePhoneWithDdd(raw: string): PhoneValidationResult {
+  const digitsOnly = String(raw || '').replace(/\D/g, '');
+  if (!digitsOnly) {
+    return { ok: false, normalizedDigits: null, reason: 'Numero vazio' };
+  }
+
+  const withoutCountry = digitsOnly.startsWith('55') ? digitsOnly.slice(2) : digitsOnly;
+
+  if (withoutCountry.length === 8 || withoutCountry.length === 9) {
+    return {
+      ok: false,
+      normalizedDigits: null,
+      reason: 'Numero sem DDD. Inclua o DDD (ex.: 44).',
+    };
+  }
+
+  if (withoutCountry.length === 10 || withoutCountry.length === 11) {
+    return {
+      ok: true,
+      normalizedDigits: digitsOnly.startsWith('55') ? digitsOnly : `55${withoutCountry}`,
+    };
+  }
+
+  return {
+    ok: false,
+    normalizedDigits: null,
+    reason: 'Numero invalido. Use DDD + numero (10 ou 11 digitos locais).',
+  };
+}
+
 function normalizeHeaderField(value: string): string {
   return stripQuotes(value)
     .normalize('NFD')
@@ -450,13 +486,9 @@ function ImportContatosDialog({
     invalid: { nome: string | null; whatsapp_numero: string; reason?: string }[];
   } | null>(null);
 
-  const normalizePhone = (raw: string) => raw.replace(/\D/g, '');
-
   const validateRow = (whatsapp_numero: string): string | null => {
-    const digits = normalizePhone(whatsapp_numero);
-    if (!digits) return 'Número vazio';
-    if (digits.length < 10 || digits.length > 15) return 'Número inválido (esperado 10 a 15 dígitos)';
-    return null;
+    const result = validatePhoneWithDdd(whatsapp_numero);
+    return result.ok ? null : result.reason || 'Numero invalido';
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -862,9 +894,9 @@ export default function ContatosPage() {
   const handleSalvarContato = async () => {
     if (!selectedContato) return;
     const nome = editNome.trim() || null;
-    const digits = editWhatsapp.replace(/\D/g, '');
-    if (!digits) {
-      toast.error('Informe um número de WhatsApp válido.');
+    const validation = validatePhoneWithDdd(editWhatsapp);
+    if (!validation.ok || !validation.normalizedDigits) {
+      toast.error(validation.reason || 'Informe um numero de WhatsApp valido com DDD.');
       return;
     }
       const formattedPhone = normalizePhoneField(editWhatsapp);
@@ -874,7 +906,7 @@ export default function ContatosPage() {
         .from('contatos')
         .update({
           nome,
-          whatsapp_numero: digits,
+          whatsapp_numero: validation.normalizedDigits,
             telefone_numero: formattedPhone || null,
         })
         .eq('id', selectedContato.id);
@@ -885,7 +917,7 @@ export default function ContatosPage() {
       const updated: Contato = {
         ...selectedContato,
         nome,
-        whatsapp_numero: digits,
+        whatsapp_numero: validation.normalizedDigits,
         telefone_numero: formattedPhone || null,
       };
       setSelectedContato(updated);

@@ -105,9 +105,30 @@ function normalizePhone(raw: string | null | undefined): string | null {
   if (!raw) return null
   const digits = String(raw).replace(/\D/g, '')
   if (!digits) return null
-  // Aceita entre 10 e 15 dígitos (com DDI)
-  if (digits.length < 10 || digits.length > 15) return null
-  return digits
+
+  const localDigits = digits.startsWith('55') ? digits.slice(2) : digits
+
+  // Aceita apenas números com DDD:
+  // - 10 dígitos locais (DDD + fixo)
+  // - 11 dígitos locais (DDD + celular)
+  if (localDigits.length !== 10 && localDigits.length !== 11) return null
+
+  return digits.startsWith('55') ? digits : `55${localDigits}`
+}
+
+function validatePhoneReason(raw: string | null | undefined): string | null {
+  const digits = String(raw ?? '').replace(/\D/g, '')
+  if (!digits) return 'numero vazio'
+
+  const localDigits = digits.startsWith('55') ? digits.slice(2) : digits
+  if (localDigits.length === 8 || localDigits.length === 9) {
+    return 'numero sem DDD'
+  }
+  if (localDigits.length !== 10 && localDigits.length !== 11) {
+    return 'numero invalido'
+  }
+
+  return null
 }
 
 Deno.serve(async (req) => {
@@ -164,7 +185,7 @@ Deno.serve(async (req) => {
     for (const r of rows) {
       const normalized = normalizePhone(r.whatsapp_numero)
       if (!normalized) {
-        invalidRows.push({ row: r, reason: 'whatsapp_numero invalido' })
+        invalidRows.push({ row: r, reason: validatePhoneReason(r.whatsapp_numero) ?? 'whatsapp_numero invalido' })
         continue
       }
 
