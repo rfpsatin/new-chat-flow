@@ -69,6 +69,23 @@ function normalizePhoneField(raw: string): string {
   let digits = original.replace(/\D/g, '');
   if (!digits) return '';
 
+  // Números antigos com prefixo de operadora/DDD começando com 0
+  // Exemplos:
+  // - 01544999775611  -> 0 + 15 (operadora) + 44 (DDD) + 999775611
+  // - 044988232882    -> 0 + 44 (DDD) + 988232882
+  if (digits.startsWith('0')) {
+    const withoutZero = digits.slice(1);
+
+    // Caso comum: 0 + XX + DDD + 9 dígitos (total 14 dígitos com o zero; 13 sem o zero).
+    // Se após remover o zero temos 13 dígitos mas NÃO começa com 55,
+    // assumimos que os 2 primeiros dígitos são código de operadora (ex.: 15, 21 etc.) e removemos.
+    if (withoutZero.length === 13 && !withoutZero.startsWith('55')) {
+      digits = withoutZero.slice(2);
+    } else {
+      digits = withoutZero;
+    }
+  }
+
   // se vier DDD + número (10 ou 11) sem 55, prefixa 55
   if (!digits.startsWith('55') && (digits.length === 10 || digits.length === 11)) {
     digits = `55${digits}`;
