@@ -199,7 +199,15 @@ Deno.serve(async (req) => {
       })
     }
 
-    if (!validRows.length) {
+    // Deduplicate by whatsapp_numero – keep last occurrence (overwrites earlier rows)
+    const deduped = new Map<string, typeof validRows[number]>()
+    for (const row of validRows) {
+      deduped.set(row.whatsapp_numero, row)
+    }
+    const uniqueRows = Array.from(deduped.values())
+    const duplicatesRemoved = validRows.length - uniqueRows.length
+
+    if (!uniqueRows.length) {
       return new Response(
         JSON.stringify({
           error: 'Nenhuma linha valida para importar',
@@ -215,7 +223,7 @@ Deno.serve(async (req) => {
     // Upsert por (empresa_id, whatsapp_numero) – assume que existe unique index ou que nao ha conflito grave
     const { error: upsertError, count } = await supabase
       .from('contatos')
-      .upsert(validRows, {
+      .upsert(uniqueRows, {
         onConflict: 'empresa_id,whatsapp_numero',
         ignoreDuplicates: false,
         count: 'exact',
@@ -240,7 +248,8 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        imported: count ?? validRows.length,
+        imported: count ?? uniqueRows.length,
+        duplicates_removed: duplicatesRemoved,
         invalid: invalidRows.length,
         invalid_rows: invalidRows,
       }),
