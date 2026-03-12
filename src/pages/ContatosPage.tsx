@@ -525,8 +525,11 @@ function ImportContatosDialog({
     URL.revokeObjectURL(url);
   };
 
-  const validateRow = (whatsapp_numero: string): string | null => {
-    const result = validatePhoneWithDdd(whatsapp_numero);
+  const validateRow = (row: { nome: string; whatsapp_numero: string }): string | null => {
+    const nomeLimpo = (row.nome || '').trim();
+    if (!nomeLimpo) return 'Nome obrigatorio';
+
+    const result = validatePhoneWithDdd(row.whatsapp_numero);
     return result.ok ? null : result.reason || 'Numero invalido';
   };
 
@@ -562,7 +565,7 @@ function ImportContatosDialog({
       return;
     }
     const validated = rows.map((row) => {
-      const err = validateRow(row.whatsapp_numero);
+      const err = validateRow({ nome: row.nome, whatsapp_numero: row.whatsapp_numero });
       return {
         ...row,
         status: (err ? 'invalid' : 'valid') as 'invalid' | 'pending' | 'valid',

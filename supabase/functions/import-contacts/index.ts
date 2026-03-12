@@ -183,6 +183,12 @@ Deno.serve(async (req) => {
     const invalidRows: { row: ImportRow; reason: string }[] = []
 
     for (const r of rows) {
+      const sanitizedName = sanitizeName(r.nome)
+      if (!sanitizedName) {
+        invalidRows.push({ row: r, reason: 'nome obrigatorio' })
+        continue
+      }
+
       const normalized = normalizePhone(r.whatsapp_numero)
       if (!normalized) {
         invalidRows.push({ row: r, reason: validatePhoneReason(r.whatsapp_numero) ?? 'whatsapp_numero invalido' })
@@ -191,7 +197,7 @@ Deno.serve(async (req) => {
 
       validRows.push({
         empresa_id: empresaId,
-        nome: sanitizeName(r.nome) || null,
+        nome: sanitizedName,
         whatsapp_numero: normalized,
         telefone_numero: normalizeOriginalPhone(r.whatsapp_numero),
         tp_contato: 'I',
