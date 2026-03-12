@@ -220,55 +220,100 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Upsert por (empresa_id, whatsapp_numero) com fallback caso colunas tp_contato/tag_origem nao existam
-    let upsertError: any = null
-    let count: number | null = null
+    // Processa em lotes pequenos para evitar que um erro impeça o restante do batch
+    // e para não travar o banco com um único upsert gigante.
+    const BATCH_SIZE = 10
+    let totalInserted = 0
 
-    const { error: err1, count: cnt1 } = await supabase
-      .from('contatos')
-      .upsert(uniqueRows, {
-        onConflict: 'empresa_id,whatsapp_numero',
-        ignoreDuplicates: false,
-        count: 'exact',
-      })
+    for (let i = 0; i < uniqueRows.length; i += BATCH_SIZE) {
+      const batch = uniqueRows.slice(i, i + BATCH_SIZE)
 
-    if (err1 && (err1.message?.includes('tp_contato') || err1.message?.includes('tag_origem'))) {
-      console.warn(`[${requestId}] Fallback: removendo tp_contato/tag_origem do upsert`)
-      const fallbackRows = uniqueRows.map(({ tp_contato, tag_origem, ...rest }) => rest)
-      const { error: err2, count: cnt2 } = await supabase
+      // 1) Tenta upsert do lote inteiro com ignoreDuplicates=true
+      let batchRows = batch
+      let batchError: any = null
+      let batchCount: number | null = null
+
+      const { error: err1, count: cnt1 } = await supabase
         .from('contatos')
-        .upsert(fallbackRows, {
+        .upsert(batchRows, {
           onConflict: 'empresa_id,whatsapp_numero',
-          ignoreDuplicates: false,
+          // se já existir (empresa_id, whatsapp_numero), ignora o registro novo
+          ignoreDuplicates: true,
           count: 'exact',
         })
-      upsertError = err2
-      count = cnt2
-    } else {
-      upsertError = err1
-      count = cnt1
-    }
 
-    if (upsertError) {
-      console.error(`[${requestId}] Upsert error:`, upsertError)
-      return new Response(
-        JSON.stringify({
-          error: 'Erro ao importar contatos',
-          details: upsertError.message,
-          imported: 0,
-          invalid_rows: invalidRows,
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        },
-      )
+      if (err1 && (err1.message?.includes('tp_contato') || err1.message?.includes('tag_origem'))) {
+        console.warn(`[${requestId}] Fallback em lote: removendo tp_contato/tag_origem`)
+        const fallbackRows = batchRows.map(({ tp_contato, tag_origem, ...rest }) => rest)
+        const { error: err2, count: cnt2 } = await supabase
+          .from('contatos')
+          .upsert(fallbackRows, {
+            onConflict: 'empresa_id,whatsapp_numero',
+            ignoreDuplicates: true,
+            count: 'exact',
+          })
+        batchError = err2
+        batchCount = cnt2
+      } else {
+        batchError = err1
+        batchCount = cnt1
+      }
+
+      if (!batchError) {
+        // Lote inteiro processado com sucesso
+        totalInserted += batchCount ?? 0
+        continue
+      }
+
+      // 2) Se o lote falhar, faz fallback linha a linha para não perder os demais registros
+      console.warn(`[${requestId}] Erro no lote, fallback linha a linha:`, batchError)
+
+      for (const row of batch) {
+        let singleRow: typeof uniqueRows[number] | Omit<typeof uniqueRows[number], 'tp_contato' | 'tag_origem'> = row
+        let singleError: any = null
+        let singleCount: number | null = null
+
+        const { error: sErr1, count: sCnt1 } = await supabase
+          .from('contatos')
+          .upsert(singleRow, {
+            onConflict: 'empresa_id,whatsapp_numero',
+            ignoreDuplicates: true,
+            count: 'exact',
+          })
+
+        if (sErr1 && (sErr1.message?.includes('tp_contato') || sErr1.message?.includes('tag_origem'))) {
+          const { tp_contato, tag_origem, ...rest } = singleRow as any
+          singleRow = rest
+          const { error: sErr2, count: sCnt2 } = await supabase
+            .from('contatos')
+            .upsert(singleRow, {
+              onConflict: 'empresa_id,whatsapp_numero',
+              ignoreDuplicates: true,
+              count: 'exact',
+            })
+          singleError = sErr2
+          singleCount = sCnt2
+        } else {
+          singleError = sErr1
+          singleCount = sCnt1
+        }
+
+        if (singleError) {
+          console.error(`[${requestId}] Erro ao importar contato individual:`, singleError)
+          invalidRows.push({
+            row: { nome: row.nome, whatsapp_numero: row.whatsapp_numero },
+            reason: singleError.message ?? 'erro ao importar contato',
+          })
+        } else {
+          totalInserted += singleCount ?? 0
+        }
+      }
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        imported: count ?? uniqueRows.length,
+        imported: totalInserted,
         duplicates_removed: duplicatesRemoved,
         invalid: invalidRows.length,
         invalid_rows: invalidRows,
