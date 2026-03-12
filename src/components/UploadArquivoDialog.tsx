@@ -146,7 +146,7 @@ export function UploadArquivoDialog({
   };
 
   const disabled =
-    !canRespond || !contatoId || !remetenteId || enviarArquivo.isPending || !file;
+    !canRespond || !contatoId || !remetenteId || !whatsappNumero || enviarArquivo.isPending || !file;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
