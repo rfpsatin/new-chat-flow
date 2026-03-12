@@ -86,9 +86,15 @@ function normalizePhoneField(raw: string): string {
     }
   }
 
-  // se vier DDD + número (10 ou 11) sem 55, prefixa 55
-  if (!digits.startsWith('55') && (digits.length === 10 || digits.length === 11)) {
-    digits = `55${digits}`;
+  if (!digits.startsWith('55')) {
+    // Se vier apenas número local (8 ou 9 dígitos), assumir DDD 44 e país 55 => 5544 + local
+    if (digits.length === 8 || digits.length === 9) {
+      digits = `5544${digits}`;
+    }
+    // Se vier DDD + número (10 ou 11) sem 55, prefixa 55
+    else if (digits.length === 10 || digits.length === 11) {
+      digits = `55${digits}`;
+    }
   }
 
   // retorna só dígitos, ex: 5544999999999
