@@ -24,8 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useEmpresa } from '@/hooks/useEmpresa';
 import {
   Dialog,
   DialogContent,
@@ -50,19 +49,7 @@ export default function UsuariosPage() {
   const empresaId = currentUser?.empresa_id ?? '';
   
   const { usuarios, isLoading, criarUsuario, editarUsuario, toggleAtivoUsuario, criarAcesso } = useGestaoUsuarios(empresaId);
-  const { data: empresaAtual } = useQuery({
-    queryKey: ['empresa-atual-nome', empresaId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('empresas')
-        .select('id, razao_social, nome_fantasia')
-        .eq('id', empresaId)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!empresaId,
-  });
+  const { empresa: empresaAtual } = useEmpresa(empresaId);
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [usuarioEditando, setUsuarioEditando] = useState<UsuarioComAtendente | null>(null);
