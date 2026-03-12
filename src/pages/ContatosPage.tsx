@@ -486,6 +486,33 @@ function ImportContatosDialog({
     invalid: { nome: string | null; whatsapp_numero: string; reason?: string }[];
   } | null>(null);
 
+  const handleDownloadInvalidReport = () => {
+    if (!importLog?.invalid.length) {
+      toast.error('Nao ha contatos rejeitados para gerar relatorio.');
+      return;
+    }
+
+    const lines = ['nome;whatsapp_numero;motivo'];
+    importLog.invalid.forEach((item) => {
+      const nome = csvEscapeField((item.nome ?? '').trim());
+      const numero = csvEscapeField((item.whatsapp_numero ?? '').trim());
+      const motivo = csvEscapeField((item.reason ?? 'Nao informado').trim());
+      lines.push(`${nome};${numero};${motivo}`);
+    });
+
+    const content = `${lines.join('\n')}\n`;
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const baseName = (fileName || 'contatos').replace(/\.csv$/i, '');
+    a.href = url;
+    a.download = `${baseName}_rejeitados.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const validateRow = (whatsapp_numero: string): string | null => {
     const result = validatePhoneWithDdd(whatsapp_numero);
     return result.ok ? null : result.reason || 'Numero invalido';
@@ -574,6 +601,13 @@ function ImportContatosDialog({
         nome: r.nome || null,
         whatsapp_numero: r.whatsapp_numero,
       }));
+      const invalidSkippedBeforeImport = rows
+        .filter((r) => r.status !== 'valid')
+        .map((r) => ({
+          nome: r.nome || null,
+          whatsapp_numero: r.whatsapp_numero,
+          reason: r.reason || (r.status === 'pending' ? 'Nao validado antes da importacao' : 'Numero invalido'),
+        }));
 
       const { data, error } = await supabase.functions.invoke('import-contacts', {
         body: { rows: payloadRows, import_tag: fileName || null },
@@ -590,16 +624,19 @@ function ImportContatosDialog({
           (data.invalid_rows as { row: ImportRow; reason?: string }[] | undefined) ?? [];
         setImportLog({
           imported: data.imported ?? ready.length,
-          invalid: invalidFromServer.map((item) => ({
-            nome: item.row.nome ?? null,
-            whatsapp_numero: item.row.whatsapp_numero,
-            reason: item.reason,
-          })),
+          invalid: [
+            ...invalidSkippedBeforeImport,
+            ...invalidFromServer.map((item) => ({
+              nome: item.row.nome ?? null,
+              whatsapp_numero: item.row.whatsapp_numero,
+              reason: item.reason,
+            })),
+          ],
         });
         toast.success(
           `Importação concluída. ${data.imported ?? ready.length} importado(s), ${
-            invalidFromServer.length
-          } rejeitado(s) no servidor.`,
+            invalidFromServer.length + invalidSkippedBeforeImport.length
+          } nao adicionado(s).`,
         );
       }
     } catch (err) {
@@ -727,9 +764,14 @@ function ImportContatosDialog({
               </p>
               {importLog.invalid.length > 0 && (
                 <div>
-                  <p className="text-muted-foreground mb-1">
-                    Linhas rejeitadas (corrija na planilha de origem se necessário):
-                  </p>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <p className="text-muted-foreground">
+                      Linhas rejeitadas (corrija na planilha de origem se necessário):
+                    </p>
+                    <Button type="button" variant="outline" size="sm" onClick={handleDownloadInvalidReport}>
+                      Gerar relatório
+                    </Button>
+                  </div>
                   <ScrollArea className="h-[120px] rounded-md border">
                     <div className="px-2 py-1 space-y-1">
                       {importLog.invalid.map((item, idx) => (
