@@ -608,6 +608,8 @@ function ImportContatosDialog({
 export default function ContatosPage() {
   const navigate = useNavigate();
   const { empresaId } = useApp();
+  const queryClient = useQueryClient();
+  const [searchTerm, setSearchTerm] = useState('');
   const {
     data: contatos,
     isLoading,
@@ -615,8 +617,6 @@ export default function ContatosPage() {
     hasNextPage,
     isFetchingNextPage,
   } = useContatosInfinite(empresaId, searchTerm);
-  const queryClient = useQueryClient();
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedContato, setSelectedContato] = useState<Contato | null>(null);
   const { data: historico } = useHistoricoContato(selectedContato?.id || null);
   const [selectedHistorico, setSelectedHistorico] = useState<HistoricoConversa | null>(null);
