@@ -486,14 +486,27 @@ function ImportContatosDialog({
     invalid: { nome: string | null; whatsapp_numero: string; reason?: string }[];
   } | null>(null);
 
+  const invalidRowsFromGrid = rows
+    .filter((r) => r.status === 'invalid')
+    .map((r) => ({
+      nome: r.nome || null,
+      whatsapp_numero: r.whatsapp_numero,
+      reason: r.reason || 'Numero invalido',
+    }));
+
+  const invalidRowsForReport = [
+    ...invalidRowsFromGrid,
+    ...(importLog?.invalid ?? []),
+  ];
+
   const handleDownloadInvalidReport = () => {
-    if (!importLog?.invalid.length) {
+    if (!invalidRowsForReport.length) {
       toast.error('Nao ha contatos rejeitados para gerar relatorio.');
       return;
     }
 
     const lines = ['nome;whatsapp_numero;motivo'];
-    importLog.invalid.forEach((item) => {
+    invalidRowsForReport.forEach((item) => {
       const nome = csvEscapeField((item.nome ?? '').trim());
       const numero = csvEscapeField((item.whatsapp_numero ?? '').trim());
       const motivo = csvEscapeField((item.reason ?? 'Nao informado').trim());
@@ -697,6 +710,13 @@ function ImportContatosDialog({
                   {rows.filter((r) => r.status === 'invalid').length}
                 </span>
               </div>
+              {invalidRowsForReport.length > 0 && (
+                <div className="flex justify-end">
+                  <Button type="button" variant="outline" size="sm" onClick={handleDownloadInvalidReport}>
+                    Gerar relatório de erros
+                  </Button>
+                </div>
+              )}
               <ScrollArea className="h-[260px] rounded-md border">
                 <div className="min-w-full text-xs">
                   <div className="grid grid-cols-[2fr,2fr,1fr,2fr] gap-1 px-2 py-1 border-b bg-muted/50 font-medium">
@@ -764,14 +784,9 @@ function ImportContatosDialog({
               </p>
               {importLog.invalid.length > 0 && (
                 <div>
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <p className="text-muted-foreground">
-                      Linhas rejeitadas (corrija na planilha de origem se necessário):
-                    </p>
-                    <Button type="button" variant="outline" size="sm" onClick={handleDownloadInvalidReport}>
-                      Gerar relatório
-                    </Button>
-                  </div>
+                  <p className="text-muted-foreground mb-1">
+                    Linhas rejeitadas (corrija na planilha de origem se necessário):
+                  </p>
                   <ScrollArea className="h-[120px] rounded-md border">
                     <div className="px-2 py-1 space-y-1">
                       {importLog.invalid.map((item, idx) => (
