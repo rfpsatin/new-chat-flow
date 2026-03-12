@@ -230,7 +230,7 @@ export function SessaoCard({ sessao, onClose }: Props) {
                       {msg.tipo_remetente === 'bot' ? '🤖 Bot' : '👤 Agente'}
                     </div>
                   )}
-                  <FormattedHistoricoContent content={getHistoricoDisplayContent(msg)} isOutgoing={msg.direcao === 'out'} />
+                  <FormattedHistoricoContent content={getHistoricoDisplayContent({ conteudo: msg.conteudo, payload: msg.payload })} isOutgoing={msg.direcao === 'out'} />
                   <div className="text-xs opacity-70 mt-1 text-right">
                     {format(new Date(msg.criado_em), 'HH:mm', { locale: ptBR })}
                   </div>
