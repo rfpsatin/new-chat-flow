@@ -144,43 +144,35 @@ function gerarHorasCompletas(dados: { hora: number; total: number }[]): ContatoP
 export function useDashboardStats(empresaId: string, periodo: PeriodoFiltro, enabled = true) {
   const { inicio, fim, inicioAnterior, fimAnterior } = getDateRange(periodo);
 
-  // Query principal: KPIs do período atual
-  const { data: kpisAtual, isLoading: loadingKpisAtual } = useQuery({
-    queryKey: ['dashboard-kpis', empresaId, periodo, 'atual'],
+  // Query única de conversas encerradas no período atual
+  const { data: conversasPeriodo, isLoading: loadingConversasPeriodo } = useQuery({
+    queryKey: ['dashboard-conversas', empresaId, periodo],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('conversas')
-        .select('id, contato_id, created_at, encerrado_em')
+        .select(`
+          id,
+          contato_id,
+          created_at,
+          encerrado_em,
+          canal,
+          agente_responsavel_id,
+          motivo_encerramento_id,
+          status,
+          motivos_encerramento(descricao)
+        `)
         .eq('empresa_id', empresaId)
         .eq('status', 'encerrado')
         .gte('encerrado_em', inicio.toISOString())
         .lt('encerrado_em', fim.toISOString());
 
       if (error) throw error;
-
-      const atendimentos = data?.length || 0;
-      const clientesUnicos = new Set(data?.map(c => c.contato_id)).size;
-      
-      // Calcular TMA
-      let totalSegundos = 0;
-      let conversasComTempo = 0;
-      data?.forEach(c => {
-        if (c.encerrado_em && c.created_at) {
-          const duracao = (new Date(c.encerrado_em).getTime() - new Date(c.created_at).getTime()) / 1000;
-          if (duracao > 0) {
-            totalSegundos += duracao;
-            conversasComTempo++;
-          }
-        }
-      });
-      const tmaSegundos = conversasComTempo > 0 ? totalSegundos / conversasComTempo : 0;
-
-      return { atendimentos, clientesUnicos, tmaSegundos };
+      return data || [];
     },
-    enabled: !!empresaId && enabled
+    enabled: !!empresaId && enabled,
   });
 
-  // Query: KPIs do período anterior (para comparação)
+  // KPIs do período anterior (para comparação)
   const { data: kpisAnterior, isLoading: loadingKpisAnterior } = useQuery({
     queryKey: ['dashboard-kpis', empresaId, periodo, 'anterior'],
     queryFn: async () => {
@@ -196,13 +188,13 @@ export function useDashboardStats(empresaId: string, periodo: PeriodoFiltro, ena
 
       return {
         atendimentos: data?.length || 0,
-        clientesUnicos: new Set(data?.map(c => c.contato_id)).size
+        clientesUnicos: new Set(data?.map((c) => c.contato_id)).size,
       };
     },
-    enabled: !!empresaId && enabled
+    enabled: !!empresaId && enabled,
   });
 
-  // Query: Mensagens (enviadas e recebidas)
+  // Mensagens (enviadas e recebidas) no período atual
   const { data: mensagens, isLoading: loadingMensagens } = useQuery({
     queryKey: ['dashboard-mensagens', empresaId, periodo],
     queryFn: async () => {
@@ -215,14 +207,14 @@ export function useDashboardStats(empresaId: string, periodo: PeriodoFiltro, ena
 
       if (error) throw error;
 
-      const enviadas = data?.filter(m => m.direcao === 'out').length || 0;
-      const recebidas = data?.filter(m => m.direcao === 'in').length || 0;
+      const enviadas = data?.filter((m) => m.direcao === 'out').length || 0;
+      const recebidas = data?.filter((m) => m.direcao === 'in').length || 0;
       return { enviadas, recebidas };
     },
-    enabled: !!empresaId && enabled
+    enabled: !!empresaId && enabled,
   });
 
-  // Query: Mensagens do período anterior
+  // Mensagens do período anterior (para comparação)
   const { data: mensagensAnterior } = useQuery({
     queryKey: ['dashboard-mensagens', empresaId, periodo, 'anterior'],
     queryFn: async () => {
@@ -236,124 +228,35 @@ export function useDashboardStats(empresaId: string, periodo: PeriodoFiltro, ena
       if (error) throw error;
 
       return {
-        enviadas: data?.filter(m => m.direcao === 'out').length || 0,
-        recebidas: data?.filter(m => m.direcao === 'in').length || 0
+        enviadas: data?.filter((m) => m.direcao === 'out').length || 0,
+        recebidas: data?.filter((m) => m.direcao === 'in').length || 0,
       };
     },
-    enabled: !!empresaId && enabled
+    enabled: !!empresaId && enabled,
   });
 
-  // Query: Contatos por hora
-  const { data: contatosPorHora, isLoading: loadingContatosHora } = useQuery({
-    queryKey: ['dashboard-contatos-hora', empresaId, periodo],
+  // Usuários considerados agentes
+  const { data: usuariosAgentes, isLoading: loadingUsuariosAgentes } = useQuery({
+    queryKey: ['dashboard-agentes-usuarios', empresaId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('conversas')
-        .select('created_at')
-        .eq('empresa_id', empresaId)
-        .gte('created_at', inicio.toISOString())
-        .lt('created_at', fim.toISOString());
-
-      if (error) throw error;
-
-      // Agrupar por hora
-      const porHora = new Map<number, number>();
-      data?.forEach(c => {
-        const hora = new Date(c.created_at).getHours();
-        porHora.set(hora, (porHora.get(hora) || 0) + 1);
-      });
-
-      return Array.from(porHora.entries()).map(([hora, total]) => ({ hora, total }));
-    },
-    enabled: !!empresaId && enabled
-  });
-
-  // Query: Atendimentos por canal
-  const { data: porCanal, isLoading: loadingCanal } = useQuery({
-    queryKey: ['dashboard-por-canal', empresaId, periodo],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('conversas')
-        .select('canal')
-        .eq('empresa_id', empresaId)
-        .eq('status', 'encerrado')
-        .gte('encerrado_em', inicio.toISOString())
-        .lt('encerrado_em', fim.toISOString());
-
-      if (error) throw error;
-
-      // Agrupar por canal
-      const porCanal = new Map<string, number>();
-      data?.forEach(c => {
-        const canal = c.canal || 'whatsapp';
-        porCanal.set(canal, (porCanal.get(canal) || 0) + 1);
-      });
-
-      return Array.from(porCanal.entries()).map(([name, value]) => ({ 
-        name: name === 'whatsapp' ? 'WhatsApp' : name, 
-        value 
-      }));
-    },
-    enabled: !!empresaId && enabled
-  });
-
-  // Query: Atendimentos por motivo de encerramento
-  const { data: porMotivo, isLoading: loadingMotivo } = useQuery({
-    queryKey: ['dashboard-por-motivo', empresaId, periodo],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('conversas')
-        .select(`
-          motivo_encerramento_id,
-          motivos_encerramento!inner(descricao)
-        `)
-        .eq('empresa_id', empresaId)
-        .eq('status', 'encerrado')
-        .not('motivo_encerramento_id', 'is', null)
-        .gte('encerrado_em', inicio.toISOString())
-        .lt('encerrado_em', fim.toISOString());
-
-      if (error) throw error;
-
-      // Agrupar por motivo
-      const porMotivo = new Map<string, number>();
-      data?.forEach((c: any) => {
-        const motivo = c.motivos_encerramento?.descricao || 'Não informado';
-        porMotivo.set(motivo, (porMotivo.get(motivo) || 0) + 1);
-      });
-
-      return Array.from(porMotivo.entries()).map(([name, value]) => ({ name, value }));
-    },
-    enabled: !!empresaId && enabled
-  });
-
-  // Query: Agentes (operadores e supervisores)
-  const { data: agentesData, isLoading: loadingAgentes } = useQuery({
-    queryKey: ['dashboard-agentes', empresaId, periodo],
-    queryFn: async () => {
-      const { data: usuarios, error: errorUsuarios } = await supabase
         .from('usuarios')
         .select('id, nome')
         .eq('empresa_id', empresaId)
         .eq('ativo', true)
         .in('tipo_usuario', ['opr', 'sup', 'adm']);
 
-      if (errorUsuarios) throw errorUsuarios;
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!empresaId && enabled,
+  });
 
-      // Buscar conversas encerradas por agente
-      const { data: conversasAgentes, error: errorConversas } = await supabase
-        .from('conversas')
-        .select('agente_responsavel_id, created_at, encerrado_em')
-        .eq('empresa_id', empresaId)
-        .eq('status', 'encerrado')
-        .not('agente_responsavel_id', 'is', null)
-        .gte('encerrado_em', inicio.toISOString())
-        .lt('encerrado_em', fim.toISOString());
-
-      if (errorConversas) throw errorConversas;
-
-      // Buscar mensagens enviadas por remetente
-      const { data: mensagensEnviadas, error: errorMsgEnv } = await supabase
+  // Mensagens enviadas por agentes no período
+  const { data: mensagensEnviadas, isLoading: loadingMsgEnv } = useQuery({
+    queryKey: ['dashboard-agentes-msg-env', empresaId, periodo],
+    queryFn: async () => {
+      const { data, error } = await supabase
         .from('mensagens_historico')
         .select('remetente_id')
         .eq('empresa_id', empresaId)
@@ -362,10 +265,17 @@ export function useDashboardStats(empresaId: string, periodo: PeriodoFiltro, ena
         .gte('criado_em', inicio.toISOString())
         .lt('criado_em', fim.toISOString());
 
-      if (errorMsgEnv) throw errorMsgEnv;
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!empresaId && enabled,
+  });
 
-      // Buscar mensagens recebidas nas conversas dos agentes
-      const { data: mensagensRecebidas, error: errorMsgRec } = await supabase
+  // Mensagens recebidas no período (para calcular recebidas por agente)
+  const { data: mensagensRecebidas, isLoading: loadingMsgRec } = useQuery({
+    queryKey: ['dashboard-agentes-msg-rec', empresaId, periodo],
+    queryFn: async () => {
+      const { data, error } = await supabase
         .from('mensagens_historico')
         .select('conversa_id')
         .eq('empresa_id', empresaId)
@@ -373,64 +283,13 @@ export function useDashboardStats(empresaId: string, periodo: PeriodoFiltro, ena
         .gte('criado_em', inicio.toISOString())
         .lt('criado_em', fim.toISOString());
 
-      if (errorMsgRec) throw errorMsgRec;
-
-      // Criar mapa de conversa -> agente
-      const conversaAgente = new Map<string, string>();
-      conversasAgentes?.forEach(c => {
-        if (c.agente_responsavel_id) {
-          conversaAgente.set(c.agente_responsavel_id, c.agente_responsavel_id);
-        }
-      });
-
-      // Calcular estatísticas por agente
-      return usuarios?.map(u => {
-        const conversasDoAgente = conversasAgentes?.filter(c => c.agente_responsavel_id === u.id) || [];
-        const atendimentos = conversasDoAgente.length;
-        
-        // Dias distintos de encerramento
-        const diasSet = new Set(conversasDoAgente.map(c => 
-          c.encerrado_em ? new Date(c.encerrado_em).toDateString() : null
-        ).filter(Boolean));
-        const dias = diasSet.size || 1;
-        
-        // Mensagens enviadas
-        const msgEnviadas = mensagensEnviadas?.filter(m => m.remetente_id === u.id).length || 0;
-        
-        // Mensagens recebidas (nas conversas do agente) - simplificado
-        const conversasIds = new Set(conversasDoAgente.map(c => c.agente_responsavel_id));
-        const msgRecebidas = mensagensRecebidas?.filter(m => conversasIds.has(m.conversa_id)).length || 0;
-        
-        // TMA
-        let totalSegundos = 0;
-        let conversasComTempo = 0;
-        conversasDoAgente.forEach(c => {
-          if (c.encerrado_em && c.created_at) {
-            const duracao = (new Date(c.encerrado_em).getTime() - new Date(c.created_at).getTime()) / 1000;
-            if (duracao > 0) {
-              totalSegundos += duracao;
-              conversasComTempo++;
-            }
-          }
-        });
-        const tmaSegundos = conversasComTempo > 0 ? totalSegundos / conversasComTempo : 0;
-
-        return {
-          id: u.id,
-          nome: u.nome,
-          atendimentos,
-          dias,
-          mediaAtendDia: dias > 0 ? Math.round((atendimentos / dias) * 10) / 10 : 0,
-          msgEnviadas,
-          msgRecebidas,
-          tma: formatarTMA(tmaSegundos)
-        };
-      }) || [];
+      if (error) throw error;
+      return data || [];
     },
-    enabled: !!empresaId && enabled
+    enabled: !!empresaId && enabled,
   });
 
-  // Query: Média de atendimentos por agente (período anterior para comparação)
+  // Média de atendimentos por agente no período anterior (mantém lógica existente)
   const { data: agentesAnterior } = useQuery({
     queryKey: ['dashboard-agentes', empresaId, periodo, 'anterior'],
     queryFn: async () => {
@@ -453,50 +312,183 @@ export function useDashboardStats(empresaId: string, periodo: PeriodoFiltro, ena
       const totalConversas = conversas?.length || 0;
       return totalConversas / totalAgentes;
     },
-    enabled: !!empresaId
+    enabled: !!empresaId,
   });
 
-  const isLoading = loadingKpisAtual || loadingKpisAnterior || loadingMensagens || 
-                   loadingContatosHora || loadingCanal || loadingMotivo || loadingAgentes;
+  const isLoading =
+    loadingConversasPeriodo ||
+    loadingKpisAnterior ||
+    loadingMensagens ||
+    loadingUsuariosAgentes ||
+    loadingMsgEnv ||
+    loadingMsgRec;
 
-  // Calcular média de atendimentos por agente
-  const totalAgentes = agentesData?.filter(a => a.atendimentos > 0).length || 1;
-  const mediaAtendAgente = (kpisAtual?.atendimentos || 0) / totalAgentes;
+  // ======== Derivações em memória a partir de conversasPeriodo ========
+  const conversas = (conversasPeriodo || []) as any[];
+
+  // KPIs atuais
+  const atendimentosAtual = conversas.length;
+  const clientesUnicosAtual = new Set(conversas.map((c) => c.contato_id)).size;
+
+  let totalSegundosTma = 0;
+  let conversasComTempoTma = 0;
+  conversas.forEach((c) => {
+    if (c.encerrado_em && c.created_at) {
+      const duracao =
+        (new Date(c.encerrado_em).getTime() - new Date(c.created_at).getTime()) / 1000;
+      if (duracao > 0) {
+        totalSegundosTma += duracao;
+        conversasComTempoTma++;
+      }
+    }
+  });
+  const tmaSegundosAtual =
+    conversasComTempoTma > 0 ? totalSegundosTma / conversasComTempoTma : 0;
+
+  // Contatos por hora
+  const contatosPorHoraDerivado = (() => {
+    const porHora = new Map<number, number>();
+    conversas.forEach((c) => {
+      if (!c.created_at) return;
+      const hora = new Date(c.created_at).getHours();
+      porHora.set(hora, (porHora.get(hora) || 0) + 1);
+    });
+    return Array.from(porHora.entries()).map(([hora, total]) => ({ hora, total }));
+  })();
+
+  // Atendimentos por canal
+  const atendimentosPorCanalDerivado = (() => {
+    const mapa = new Map<string, number>();
+    conversas.forEach((c) => {
+      const canal = c.canal || 'whatsapp';
+      mapa.set(canal, (mapa.get(canal) || 0) + 1);
+    });
+    return Array.from(mapa.entries()).map(([name, value]) => ({
+      name: name === 'whatsapp' ? 'WhatsApp' : name,
+      value,
+    }));
+  })();
+
+  // Atendimentos por motivo
+  const atendimentosPorMotivoDerivado = (() => {
+    const mapa = new Map<string, number>();
+    conversas.forEach((c: any) => {
+      if (!c.motivo_encerramento_id) return;
+      const motivo = c.motivos_encerramento?.descricao || 'Não informado';
+      mapa.set(motivo, (mapa.get(motivo) || 0) + 1);
+    });
+    return Array.from(mapa.entries()).map(([name, value]) => ({ name, value }));
+  })();
+
+  // Estatísticas por agente
+  const agentesData: AgenteStats[] =
+    usuariosAgentes && mensagensEnviadas && mensagensRecebidas
+      ? (usuariosAgentes as any[]).map((u) => {
+          const conversasDoAgente = conversas.filter(
+            (c) => c.agente_responsavel_id === u.id,
+          );
+          const atendimentos = conversasDoAgente.length;
+
+          const diasSet = new Set(
+            conversasDoAgente
+              .map((c) =>
+                c.encerrado_em ? new Date(c.encerrado_em).toDateString() : null,
+              )
+              .filter(Boolean),
+          );
+          const dias = diasSet.size || 1;
+
+          const msgEnviadas =
+            (mensagensEnviadas as any[]).filter((m) => m.remetente_id === u.id)
+              .length || 0;
+
+          const conversasIds = new Set(conversasDoAgente.map((c) => c.id as string));
+          const msgRecebidas =
+            (mensagensRecebidas as any[]).filter((m) =>
+              conversasIds.has(m.conversa_id),
+            ).length || 0;
+
+          let totalSegundos = 0;
+          let conversasComTempo = 0;
+          conversasDoAgente.forEach((c) => {
+            if (c.encerrado_em && c.created_at) {
+              const duracao =
+                (new Date(c.encerrado_em).getTime() -
+                  new Date(c.created_at).getTime()) /
+                1000;
+              if (duracao > 0) {
+                totalSegundos += duracao;
+                conversasComTempo++;
+              }
+            }
+          });
+          const tmaSegundos =
+            conversasComTempo > 0 ? totalSegundos / conversasComTempo : 0;
+
+          return {
+            id: u.id,
+            nome: u.nome,
+            atendimentos,
+            dias,
+            mediaAtendDia:
+              dias > 0 ? Math.round((atendimentos / dias) * 10) / 10 : 0,
+            msgEnviadas,
+            msgRecebidas,
+            tma: formatarTMA(tmaSegundos),
+          };
+        })
+      : [];
+
+  // Média de atendimentos por agente (atual e anterior)
+  const totalAgentesAtivos = agentesData?.filter((a) => a.atendimentos > 0).length || 1;
+  const mediaAtendAgente = (atendimentosAtual || 0) / totalAgentesAtivos;
   const mediaAtendAgenteAnterior = agentesAnterior || 0;
 
   const stats: DashboardStats = {
     kpis: {
       atendimentos: {
-        valor: kpisAtual?.atendimentos || 0,
+        valor: atendimentosAtual || 0,
         valorAnterior: kpisAnterior?.atendimentos || 0,
-        variacao: calcularVariacao(kpisAtual?.atendimentos || 0, kpisAnterior?.atendimentos || 0)
+        variacao: calcularVariacao(
+          atendimentosAtual || 0,
+          kpisAnterior?.atendimentos || 0,
+        ),
       },
       clientesUnicos: {
-        valor: kpisAtual?.clientesUnicos || 0,
+        valor: clientesUnicosAtual || 0,
         valorAnterior: kpisAnterior?.clientesUnicos || 0,
-        variacao: calcularVariacao(kpisAtual?.clientesUnicos || 0, kpisAnterior?.clientesUnicos || 0)
+        variacao: calcularVariacao(
+          clientesUnicosAtual || 0,
+          kpisAnterior?.clientesUnicos || 0,
+        ),
       },
       msgEnviadas: {
         valor: mensagens?.enviadas || 0,
         valorAnterior: mensagensAnterior?.enviadas || 0,
-        variacao: calcularVariacao(mensagens?.enviadas || 0, mensagensAnterior?.enviadas || 0)
+        variacao: calcularVariacao(
+          mensagens?.enviadas || 0,
+          mensagensAnterior?.enviadas || 0,
+        ),
       },
       msgRecebidas: {
         valor: mensagens?.recebidas || 0,
         valorAnterior: mensagensAnterior?.recebidas || 0,
-        variacao: calcularVariacao(mensagens?.recebidas || 0, mensagensAnterior?.recebidas || 0)
+        variacao: calcularVariacao(
+          mensagens?.recebidas || 0,
+          mensagensAnterior?.recebidas || 0,
+        ),
       },
       mediaAtendAgente: {
         valor: Math.round(mediaAtendAgente * 10) / 10,
         valorAnterior: Math.round(mediaAtendAgenteAnterior * 10) / 10,
-        variacao: calcularVariacao(mediaAtendAgente, mediaAtendAgenteAnterior)
+        variacao: calcularVariacao(mediaAtendAgente, mediaAtendAgenteAnterior),
       },
-      tma: formatarTMA(kpisAtual?.tmaSegundos || 0)
+      tma: formatarTMA(tmaSegundosAtual || 0),
     },
-    contatosPorHora: gerarHorasCompletas(contatosPorHora || []),
-    atendimentosPorCanal: porCanal || [],
-    atendimentosPorMotivo: porMotivo || [],
-    agentes: agentesData || []
+    contatosPorHora: gerarHorasCompletas(contatosPorHoraDerivado || []),
+    atendimentosPorCanal: atendimentosPorCanalDerivado || [],
+    atendimentosPorMotivo: atendimentosPorMotivoDerivado || [],
+    agentes: agentesData || [],
   };
 
   return { stats, isLoading };
