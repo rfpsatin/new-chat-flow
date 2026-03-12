@@ -153,7 +153,7 @@ Deno.serve(async (req) => {
       source: 'web-chat',
       channel: channelNormalized,
       channel_id: channelId,
-      from_me: true,
+      attendence: true,
       empresa_id,
       conversa_id,
       remetente_id,
