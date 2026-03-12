@@ -949,17 +949,47 @@ export type Database = {
         Returns: undefined
       }
       get_acompanhamento_mensagens: {
-        Args: { p_data_inicio: string; p_data_fim: string }
+        Args: { p_data_fim: string; p_data_inicio: string }
         Returns: {
-          empresa_id: string
-          empresa_nome: string | null
-          mensagens_recebidas: number
           conversas_fechadas: number
-          em_aberto_total: number
-          em_aberto_bot: number
-          em_aberto_triagem: number
-          em_aberto_fila: number
           em_aberto_atendimento: number
+          em_aberto_bot: number
+          em_aberto_fila: number
+          em_aberto_total: number
+          em_aberto_triagem: number
+          empresa_id: string
+          empresa_nome: string
+          mensagens_recebidas: number
+        }[]
+      }
+      get_db_connection_states: {
+        Args: never
+        Returns: {
+          count: number
+          state: string
+        }[]
+      }
+      get_db_health_overview: {
+        Args: never
+        Returns: {
+          active_connections: number
+          cache_hit_ratio: number
+          db_size_bytes: number
+          db_size_pretty: string
+          max_connections: number
+        }[]
+      }
+      get_db_table_stats: {
+        Args: never
+        Returns: {
+          data_size: string
+          estimated_rows: number
+          idx_scan: number
+          index_size: string
+          n_dead_tup: number
+          seq_scan: number
+          table_name: string
+          total_size: string
         }[]
       }
       get_next_nr_protocolo: { Args: never; Returns: string }
