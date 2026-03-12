@@ -126,6 +126,7 @@ export function UploadArquivoDialog({
         contato_id: contatoId,
         remetenteId,
         file,
+        whatsapp_numero: whatsappNumero,
       });
       toast({
         title: 'Arquivo enviado',
