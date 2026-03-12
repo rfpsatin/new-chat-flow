@@ -220,14 +220,34 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Upsert por (empresa_id, whatsapp_numero) – assume que existe unique index ou que nao ha conflito grave
-    const { error: upsertError, count } = await supabase
+    // Upsert por (empresa_id, whatsapp_numero) com fallback caso colunas tp_contato/tag_origem nao existam
+    let upsertError: any = null
+    let count: number | null = null
+
+    const { error: err1, count: cnt1 } = await supabase
       .from('contatos')
       .upsert(uniqueRows, {
         onConflict: 'empresa_id,whatsapp_numero',
         ignoreDuplicates: false,
         count: 'exact',
       })
+
+    if (err1 && (err1.message?.includes('tp_contato') || err1.message?.includes('tag_origem'))) {
+      console.warn(`[${requestId}] Fallback: removendo tp_contato/tag_origem do upsert`)
+      const fallbackRows = uniqueRows.map(({ tp_contato, tag_origem, ...rest }) => rest)
+      const { error: err2, count: cnt2 } = await supabase
+        .from('contatos')
+        .upsert(fallbackRows, {
+          onConflict: 'empresa_id,whatsapp_numero',
+          ignoreDuplicates: false,
+          count: 'exact',
+        })
+      upsertError = err2
+      count = cnt2
+    } else {
+      upsertError = err1
+      count = cnt1
+    }
 
     if (upsertError) {
       console.error(`[${requestId}] Upsert error:`, upsertError)

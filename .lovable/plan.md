@@ -1,37 +1,32 @@
 
 
-## Plano: Ajustes no modulo de importacao de contatos
+## Redeploy de todas as Edge Functions
 
-### Diagnostico
+Vou fazer o redeploy de todas as 21 edge functions do projeto para garantir que o código mais recente (incluindo os headers `apikey` adicionados em `run-campaigns` e `start-conversation`) esteja ativo em produção.
 
-O codigo ja possui a maior parte da logica solicitada (contadores, botao de relatorio, validacao, import_tag). O problema principal e que a Edge Function `import-contacts` envia `tp_contato` e `tag_origem` no upsert, mas essas colunas **nao existem** na tabela `contatos`. Isso causa falha silenciosa ou erro 500.
+### Funções a redeployar
+1. buscar-empresa
+2. check-attendance-mode
+3. close-service
+4. conversation-attendance-status
+5. create-user-auth
+6. import-contacts
+7. n8n-reset-human-mode
+8. n8n-send-message
+9. n8n-webhook-cinemkt
+10. reschedule-campaign-errors
+11. run-campaigns
+12. setup-super-admin
+13. start-conversation
+14. whapi-config
+15. whapi-connection-webhook
+16. whapi-media
+17. whapi-qr
+18. whapi-reconnect
+19. whapi-send-message
+20. whapi-status
+21. whapi-webhook
 
-### Alteracoes necessarias
-
-#### 1. Migration: adicionar colunas `tp_contato` e `tag_origem` na tabela `contatos`
-
-```sql
-ALTER TABLE public.contatos
-  ADD COLUMN IF NOT EXISTS tp_contato text NOT NULL DEFAULT 'N',
-  ADD COLUMN IF NOT EXISTS tag_origem text;
-```
-
-Valores: `'I'` = importado, `'N'` = normal (default).
-
-#### 2. Edge Function `import-contacts/index.ts` — fallback resiliente
-
-Adicionar try/catch no upsert: se falhar com erro de coluna inexistente, tentar novamente sem `tp_contato` e `tag_origem`. Isso garante que a importacao nunca quebra por causa dessas colunas.
-
-#### 3. Frontend `ContatosPage.tsx` — ajustes no texto do resumo
-
-- Trocar "rejeitado(s) no servidor" por "nao adicionado(s)" no resumo final (linha 783).
-- Garantir que o total de "nao adicionados" inclui invalidos do frontend + rejeitados do backend (ja esta implementado nas linhas 617-651, apenas ajustar o texto).
-
-### Sem alteracoes
-
-- Logica de validacao de telefone (ja correta)
-- Botao "Gerar relatorio de erros" (ja existe e aparece quando ha invalidos)
-- Contadores (ja exibidos)
-- Formatacao de telefone (ja implementada)
-- Envio de `import_tag` (ja enviado como nome do arquivo)
+### Ação
+Deploy paralelo de todas as funções usando a ferramenta de deploy.
 

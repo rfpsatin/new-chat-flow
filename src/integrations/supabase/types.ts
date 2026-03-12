@@ -182,7 +182,9 @@ export type Database = {
           empresa_id: string
           id: string
           nome: string | null
+          tag_origem: string | null
           telefone_numero: string | null
+          tp_contato: string
           whatsapp_numero: string
         }
         Insert: {
@@ -190,7 +192,9 @@ export type Database = {
           empresa_id: string
           id?: string
           nome?: string | null
+          tag_origem?: string | null
           telefone_numero?: string | null
+          tp_contato?: string
           whatsapp_numero: string
         }
         Update: {
@@ -198,7 +202,9 @@ export type Database = {
           empresa_id?: string
           id?: string
           nome?: string | null
+          tag_origem?: string | null
           telefone_numero?: string | null
+          tp_contato?: string
           whatsapp_numero?: string
         }
         Relationships: [
