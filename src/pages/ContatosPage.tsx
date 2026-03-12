@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Search, Phone, Calendar, MessageSquare, User, Clock, Send, Loader2, Info } from 'lucide-react';
@@ -1034,19 +1035,42 @@ export default function ContatosPage() {
 
     setExporting(true);
     try {
-      const { data, error } = await supabase
-        .from('contatos')
-        .select('nome, whatsapp_numero')
-        .eq('empresa_id', empresaId)
-        .order('created_at', { ascending: true });
+      const pageSize = 1000;
+      let from = 0;
+      const contatos: any[] = [];
 
-      if (error) {
-        throw error;
+      // Pagina a tabela inteira em blocos de 1000 registros
+      // até não receber mais resultados.
+      // Isso garante que exportamos toda a base, respeitando o limite padrão do Supabase.
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { data, error } = await supabase
+          .from('contatos')
+          .select('nome, whatsapp_numero')
+          .eq('empresa_id', empresaId)
+          .order('created_at', { ascending: true })
+          .range(from, from + pageSize - 1);
+
+        if (error) {
+          throw error;
+        }
+
+        const page = (data ?? []).filter(
+          (c) => c.whatsapp_numero && String(c.whatsapp_numero).trim(),
+        );
+
+        if (!page.length) {
+          break;
+        }
+
+        contatos.push(...page);
+
+        if (page.length < pageSize) {
+          break;
+        }
+
+        from += pageSize;
       }
-
-      const contatos = (data ?? []).filter(
-        (c) => c.whatsapp_numero && String(c.whatsapp_numero).trim(),
-      );
 
       if (!contatos.length) {
         toast.error('Nenhum contato encontrado para exportar.');
@@ -1087,22 +1111,41 @@ export default function ContatosPage() {
           <div className="p-4 border-b space-y-3">
             <div className="flex items-center justify-between gap-2">
               <h2 className="font-semibold text-lg">Contatos</h2>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleExportContatos}
-                  disabled={exporting}
-                >
-                  {exporting ? 'Exportando...' : 'Exportar CSV'}
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setShowTratamento(true)}>
-                  Tratar dados brutos
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
-                  Importar
-                </Button>
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5">
+                    Ações
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      if (!exporting) {
+                        void handleExportContatos();
+                      }
+                    }}
+                  >
+                    Exportar CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      setShowTratamento(true);
+                    }}
+                  >
+                    Tratar dados brutos
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      setShowImport(true);
+                    }}
+                  >
+                    Importar
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
