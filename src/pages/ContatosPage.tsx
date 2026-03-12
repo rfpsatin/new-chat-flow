@@ -46,37 +46,36 @@ function stripQuotes(value: string): string {
 
 function normalizeNameField(raw: string): string {
   const v = stripQuotes(raw);
+
   return v
-    .replace(/["'`«»\u201C\u201D\u2018\u2019]/g, '') // aspas restantes
-    .replace(/[\x00-\x1F\x7F]/g, '')                  // controle
-    .replace(/[^a-zA-ZÀ-ÿ\s\-\.]/g, '')               // mantém letras (com acento), espaço, hífen, ponto
+    // remove acentuação
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    // remove aspas e pontuações esquisitas
+    .replace(/["'`«»\u201C\u201D\u2018\u2019]/g, '')
+    // remove caracteres de controle
+    .replace(/[\x00-\x1F\x7F]/g, '')
+    // mantém só letras A–Z (sem acento) e espaços
+    .replace(/[^a-zA-Z\s]/g, '')
+    // colapsa espaços múltiplos
     .replace(/\s+/g, ' ')
     .trim();
 }
 
 function normalizePhoneField(raw: string): string {
   const original = stripQuotes(raw).trim();
-  const digitsOnly = original.replace(/\D/g, '');
-  if (!digitsOnly) return original;
 
-  let digits = digitsOnly;
+  // mantém apenas dígitos (remove +, parênteses, espaços, hífens etc.)
+  let digits = original.replace(/\D/g, '');
+  if (!digits) return '';
+
+  // se vier DDD + número (10 ou 11) sem 55, prefixa 55
   if (!digits.startsWith('55') && (digits.length === 10 || digits.length === 11)) {
     digits = `55${digits}`;
   }
 
-  if (digits.startsWith('55') && digits.length === 12) {
-    const ddd = digits.slice(2, 4);
-    const local = digits.slice(4);
-    return `55 (${ddd}) ${local.slice(0, 4)}-${local.slice(4)}`;
-  }
-
-  if (digits.startsWith('55') && digits.length === 13) {
-    const ddd = digits.slice(2, 4);
-    const local = digits.slice(4);
-    return `55 (${ddd}) ${local.slice(0, 5)}-${local.slice(5)}`;
-  }
-
-  return original;
+  // retorna só dígitos, ex: 5544999999999
+  return digits;
 }
 
 type PhoneValidationResult = {
