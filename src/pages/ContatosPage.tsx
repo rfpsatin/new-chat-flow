@@ -957,6 +957,7 @@ export default function ContatosPage() {
   const [editNome, setEditNome] = useState('');
   const [editWhatsapp, setEditWhatsapp] = useState('');
   const [savingContato, setSavingContato] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const filteredContatos = contatos ?? [];
 
@@ -1025,6 +1026,59 @@ export default function ContatosPage() {
     }
   };
 
+  const handleExportContatos = async () => {
+    if (!empresaId) {
+      toast.error('Empresa não encontrada na sessão.');
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const { data, error } = await supabase
+        .from('contatos')
+        .select('nome, whatsapp_numero')
+        .eq('empresa_id', empresaId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        throw error;
+      }
+
+      const contatos = (data ?? []).filter(
+        (c) => c.whatsapp_numero && String(c.whatsapp_numero).trim(),
+      );
+
+      if (!contatos.length) {
+        toast.error('Nenhum contato encontrado para exportar.');
+        return;
+      }
+
+      const rows: ImportRow[] = contatos.map((c: any) => ({
+        nome: c.nome ?? null,
+        whatsapp_numero: String(c.whatsapp_numero),
+      }));
+
+      const csv = buildNormalizedContactsCsv(rows);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'contatos_exportados.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success(`Exportados ${rows.length} contato(s).`);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Erro ao exportar contatos. Tente novamente.',
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <MainLayout>
       <div className="flex h-full">
@@ -1034,6 +1088,14 @@ export default function ContatosPage() {
             <div className="flex items-center justify-between gap-2">
               <h2 className="font-semibold text-lg">Contatos</h2>
               <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportContatos}
+                  disabled={exporting}
+                >
+                  {exporting ? 'Exportando...' : 'Exportar CSV'}
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => setShowTratamento(true)}>
                   Tratar dados brutos
                 </Button>
