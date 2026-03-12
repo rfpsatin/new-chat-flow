@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { HistoricoConversa, ContatoComHistorico, AtendenteComHistorico, FiltrosHistorico } from '@/types/atendimento';
 import { startOfDay, endOfDay } from 'date-fns';
+import { useMemo } from 'react';
+import { useOperadores } from '@/hooks/useUsuarios';
 
 // Lista atendentes que têm sessões finalizadas
 export function useAtendentesComHistorico(empresaId: string) {
@@ -174,22 +176,17 @@ export function useMensagensHistorico(conversaId: string | null) {
   });
 }
 
+// Deriva lista de operadores {id, nome} do cache de useOperadores
+// (sem query adicional ao banco)
 export function useOperadoresHistorico(empresaId: string) {
-  return useQuery({
-    queryKey: ['operadores-historico', empresaId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('usuarios')
-        .select('id, nome')
-        .eq('empresa_id', empresaId)
-        .eq('ativo', true)
-        .order('nome');
+  const { data: operadores, isLoading, error } = useOperadores(empresaId);
 
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!empresaId,
-  });
+  const data = useMemo(
+    () => operadores?.map(({ id, nome }) => ({ id, nome })) ?? [],
+    [operadores],
+  );
+
+  return { data, isLoading, error };
 }
 
 // Histórico de sessões anteriores de um contato (para contexto no chat)
