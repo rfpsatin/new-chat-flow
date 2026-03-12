@@ -17,6 +17,17 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const SESSION_HEARTBEAT_MS = 4 * 60 * 1000; // 4 min
 
+function isAuthError(error: unknown): boolean {
+  if (!error) return false;
+  const e = error as { status?: number; message?: string; name?: string };
+  if (e.status === 401 || e.status === 403) return true;
+  const msg = (e.message || '').toLowerCase();
+  return msg.includes('session_not_found')
+    || msg.includes('jwt expired')
+    || msg.includes('invalid jwt')
+    || e.name === 'AuthSessionMissingError';
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<Usuario | null>(null);
   const [selectedConversa, setSelectedConversa] = useState<import('@/types/atendimento').Conversa | null>(null);
@@ -33,14 +44,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [navigate]);
 
   useEffect(() => {
-    let initialSessionHandled = false;
-
     const setLoadingDone = () => setAuthLoading(false);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       try {
-        if (event === 'INITIAL_SESSION' && initialSessionHandled) return;
-
         if (session?.user) {
           const { data: usuario } = await supabase
             .from('usuarios')
@@ -52,9 +59,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (usuario) {
             setCurrentUser(usuario as Usuario);
           } else {
-            console.warn('Auth session found but no active usuario record, signing out');
+            console.warn('Auth session exists but no active usuario record');
             setCurrentUser(null);
-            await supabase.auth.signOut();
             navigate('/login', { replace: true });
           }
         } else {
@@ -69,33 +75,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    supabase.auth
-      .getSession()
-      .then(async ({ data: { session } }) => {
-        initialSessionHandled = true;
-        if (session?.user) {
-          const { data: usuario } = await supabase
-            .from('usuarios')
-            .select('*')
-            .eq('auth_user_id', session.user.id)
-            .eq('ativo', true)
-            .maybeSingle();
-
-          if (usuario) {
-            setCurrentUser(usuario as Usuario);
-          } else {
-            console.warn('Stale auth session detected, signing out');
-            setCurrentUser(null);
-            await supabase.auth.signOut();
-            navigate('/login', { replace: true });
-          }
-        }
-      })
-      .catch((err) => {
-        console.warn('getSession failed on load', err);
-      })
-      .finally(setLoadingDone);
-
     const timeoutId = window.setTimeout(setLoadingDone, 8000);
 
     return () => {
@@ -104,9 +83,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Re-validate session when the browser tab returns to the foreground.
-  // Browsers freeze timers in background tabs, so the Supabase auto-refresh
-  // may have missed a token renewal while the tab was hidden.
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (document.visibilityState !== 'visible') return;
@@ -114,12 +90,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       try {
         const { data: { user }, error } = await supabase.auth.getUser();
-        if (error || !user) {
-          console.warn('Session expired while tab was in background');
+        if (error && isAuthError(error)) {
+          console.warn('Session expired (visibility check):', error.message);
+          clearSessionAndRedirect();
+        } else if (!error && !user) {
+          console.warn('Session gone (visibility check)');
           clearSessionAndRedirect();
         }
-      } catch (err) {
-        console.warn('visibilitychange session check failed:', err);
+      } catch {
+        // Network or transient error – keep session alive
       }
     };
 
@@ -127,21 +106,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [clearSessionAndRedirect]);
 
-  // Periodic heartbeat: ensures the session is still alive even when the user
-  // is idle but the tab remains visible. Catches silent JWT expiry that would
-  // otherwise only surface as 401 errors on data queries.
   useEffect(() => {
     const id = window.setInterval(async () => {
       if (!currentUserRef.current) return;
 
       try {
         const { data: { user }, error } = await supabase.auth.getUser();
-        if (error || !user) {
-          console.warn('Session heartbeat: session no longer valid');
+        if (error && isAuthError(error)) {
+          console.warn('Session heartbeat: auth error', error.message);
+          clearSessionAndRedirect();
+        } else if (!error && !user) {
+          console.warn('Session heartbeat: no user');
           clearSessionAndRedirect();
         }
-      } catch (err) {
-        console.warn('Session heartbeat failed:', err);
+      } catch {
+        // Network or transient error – keep session alive
       }
     }, SESSION_HEARTBEAT_MS);
 

@@ -20,6 +20,8 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      await supabase.auth.signOut().catch(() => {});
+
       const { error, data: authData } = await supabase.auth.signInWithPassword({ email, password });
 
       if (error) {
@@ -30,13 +32,6 @@ export default function LoginPage() {
       const userId = authData.user?.id;
       if (!userId) {
         toast({ title: 'Erro', description: 'Usuário não encontrado', variant: 'destructive' });
-        return;
-      }
-
-      // Garantir que a sessão ainda está presente (evita race com signOut em segundo plano)
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) {
-        toast({ title: 'Erro ao fazer login', description: 'Sessão perdida. Tente novamente.', variant: 'destructive' });
         return;
       }
 
@@ -63,7 +58,7 @@ export default function LoginPage() {
         return;
       }
 
-      await supabase.auth.signOut();
+      await supabase.auth.signOut().catch(() => {});
       toast({ title: 'Acesso negado', description: 'Seu usuário não possui acesso ao sistema.', variant: 'destructive' });
     } catch (err) {
       console.error('Login failed:', err);
