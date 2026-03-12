@@ -780,7 +780,7 @@ function ImportContatosDialog({
             <div className="mt-3 border-t pt-2 text-xs space-y-1">
               <p className="font-medium">
                 Resultado da importação: {importLog.imported} importado(s),{' '}
-                {importLog.invalid.length} rejeitado(s) no servidor.
+                {importLog.invalid.length} não adicionado(s).
               </p>
               {importLog.invalid.length > 0 && (
                 <div>
