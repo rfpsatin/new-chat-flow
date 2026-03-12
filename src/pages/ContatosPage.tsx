@@ -18,7 +18,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Search, Phone, Calendar, MessageSquare, User, Clock, Send, Loader2, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useMensagensHistorico } from '@/hooks/useMensagens';
+import { useMensagensHistoricoInfinite } from '@/hooks/useMensagens';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -135,7 +135,13 @@ function parseCsvLines(text: string): ImportRow[] {
 }
 
 function MensagensDialog({ conversa, onClose }: { conversa: HistoricoConversa; onClose: () => void }) {
-  const { data: mensagens, isLoading } = useMensagensHistorico(conversa.conversa_id);
+  const {
+    mensagens,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useMensagensHistoricoInfinite(conversa.conversa_id);
 
   return (
     <Dialog open onOpenChange={onClose}>
@@ -150,10 +156,23 @@ function MensagensDialog({ conversa, onClose }: { conversa: HistoricoConversa; o
           <div className="p-2 space-y-2">
             {isLoading ? (
               <p className="text-center text-muted-foreground py-4">Carregando...</p>
-            ) : mensagens?.length === 0 ? (
+            ) : (mensagens?.length ?? 0) === 0 ? (
               <p className="text-center text-muted-foreground py-4">Nenhuma mensagem</p>
             ) : (
-              mensagens?.map((msg) => (
+              <>
+                {hasNextPage && (
+                  <div className="flex justify-center py-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => fetchNextPage()}
+                      disabled={isFetchingNextPage}
+                    >
+                      {isFetchingNextPage ? 'Carregando...' : 'Carregar mais antigas'}
+                    </Button>
+                  </div>
+                )}
+                {mensagens?.map((msg) => (
                 <div
                   key={msg.id}
                   className={cn(
@@ -173,7 +192,8 @@ function MensagensDialog({ conversa, onClose }: { conversa: HistoricoConversa; o
                     {format(new Date(msg.criado_em), 'HH:mm', { locale: ptBR })}
                   </div>
                 </div>
-              ))
+              ))}
+              </>
             )}
           </div>
         </ScrollArea>

@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { MensagemAtiva } from '@/types/atendimento';
 import { useEffect } from 'react';
@@ -210,4 +210,53 @@ export function useMensagensHistorico(conversaId: string | null) {
     },
     enabled: !!conversaId,
   });
+}
+
+const MENSAGENS_HISTORICO_PAGE_SIZE = 50;
+
+/** Mensagens históricas com "Carregar mais antigas": carrega as mais recentes primeiro e depois páginas mais antigas. */
+export function useMensagensHistoricoInfinite(conversaId: string | null) {
+  const infinite = useInfiniteQuery({
+    queryKey: ['mensagens-historico-infinite', conversaId],
+    queryFn: async ({ pageParam }: { pageParam: string | undefined }) => {
+      if (!conversaId) return [];
+
+      let query = supabase
+        .from('mensagens_historico')
+        .select('*')
+        .eq('conversa_id', conversaId)
+        .order('criado_em', { ascending: false })
+        .limit(MENSAGENS_HISTORICO_PAGE_SIZE);
+
+      if (pageParam) {
+        query = query.lt('criado_em', pageParam);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []) as { id: number; criado_em: string; [key: string]: unknown }[];
+    },
+    getNextPageParam: (lastPage) =>
+      lastPage.length === MENSAGENS_HISTORICO_PAGE_SIZE
+        ? lastPage[lastPage.length - 1].criado_em
+        : undefined,
+    initialPageParam: undefined as string | undefined,
+    enabled: !!conversaId,
+  });
+
+  const mensagensOrdenadas =
+    infinite.data?.pages != null
+      ? [...infinite.data.pages.flat()].sort(
+          (a, b) => new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime()
+        )
+      : [];
+
+  return {
+    ...infinite,
+    data: mensagensOrdenadas,
+    mensagens: mensagensOrdenadas,
+    fetchNextPage: infinite.fetchNextPage,
+    hasNextPage: infinite.hasNextPage,
+    isFetchingNextPage: infinite.isFetchingNextPage,
+  };
 }
