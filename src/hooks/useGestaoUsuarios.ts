@@ -37,23 +37,24 @@ export function useGestaoUsuarios(empresaId: string) {
   const usuariosQuery = useQuery({
     queryKey: ['gestao-usuarios', empresaId],
     queryFn: async () => {
-      // Buscar usuários
-      const { data: usuarios, error: usuariosError } = await supabase
-        .from('usuarios')
-        .select('*')
-        .eq('empresa_id', empresaId)
-        .in('tipo_usuario', ['sup', 'opr', 'adm'])
-        .order('nome');
-      
-      if (usuariosError) throw usuariosError;
-      
-      // Buscar atendentes
-      const { data: atendentes, error: atendentesError } = await supabase
-        .from('atendentes')
-        .select('*')
-        .eq('empresa_id', empresaId);
-      
-      if (atendentesError) throw atendentesError;
+      const [usuariosResult, atendentesResult] = await Promise.all([
+        supabase
+          .from('usuarios')
+          .select('*')
+          .eq('empresa_id', empresaId)
+          .in('tipo_usuario', ['sup', 'opr', 'adm'])
+          .order('nome'),
+        supabase
+          .from('atendentes')
+          .select('*')
+          .eq('empresa_id', empresaId),
+      ]);
+
+      if (usuariosResult.error) throw usuariosResult.error;
+      if (atendentesResult.error) throw atendentesResult.error;
+
+      const usuarios = usuariosResult.data;
+      const atendentes = atendentesResult.data;
       
       // Mapear atendentes por usuario_id
       const atendentesMap = new Map<string, Atendente>();
