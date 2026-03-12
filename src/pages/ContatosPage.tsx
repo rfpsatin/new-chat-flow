@@ -840,8 +840,20 @@ function TratarDadosBrutosDialog({
         return;
       }
 
-      setRows(parsed);
-      toast.success(`${parsed.length} contato(s) tratado(s). Baixe o CSV para importar.`);
+      // Remove linhas com nome em branco ou telefone em branco
+      const filtered = parsed.filter((row) => {
+        const nomeOk = !!(row.nome && row.nome.toString().trim());
+        const telOk = !!(row.whatsapp_numero && row.whatsapp_numero.toString().trim());
+        return nomeOk && telOk;
+      });
+
+      setRows(filtered);
+      const descartados = parsed.length - filtered.length;
+      toast.success(
+        `${filtered.length} contato(s) tratado(s).` +
+          (descartados > 0 ? ` ${descartados} linha(s) com nome/telefone em branco foram descartadas.` : '') +
+          ' Baixe o CSV para importar.',
+      );
     };
     reader.readAsText(file, 'utf-8');
   };
