@@ -187,7 +187,7 @@ function MensagensDialog({ conversa, onClose }: { conversa: HistoricoConversa; o
                       {msg.tipo_remetente === 'bot' ? '🤖 Bot' : '👤 Agente'}
                     </div>
                   )}
-                  <p className="whitespace-pre-wrap break-words">{msg.conteudo}</p>
+                  <p className="whitespace-pre-wrap break-words">{String(msg.conteudo ?? '')}</p>
                   <div className="text-xs opacity-70 mt-1 text-right">
                     {format(new Date(msg.criado_em), 'HH:mm', { locale: ptBR })}
                   </div>
