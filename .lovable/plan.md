@@ -1,32 +1,14 @@
 
 
-## Redeploy de todas as Edge Functions
+## Plano: Deploy de todas as Edge Functions
 
-Vou fazer o redeploy de todas as 21 edge functions do projeto para garantir que o código mais recente (incluindo os headers `apikey` adicionados em `run-campaigns` e `start-conversation`) esteja ativo em produção.
+O projeto possui 22 edge functions. Vou fazer o deploy de todas em paralelo para garantir que o codigo mais recente esteja ativo em producao.
 
-### Funções a redeployar
-1. buscar-empresa
-2. check-attendance-mode
-3. close-service
-4. conversation-attendance-status
-5. create-user-auth
-6. import-contacts
-7. n8n-reset-human-mode
-8. n8n-send-message
-9. n8n-webhook-cinemkt
-10. reschedule-campaign-errors
-11. run-campaigns
-12. setup-super-admin
-13. start-conversation
-14. whapi-config
-15. whapi-connection-webhook
-16. whapi-media
-17. whapi-qr
-18. whapi-reconnect
-19. whapi-send-message
-20. whapi-status
-21. whapi-webhook
+### Funcoes a deployar
 
-### Ação
-Deploy paralelo de todas as funções usando a ferramenta de deploy.
+buscar-empresa, check-attendance-mode, close-service, conversation-attendance-status, create-user-auth, import-contacts, n8n-reset-human-mode, n8n-send-message, n8n-webhook-cinemkt, reschedule-campaign-errors, run-campaigns, setup-super-admin, start-conversation, whapi-config, whapi-connection-webhook, whapi-media, whapi-qr, whapi-reconnect, whapi-send-media, whapi-send-message, whapi-status, whapi-webhook.
+
+### Acao
+
+Deploy paralelo de todas as 22 funcoes usando a ferramenta de deploy. Nenhuma alteracao de codigo necessaria.
 
