@@ -157,24 +157,7 @@ export function useSessoesContato(empresaId: string, contatoId: string | null, f
   });
 }
 
-export function useMensagensHistorico(conversaId: string | null) {
-  return useQuery({
-    queryKey: ['mensagens-historico', conversaId],
-    queryFn: async () => {
-      if (!conversaId) return [];
-
-      const { data, error } = await supabase
-        .from('mensagens_historico')
-        .select('*')
-        .eq('conversa_id', conversaId)
-        .order('criado_em', { ascending: true });
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!conversaId,
-  });
-}
+export { useMensagensHistorico } from '@/hooks/useMensagens';
 
 // Deriva lista de operadores {id, nome} do cache de useOperadores
 // (sem query adicional ao banco)

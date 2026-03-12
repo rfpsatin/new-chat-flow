@@ -18,7 +18,7 @@ Reduzir o número de queries ao Supabase, reaproveitando dados já disponíveis 
 
 **Impacto:** -1 query, -1 queryKey desnecessário.
 
-**Status:** [ ] Pendente
+**Status:** [x] Concluído
 
 ---
 
@@ -41,7 +41,7 @@ Reduzir o número de queries ao Supabase, reaproveitando dados já disponíveis 
 
 **Impacto:** -5 queries ao banco (todas servidas pelo cache de 1 única query).
 
-**Status:** [ ] Pendente
+**Status:** [x] Concluído
 
 ---
 
@@ -55,7 +55,7 @@ Reduzir o número de queries ao Supabase, reaproveitando dados já disponíveis 
 
 **Impacto:** -1 query por mensagem/arquivo enviado e por encerramento.
 
-**Status:** [ ] Pendente
+**Status:** [x] Concluído
 
 ---
 
@@ -69,7 +69,7 @@ Reduzir o número de queries ao Supabase, reaproveitando dados já disponíveis 
 
 **Impacto:** -1 query por encerramento.
 
-**Status:** [ ] Pendente
+**Status:** [x] Concluído
 
 ---
 
@@ -83,7 +83,7 @@ Reduzir o número de queries ao Supabase, reaproveitando dados já disponíveis 
 
 **Impacto:** Sem redução de queries, mas reduz o tempo de resposta (~2x mais rápido para carregar a tela).
 
-**Status:** [ ] Pendente
+**Status:** [x] Concluído
 
 ---
 
@@ -107,7 +107,7 @@ Muitas consultam a mesma tabela com filtros de período similares.
 
 **Impacto:** -9 queries por renderização do dashboard (de 12 para ~3).
 
-**Status:** [ ] Pendente
+**Status:** [x] Concluído
 
 ---
 
@@ -121,7 +121,7 @@ Muitas consultam a mesma tabela com filtros de período similares.
 
 **Impacto:** -1 query a cada 5 segundos (reduz polling pela metade).
 
-**Status:** [ ] Pendente
+**Status:** [x] Concluído
 
 ---
 
@@ -135,7 +135,7 @@ Muitas consultam a mesma tabela com filtros de período similares.
 
 **Impacto:** 0 queries (limpeza de código, previne divergências futuras).
 
-**Status:** [ ] Pendente
+**Status:** [x] Concluído
 
 ---
 

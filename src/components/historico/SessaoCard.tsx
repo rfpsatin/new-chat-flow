@@ -6,7 +6,7 @@ import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import React from 'react';
 import { HistoricoConversa } from '@/types/atendimento';
-import { useMensagensHistorico } from '@/hooks/useHistorico';
+import { useMensagensHistorico } from '@/hooks/useMensagens';
 import { SatisfacaoStars } from './SatisfacaoStars';
 
 function getHistoricoDisplayContent(msg: { conteudo: string | null; payload?: any }): string {

@@ -18,7 +18,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Search, Phone, Calendar, MessageSquare, User, Clock, Send, Loader2, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useMensagensHistorico } from '@/hooks/useHistorico';
+import { useMensagensHistorico } from '@/hooks/useMensagens';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
