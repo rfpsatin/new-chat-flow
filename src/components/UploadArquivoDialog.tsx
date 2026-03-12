@@ -19,6 +19,7 @@ interface UploadArquivoDialogProps {
   conversaId: string;
   contatoId: string | null;
   remetenteId: string | null;
+  whatsappNumero: string | null;
   canRespond: boolean;
 }
 
@@ -32,6 +33,7 @@ export function UploadArquivoDialog({
   conversaId,
   contatoId,
   remetenteId,
+  whatsappNumero,
   canRespond,
 }: UploadArquivoDialogProps) {
   const { toast } = useToast();
@@ -112,7 +114,7 @@ export function UploadArquivoDialog({
       setError('Selecione um arquivo para enviar.');
       return;
     }
-    if (!contatoId || !remetenteId) {
+    if (!contatoId || !remetenteId || !whatsappNumero) {
       setError('Não foi possível identificar o contato ou atendente.');
       return;
     }
@@ -124,6 +126,7 @@ export function UploadArquivoDialog({
         contato_id: contatoId,
         remetenteId,
         file,
+        whatsapp_numero: whatsappNumero,
       });
       toast({
         title: 'Arquivo enviado',
@@ -143,7 +146,7 @@ export function UploadArquivoDialog({
   };
 
   const disabled =
-    !canRespond || !contatoId || !remetenteId || enviarArquivo.isPending || !file;
+    !canRespond || !contatoId || !remetenteId || !whatsappNumero || enviarArquivo.isPending || !file;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
