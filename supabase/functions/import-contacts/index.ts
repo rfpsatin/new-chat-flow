@@ -199,7 +199,15 @@ Deno.serve(async (req) => {
       })
     }
 
-    if (!validRows.length) {
+    // Deduplicate by whatsapp_numero – keep last occurrence (overwrites earlier rows)
+    const deduped = new Map<string, typeof validRows[number]>()
+    for (const row of validRows) {
+      deduped.set(row.whatsapp_numero, row)
+    }
+    const uniqueRows = Array.from(deduped.values())
+    const duplicatesRemoved = validRows.length - uniqueRows.length
+
+    if (!uniqueRows.length) {
       return new Response(
         JSON.stringify({
           error: 'Nenhuma linha valida para importar',
