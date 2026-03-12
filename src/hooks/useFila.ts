@@ -2,9 +2,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { FilaAtendimento, Conversa } from '@/types/atendimento';
 import { useEffect, useMemo } from 'react';
+import { usePageVisibility } from '@/hooks/usePageVisibility';
 
 export function useFila(empresaId: string) {
   const queryClient = useQueryClient();
+  const isTabVisible = usePageVisibility();
+
+  // Quando a aba estiver visível, fazemos um polling leve (30s) como "heart-beat".
+  // Quando a aba estiver em background, confiamos apenas no Realtime + recarregamento manual.
+  const refetchInterval = isTabVisible ? 30000 : false;
 
   const query = useQuery({
     queryKey: ['fila', empresaId],
@@ -18,7 +24,7 @@ export function useFila(empresaId: string) {
       return data as FilaAtendimento[];
     },
     enabled: !!empresaId,
-    refetchInterval: 5000,
+    refetchInterval,
   });
 
   // Real-time subscription
