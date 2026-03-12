@@ -19,6 +19,7 @@ interface UploadArquivoDialogProps {
   conversaId: string;
   contatoId: string | null;
   remetenteId: string | null;
+  whatsappNumero: string | null;
   canRespond: boolean;
 }
 
