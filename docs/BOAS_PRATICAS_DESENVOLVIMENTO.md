@@ -85,6 +85,7 @@ Esta seção registra otimizações já implementadas, para servirem de modelo.
 - **Antes de criar uma nova query:**
   - Procurar se já existe um hook em `src/hooks/**` que faz algo parecido.
   - Se existir, reutilizar ou estender o hook atual.
+  - Em caso de dúvida, preferir **consultar este documento** e o `docs/REDUNDANCIA_QUERIES.md` antes de adicionar novos acessos ao banco.
 
 - **Ao criar novos hooks:**
   - Pensar se ele pode servir como “boundary” para várias telas (ex.: `useDashboardStats`, `useFila`, `useEmpresa`).
