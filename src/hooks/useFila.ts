@@ -3,40 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { FilaAtendimento, Conversa } from '@/types/atendimento';
 import { useEffect, useMemo } from 'react';
 
-// Retorna contagem de atendimentos ativos por agente
-export function useAtendimentosAtivos(empresaId: string) {
-  const { data: filaData } = useQuery({
-    queryKey: ['fila-ativos', empresaId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('vw_fila_atendimento')
-        .select('agente_responsavel_id')
-        .eq('empresa_id', empresaId)
-        .eq('status', 'em_atendimento_humano');
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!empresaId,
-    refetchInterval: 5000,
-  });
-
-  const contagemPorAgente = useMemo(() => {
-    const map = new Map<string, number>();
-    filaData?.forEach((item) => {
-      if (item.agente_responsavel_id) {
-        map.set(
-          item.agente_responsavel_id,
-          (map.get(item.agente_responsavel_id) || 0) + 1
-        );
-      }
-    });
-    return map;
-  }, [filaData]);
-
-  return contagemPorAgente;
-}
-
 export function useFila(empresaId: string) {
   const queryClient = useQueryClient();
 
@@ -79,6 +45,25 @@ export function useFila(empresaId: string) {
   }, [empresaId, queryClient]);
 
   return query;
+}
+
+// Deriva contagem de atendimentos ativos por agente a partir do cache de useFila
+// (sem query adicional — reutiliza ['fila', empresaId] que já faz polling a cada 5s)
+export function useAtendimentosAtivos(empresaId: string) {
+  const { data: filaData } = useFila(empresaId);
+
+  return useMemo(() => {
+    const map = new Map<string, number>();
+    filaData?.forEach((item) => {
+      if (item.status === 'em_atendimento_humano' && item.agente_responsavel_id) {
+        map.set(
+          item.agente_responsavel_id,
+          (map.get(item.agente_responsavel_id) || 0) + 1
+        );
+      }
+    });
+    return map;
+  }, [filaData]);
 }
 
 // Supervisora encaminha conversa para atendente (esperando_tria → fila_humano)
