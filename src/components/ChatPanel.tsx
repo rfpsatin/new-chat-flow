@@ -102,6 +102,7 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
           contato_id: conversaDetalhes.contato_id,
           remetenteId: currentUser.id,
           file,
+          whatsapp_numero: conversa.whatsapp_numero,
         });
       } catch (error) {
         const message =
@@ -163,6 +164,7 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
       conteudo: mensagemInput.trim(),
       remetenteId: currentUser.id,
       humanMode,
+      whatsapp_numero: conversa.whatsapp_numero,
       replyToMessageId: replyingTo?.id ?? null,
       replyToWhatsappId: (replyingTo as any)?.whatsapp_message_id ?? null,
     });

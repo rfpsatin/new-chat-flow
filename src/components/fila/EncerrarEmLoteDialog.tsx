@@ -129,22 +129,12 @@ export function EncerrarEmLoteDialog({
                     body: { conversa_id: conversa.conversa_id, empresa_id: empresaId },
                   })
                 ).catch(console.error);
-              } else {
-                const { data: contato } = await withTimeout(async () =>
-                  supabase
-                    .from('contatos')
-                    .select('whatsapp_numero')
-                    .eq('id', conversa.contato_id!)
-                    .single()
-                );
-
-                if (contato) {
-                  await withTimeout(() =>
-                    supabase.functions.invoke('close-service', {
-                      body: { conversa_id: conversa.conversa_id, empresa_id: empresaId, chat_id: contato.whatsapp_numero },
-                    })
-                  ).catch(console.error);
-                }
+              } else if (conversa.whatsapp_numero) {
+                await withTimeout(() =>
+                  supabase.functions.invoke('close-service', {
+                    body: { conversa_id: conversa.conversa_id, empresa_id: empresaId, chat_id: conversa.whatsapp_numero },
+                  })
+                ).catch(console.error);
               }
             } catch (externalError) {
               console.error('Erro em integrações externas (seguindo encerramento):', conversa.conversa_id, externalError);

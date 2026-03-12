@@ -42,6 +42,7 @@ export function useEncerrarConversa() {
       resumo,
       empresaId,
       contatoId,
+      whatsapp_numero,
     }: {
       conversaId: string;
       motivoId: string;
@@ -49,23 +50,13 @@ export function useEncerrarConversa() {
       resumo?: string;
       empresaId: string;
       contatoId: string;
+      whatsapp_numero: string;
     }) => {
-      // 1. Buscar número do contato para enviar via WhatsApp
-      const { data: contato, error: contatoError } = await supabase
-        .from('contatos')
-        .select('whatsapp_numero')
-        .eq('id', contatoId)
-        .single();
-
-      if (contatoError || !contato) {
-        throw new Error('Não foi possível obter o número do contato');
-      }
-
-      // 2. Enviar mensagem de pesquisa via WhatsApp
+      // 1. Enviar mensagem de pesquisa via WhatsApp
       const { error: whapiError } = await supabase.functions.invoke('whapi-send-message', {
         body: {
           empresa_id: empresaId,
-          to: contato.whatsapp_numero,
+          to: whatsapp_numero,
           message: MENSAGEM_PESQUISA,
         },
       });
@@ -127,7 +118,7 @@ export function useEncerrarConversa() {
             body: {
               conversa_id: conversaId,
               empresa_id: empresaId,
-              chat_id: contato.whatsapp_numero,
+              chat_id: whatsapp_numero,
             },
           });
 

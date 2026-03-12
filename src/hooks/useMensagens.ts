@@ -62,6 +62,7 @@ export function useEnviarMensagem() {
       conteudo,
       remetenteId,
       humanMode,
+      whatsapp_numero,
       replyToMessageId,
       replyToWhatsappId,
     }: {
@@ -71,28 +72,17 @@ export function useEnviarMensagem() {
       conteudo: string;
       remetenteId: string;
       humanMode?: boolean;
+      whatsapp_numero: string;
       replyToMessageId?: number | null;
       replyToWhatsappId?: string | null;
     }) => {
-      // 1. Get contact to retrieve WhatsApp number
-      const { data: contato, error: contatoError } = await supabase
-        .from('contatos')
-        .select('whatsapp_numero')
-        .eq('id', contato_id)
-        .single();
-
-      if (contatoError || !contato) {
-        throw new Error('Contato não encontrado');
-      }
-
-      // 2. Send message via Whapi API
       const isHuman = humanMode === true;
       const whapiBody = `#\"human_mode=${isHuman ? 'true' : 'false'}\"# ${conteudo}`;
 
       const { data: sendResult, error: whapiError } = await supabase.functions.invoke('whapi-send-message', {
         body: {
           empresa_id: empresaId,
-          to: contato.whatsapp_numero,
+          to: whatsapp_numero,
           message: whapiBody,
           reply_to_whatsapp_id: replyToWhatsappId ?? undefined,
         },
@@ -139,27 +129,16 @@ export function useEnviarArquivo() {
       contato_id,
       remetenteId,
       file,
-      humanMode, // reservado para evoluções futuras
+      whatsapp_numero,
     }: {
       empresaId: string;
       conversaId: string;
       contato_id: string;
       remetenteId: string;
       file: File;
-      humanMode?: boolean;
+      whatsapp_numero: string;
     }) => {
-      // 1. Buscar contato para obter número do WhatsApp
-      const { data: contato, error: contatoError } = await supabase
-        .from('contatos')
-        .select('whatsapp_numero')
-        .eq('id', contato_id)
-        .single();
-
-      if (contatoError || !contato) {
-        throw new Error('Contato não encontrado');
-      }
-
-      // 2. Fazer upload do arquivo para o storage para gerar uma URL pública
+      // 1. Fazer upload do arquivo para o storage para gerar uma URL pública
       //    Bucket esperado: "chat-media" (precisa existir no projeto Supabase)
       const bucket = 'chat-media';
       const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -192,7 +171,7 @@ export function useEnviarArquivo() {
       const { error: whapiError } = await supabase.functions.invoke('whapi-send-media', {
         body: {
           empresa_id: empresaId,
-          to: contato.whatsapp_numero,
+          to: whatsapp_numero,
           media_url: mediaUrl,
           media_kind: mediaKind,
           filename: file.name,
