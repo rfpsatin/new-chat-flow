@@ -948,20 +948,6 @@ export type Database = {
         Args: { p_conversa_id: string }
         Returns: undefined
       }
-      get_acompanhamento_mensagens: {
-        Args: { p_data_inicio: string; p_data_fim: string }
-        Returns: {
-          empresa_id: string
-          empresa_nome: string | null
-          mensagens_recebidas: number
-          conversas_fechadas: number
-          em_aberto_total: number
-          em_aberto_bot: number
-          em_aberto_triagem: number
-          em_aberto_fila: number
-          em_aberto_atendimento: number
-        }[]
-      }
       get_next_nr_protocolo: { Args: never; Returns: string }
       is_super_admin: { Args: { p_user_id: string }; Returns: boolean }
       solicitar_atendimento_humano: {
