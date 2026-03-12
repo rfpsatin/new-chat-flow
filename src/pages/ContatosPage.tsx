@@ -28,6 +28,11 @@ type ImportRow = {
   email?: string | null;
 };
 
+type ParsedCsv = {
+  delimiter: ',' | ';';
+  rows: string[][];
+};
+
 function stripQuotes(value: string): string {
   let v = value.trim();
   // Converte "" em "
@@ -55,27 +60,109 @@ function normalizePhoneField(raw: string): string {
   return v.trim();
 }
 
-function parseCsvLines(text: string): ImportRow[] {
+function normalizeHeaderField(value: string): string {
+  return stripQuotes(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function parseCsvRow(line: string, delimiter: ',' | ';'): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const next = line[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        current += '"';
+        i++;
+        continue;
+      }
+      inQuotes = !inQuotes;
+      continue;
+    }
+
+    if (char === delimiter && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  result.push(current.trim());
+  return result;
+}
+
+function countDelimiterOutsideQuotes(line: string, delimiter: ',' | ';'): number {
+  let count = 0;
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const next = line[i + 1];
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        i++;
+        continue;
+      }
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (char === delimiter && !inQuotes) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+function parseCsvText(text: string): ParsedCsv {
   const rawLines = text
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
 
-  if (rawLines.length === 0) return [];
+  if (!rawLines.length) {
+    return { delimiter: ';', rows: [] };
+  }
+
+  const firstLine = rawLines[0];
+  const commas = countDelimiterOutsideQuotes(firstLine, ',');
+  const semicolons = countDelimiterOutsideQuotes(firstLine, ';');
+  const delimiter: ',' | ';' = semicolons > commas ? ';' : ',';
+
+  return {
+    delimiter,
+    rows: rawLines.map((line) => parseCsvRow(line, delimiter)),
+  };
+}
+
+function parseCsvLines(text: string): ImportRow[] {
+  const parsedCsv = parseCsvText(text);
+  if (!parsedCsv.rows.length) return [];
 
   const rows: ImportRow[] = [];
+  const [headerRow, ...dataRows] = parsedCsv.rows;
+  const headers = headerRow.map(normalizeHeaderField);
 
-  const header = rawLines[0];
-  const headerClean = stripQuotes(header).toLowerCase();
+  const idxByName = (name: string) => headers.indexOf(name);
+  const idxByCandidates = (candidates: string[]) =>
+    headers.findIndex((header) => candidates.includes(header));
 
-  // Caso 0: formato simples com cabeçalho "Nome,Numero" (como no exemplo enviado)
-  if (headerClean.startsWith('nome,') && headerClean.includes('numero')) {
-    for (let i = 1; i < rawLines.length; i++) {
-      const line = rawLines[i];
-      const cols = line.split(','); // esperamos duas colunas: nome,numero
-      if (cols.length < 2) continue;
-      const nome = normalizeNameField(cols[0]);
-      const whatsapp = normalizePhoneField(cols[1]);
+  // Caso 0: formato simples com cabeçalho nome/numero
+  const idxNomeSimple = idxByCandidates(['nome', 'name']);
+  const idxNumeroSimple = idxByCandidates(['numero', 'whatsapp_numero', 'whatsapp', 'telefone', 'phone']);
+  if (idxNomeSimple >= 0 && idxNumeroSimple >= 0) {
+    for (const cols of dataRows) {
+      const nome = normalizeNameField(cols[idxNomeSimple] ?? '');
+      const whatsapp = normalizePhoneField(cols[idxNumeroSimple] ?? '');
       if (!whatsapp) continue;
       rows.push({
         nome: nome || null,
@@ -86,20 +173,17 @@ function parseCsvLines(text: string): ImportRow[] {
     return rows;
   }
 
-  // Caso 1: CSV exportado do Google Contacts (como o exemplo enviado)
-  if (header.includes('Phone 1 - Value')) {
-    const headers = header.split(',').map((h) => stripQuotes(h));
-    const idxPhone = headers.indexOf('Phone 1 - Value');
-    const idxFirst = headers.indexOf('First Name');
-    const idxMiddle = headers.indexOf('Middle Name');
-    const idxLast = headers.indexOf('Last Name');
-    const idxOrg = headers.indexOf('Organization Name');
-    const idxEmail = headers.indexOf('E-mail 1 - Value'); // pode não existir
+  // Caso 1: CSV exportado do Google Contacts
+  const idxPhone = idxByCandidates(['phone 1 - value', 'phone', 'telefone', 'whatsapp_numero', 'whatsapp']);
+  if (idxPhone >= 0) {
+    const idxFirst = idxByName('first name');
+    const idxMiddle = idxByName('middle name');
+    const idxLast = idxByName('last name');
+    const idxOrg = idxByName('organization name');
+    const idxEmail = idxByCandidates(['e-mail 1 - value', 'email', 'e-mail']);
 
-    for (let i = 1; i < rawLines.length; i++) {
-      const line = rawLines[i];
-      const cols = line.split(','); // no exemplo, não há vírgulas dentro de campos
-      if (idxPhone === -1 || !cols[idxPhone]) continue;
+    for (const cols of dataRows) {
+      if (!cols[idxPhone]) continue;
 
       const phoneRaw = normalizePhoneField(cols[idxPhone] ?? '');
       if (!phoneRaw) continue;
@@ -111,8 +195,7 @@ function parseCsvLines(text: string): ImportRow[] {
       if (!nome && idxOrg >= 0) {
         nome = normalizeNameField(cols[idxOrg] ?? '');
       }
-      const email =
-        idxEmail >= 0 ? (stripQuotes(cols[idxEmail] ?? '') || null) : null;
+      const email = idxEmail >= 0 ? (stripQuotes(cols[idxEmail] ?? '') || null) : null;
 
       rows.push({
         nome: nome || null,
@@ -125,10 +208,9 @@ function parseCsvLines(text: string): ImportRow[] {
   }
 
   // Caso 2: formato simples "nome;whatsapp;email" ou "nome,whatsapp,email"
-  for (const line of rawLines) {
-    const parts = line.split(/[;,]/).map((p) => stripQuotes(p));
+  for (const parts of dataRows) {
     if (parts.length === 0) continue;
-    const [nome, whatsapp, email] = parts;
+    const [nome, whatsapp, email] = parts.map((p) => stripQuotes(p));
     if (!whatsapp || whatsapp === 'whatsapp_numero') continue; // ignora cabeçalho simples
     rows.push({
       nome: normalizeNameField(nome || ''),
@@ -138,6 +220,24 @@ function parseCsvLines(text: string): ImportRow[] {
   }
 
   return rows;
+}
+
+function csvEscapeField(value: string): string {
+  if (value.includes(';') || value.includes('"') || value.includes('\n')) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+function buildNormalizedContactsCsv(rows: ImportRow[]): string {
+  const lines = ['nome;whatsapp_numero;email'];
+  rows.forEach((row) => {
+    const nome = csvEscapeField((row.nome ?? '').trim());
+    const whatsapp = csvEscapeField(row.whatsapp_numero.trim());
+    const email = csvEscapeField((row.email ?? '').trim());
+    lines.push(`${nome};${whatsapp};${email}`);
+  });
+  return `${lines.join('\n')}\n`;
 }
 
 function MensagensDialog({ conversa, onClose }: { conversa: HistoricoConversa; onClose: () => void }) {
@@ -413,7 +513,7 @@ function ImportContatosDialog({
       }));
 
       const { data, error } = await supabase.functions.invoke('import-contacts', {
-        body: { rows: payloadRows },
+        body: { rows: payloadRows, import_tag: fileName || null },
       });
       if (error) {
         throw new Error(error.message || 'Falha ao importar contatos');
@@ -598,6 +698,92 @@ function ImportContatosDialog({
   );
 }
 
+function TratarDadosBrutosDialog({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [sourceName, setSourceName] = useState('');
+  const [rows, setRows] = useState<ImportRow[]>([]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSourceName(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result || '');
+      const parsed = parseCsvLines(text);
+      if (!parsed.length) {
+        toast.error('Nenhuma linha reconhecida. Verifique se o arquivo CSV está válido.');
+        setRows([]);
+        return;
+      }
+
+      setRows(parsed);
+      toast.success(`${parsed.length} contato(s) tratado(s). Baixe o CSV para importar.`);
+    };
+    reader.readAsText(file, 'utf-8');
+  };
+
+  const handleDownload = () => {
+    if (!rows.length) {
+      toast.error('Carregue um arquivo antes de baixar.');
+      return;
+    }
+
+    const content = buildNormalizedContactsCsv(rows);
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const baseName = sourceName ? sourceName.replace(/\.csv$/i, '') : 'contatos';
+    a.download = `${baseName}_tratado.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Tratar dados brutos</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 text-sm">
+          <p className="text-muted-foreground">
+            Envie um CSV exportado do Google Contatos (separado por vírgula ou ponto e vírgula). O sistema
+            irá padronizar para o formato de importação: <strong>nome;whatsapp_numero;email</strong>.
+          </p>
+          <Input type="file" accept=".csv,text/csv" onChange={handleFileChange} />
+          {sourceName && (
+            <p className="text-xs text-muted-foreground">
+              Arquivo: <span className="font-medium text-foreground">{sourceName}</span>
+            </p>
+          )}
+          {rows.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {rows.length} linha(s) reconhecida(s) e pronta(s) para exportar.
+            </p>
+          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Fechar
+            </Button>
+            <Button type="button" onClick={handleDownload} disabled={!rows.length}>
+              Baixar CSV tratado
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function ContatosPage() {
   const navigate = useNavigate();
   const { empresaId } = useApp();
@@ -608,6 +794,7 @@ export default function ContatosPage() {
   const [selectedHistorico, setSelectedHistorico] = useState<HistoricoConversa | null>(null);
   const [contatoParaIniciar, setContatoParaIniciar] = useState<Contato | null>(null);
   const [showImport, setShowImport] = useState(false);
+  const [showTratamento, setShowTratamento] = useState(false);
 
   const filteredContatos = contatos?.filter(contato =>
     contato.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -635,9 +822,14 @@ export default function ContatosPage() {
           <div className="p-4 border-b space-y-3">
             <div className="flex items-center justify-between gap-2">
               <h2 className="font-semibold text-lg">Contatos</h2>
-              <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
-                Importar
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setShowTratamento(true)}>
+                  Tratar dados brutos
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
+                  Importar
+                </Button>
+              </div>
             </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -808,6 +1000,12 @@ export default function ContatosPage() {
         <ImportContatosDialog
           open={showImport}
           onClose={() => setShowImport(false)}
+        />
+      )}
+      {showTratamento && (
+        <TratarDadosBrutosDialog
+          open={showTratamento}
+          onClose={() => setShowTratamento(false)}
         />
       )}
     </MainLayout>

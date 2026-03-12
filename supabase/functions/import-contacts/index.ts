@@ -14,6 +14,7 @@ interface ImportRow {
 
 interface ImportContactsRequest {
   rows?: ImportRow[]
+  import_tag?: string | null
 }
 
 type CallerTenant = {
@@ -91,6 +92,7 @@ Deno.serve(async (req) => {
   try {
     const body: ImportContactsRequest = await req.json().catch(() => ({}))
     const rows = body.rows ?? []
+    const importTag = body.import_tag?.trim() || null
 
     if (!Array.isArray(rows) || rows.length === 0) {
       return new Response(
@@ -113,7 +115,14 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    const validRows: { empresa_id: string; nome: string | null; whatsapp_numero: string; email: string | null }[] = []
+    const validRows: {
+      empresa_id: string
+      nome: string | null
+      whatsapp_numero: string
+      email: string | null
+      tp_contato: 'I'
+      tag_origem: string | null
+    }[] = []
     const invalidRows: { row: ImportRow; reason: string }[] = []
 
     for (const r of rows) {
@@ -128,6 +137,8 @@ Deno.serve(async (req) => {
         nome: r.nome?.trim() || null,
         whatsapp_numero: normalized,
         email: r.email?.trim() || null,
+        tp_contato: 'I',
+        tag_origem: importTag,
       })
     }
 
