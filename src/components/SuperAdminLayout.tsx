@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSuperAdmin } from '@/contexts/SuperAdminContext';
-import { Building2, LogOut, ShieldCheck } from 'lucide-react';
+import { Building2, LogOut, ShieldCheck, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -27,7 +27,7 @@ export function SuperAdminLayout({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-        <nav className="flex-1 p-2">
+        <nav className="flex-1 p-2 space-y-1">
           <button
             onClick={() => navigate('/superadmin/empresas')}
             className={cn(
@@ -39,6 +39,18 @@ export function SuperAdminLayout({ children }: { children: ReactNode }) {
           >
             <Building2 className="h-4 w-4" />
             Empresas
+          </button>
+          <button
+            onClick={() => navigate('/superadmin/acompanhamento')}
+            className={cn(
+              "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors",
+              location.pathname.includes('/superadmin/acompanhamento')
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-muted text-foreground"
+            )}
+          >
+            <MessageSquare className="h-4 w-4" />
+            Acompanhamento
           </button>
         </nav>
 
