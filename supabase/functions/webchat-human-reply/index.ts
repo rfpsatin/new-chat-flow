@@ -144,12 +144,17 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Normalize channel to lowercase for n8n compatibility
+    const channelNormalized = conversa.channel ? conversa.channel.toLowerCase() : null
+
     const n8nPayload: Record<string, unknown> = {
-      action: 'human_reply',
       to: conversa.n8n_webhook_id,
+      body: mensagem,
+      source: 'web-chat',
+      channel: channelNormalized,
+      channel_id: channelId,
       empresa_id,
       conversa_id,
-      mensagem,
       remetente_id,
     }
 
