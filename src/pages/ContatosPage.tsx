@@ -55,7 +55,28 @@ function normalizeNameField(raw: string): string {
 }
 
 function normalizePhoneField(raw: string): string {
-  return stripQuotes(raw).trim();
+  const original = stripQuotes(raw).trim();
+  const digitsOnly = original.replace(/\D/g, '');
+  if (!digitsOnly) return original;
+
+  let digits = digitsOnly;
+  if (!digits.startsWith('55') && (digits.length === 10 || digits.length === 11)) {
+    digits = `55${digits}`;
+  }
+
+  if (digits.startsWith('55') && digits.length === 12) {
+    const ddd = digits.slice(2, 4);
+    const local = digits.slice(4);
+    return `55 (${ddd}) ${local.slice(0, 4)}-${local.slice(4)}`;
+  }
+
+  if (digits.startsWith('55') && digits.length === 13) {
+    const ddd = digits.slice(2, 4);
+    const local = digits.slice(4);
+    return `55 (${ddd}) ${local.slice(0, 5)}-${local.slice(5)}`;
+  }
+
+  return original;
 }
 
 function normalizeHeaderField(value: string): string {
@@ -819,16 +840,12 @@ export default function ContatosPage() {
   };
 
   const formatPhone = (phone: string) => {
-    const cleaned = phone.replace(/\D/g, '');
-    if (cleaned.length === 13) {
-      return `+${cleaned.slice(0, 2)} (${cleaned.slice(2, 4)}) ${cleaned.slice(4, 9)}-${cleaned.slice(9)}`;
-    }
-    return phone;
+    return normalizePhoneField(phone);
   };
 
   const getDisplayPhone = (contato: Contato) => {
     const original = (contato.telefone_numero ?? '').trim();
-    if (original) return original;
+    if (original) return normalizePhoneField(original);
     return formatPhone(contato.whatsapp_numero);
   };
 
@@ -850,6 +867,7 @@ export default function ContatosPage() {
       toast.error('Informe um número de WhatsApp válido.');
       return;
     }
+      const formattedPhone = normalizePhoneField(editWhatsapp);
     setSavingContato(true);
     try {
       const { error } = await supabase
@@ -857,7 +875,7 @@ export default function ContatosPage() {
         .update({
           nome,
           whatsapp_numero: digits,
-          telefone_numero: editWhatsapp.trim() || null,
+            telefone_numero: formattedPhone || null,
         })
         .eq('id', selectedContato.id);
 
@@ -868,7 +886,7 @@ export default function ContatosPage() {
         ...selectedContato,
         nome,
         whatsapp_numero: digits,
-        telefone_numero: editWhatsapp.trim() || null,
+        telefone_numero: formattedPhone || null,
       };
       setSelectedContato(updated);
       queryClient.invalidateQueries({ queryKey: ['contatos', empresaId] });

@@ -13,8 +13,30 @@ interface ImportRow {
 
 function normalizeOriginalPhone(raw: string | null | undefined): string | null {
   if (!raw) return null
-  const value = String(raw).trim()
-  return value.length ? value : null
+  const original = String(raw).trim()
+  if (!original) return null
+
+  const digitsOnly = original.replace(/\D/g, '')
+  if (!digitsOnly) return original
+
+  let digits = digitsOnly
+  if (!digits.startsWith('55') && (digits.length === 10 || digits.length === 11)) {
+    digits = `55${digits}`
+  }
+
+  if (digits.startsWith('55') && digits.length === 12) {
+    const ddd = digits.slice(2, 4)
+    const local = digits.slice(4)
+    return `55 (${ddd}) ${local.slice(0, 4)}-${local.slice(4)}`
+  }
+
+  if (digits.startsWith('55') && digits.length === 13) {
+    const ddd = digits.slice(2, 4)
+    const local = digits.slice(4)
+    return `55 (${ddd}) ${local.slice(0, 5)}-${local.slice(5)}`
+  }
+
+  return original
 }
 
 interface ImportContactsRequest {
