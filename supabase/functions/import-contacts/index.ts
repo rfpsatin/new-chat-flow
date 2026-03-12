@@ -11,6 +11,12 @@ interface ImportRow {
   whatsapp_numero: string
 }
 
+function normalizeOriginalPhone(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  const value = String(raw).trim()
+  return value.length ? value : null
+}
+
 interface ImportContactsRequest {
   rows?: ImportRow[]
   import_tag?: string | null
@@ -127,6 +133,7 @@ Deno.serve(async (req) => {
       empresa_id: string
       nome: string | null
       whatsapp_numero: string
+      telefone_numero: string | null
       tp_contato: 'I'
       tag_origem: string | null
     }[] = []
@@ -143,6 +150,7 @@ Deno.serve(async (req) => {
         empresa_id: empresaId,
         nome: sanitizeName(r.nome) || null,
         whatsapp_numero: normalized,
+        telefone_numero: normalizeOriginalPhone(r.whatsapp_numero),
         tp_contato: 'I',
         tag_origem: importTag,
       })

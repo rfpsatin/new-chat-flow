@@ -55,10 +55,7 @@ function normalizeNameField(raw: string): string {
 }
 
 function normalizePhoneField(raw: string): string {
-  let v = stripQuotes(raw);
-  // Remove sinal de +
-  v = v.replace(/\+/g, '');
-  return v.trim();
+  return stripQuotes(raw).trim();
 }
 
 function normalizeHeaderField(value: string): string {
@@ -829,6 +826,12 @@ export default function ContatosPage() {
     return phone;
   };
 
+  const getDisplayPhone = (contato: Contato) => {
+    const original = (contato.telefone_numero ?? '').trim();
+    if (original) return original;
+    return formatPhone(contato.whatsapp_numero);
+  };
+
   useEffect(() => {
     if (selectedContato) {
       setEditNome(selectedContato.nome ?? '');
@@ -854,6 +857,7 @@ export default function ContatosPage() {
         .update({
           nome,
           whatsapp_numero: digits,
+          telefone_numero: editWhatsapp.trim() || null,
         })
         .eq('id', selectedContato.id);
 
@@ -864,6 +868,7 @@ export default function ContatosPage() {
         ...selectedContato,
         nome,
         whatsapp_numero: digits,
+        telefone_numero: editWhatsapp.trim() || null,
       };
       setSelectedContato(updated);
       queryClient.invalidateQueries({ queryKey: ['contatos', empresaId] });
@@ -938,7 +943,7 @@ export default function ContatosPage() {
                           </p>
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <Phone className="w-3 h-3" />
-                            <span>{formatPhone(contato.whatsapp_numero)}</span>
+                            <span>{getDisplayPhone(contato)}</span>
                           </div>
                         </div>
                       </div>
@@ -1000,7 +1005,7 @@ export default function ContatosPage() {
                       <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Phone className="w-4 h-4" />
-                          {formatPhone(editWhatsapp)}
+                          {editWhatsapp}
                         </span>
                         <span className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />

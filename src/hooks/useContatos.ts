@@ -34,7 +34,7 @@ export function useContatosInfinite(empresaId: string, search?: string) {
         .eq('empresa_id', empresaId);
 
       if (term) {
-        query = query.or(`nome.ilike.%${term}%,whatsapp_numero.ilike.%${term}%`);
+        query = query.or(`nome.ilike.%${term}%,whatsapp_numero.ilike.%${term}%,telefone_numero.ilike.%${term}%`);
       }
 
       const { data, error } = await query
