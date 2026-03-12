@@ -2,9 +2,17 @@ import { Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDev } from '@/contexts/DevContext';
 import { cn } from '@/lib/utils';
+import { useApp } from '@/contexts/AppContext';
 
 export function DevToggle() {
   const { isDevMode, toggleDevMode, setDevPanelOpen } = useDev();
+  const { currentUser } = useApp();
+
+  const isDevAllowed = currentUser?.tipo_usuario === 'adm';
+
+  if (!isDevAllowed) {
+    return null;
+  }
 
   const handleClick = () => {
     if (!isDevMode) {

@@ -8,6 +8,8 @@ export interface EmpresaFormData {
   nome_fantasia: string;
   cnpj: string;
   ativo: boolean;
+  agente_ia_ativo: boolean;
+  tipo_atendimento: 'marketing' | 'comercial';
 }
 
 export function useEmpresa(empresaId: string) {
@@ -19,7 +21,7 @@ export function useEmpresa(empresaId: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('empresas')
-        .select('id, razao_social, nome_fantasia, cnpj, ativo, created_at')
+        .select('id, razao_social, nome_fantasia, cnpj, ativo, agente_ia_ativo, tipo_atendimento, created_at')
         .eq('id', empresaId)
         .single();
 
@@ -38,9 +40,11 @@ export function useEmpresa(empresaId: string) {
           nome_fantasia: dados.nome_fantasia,
           cnpj: dados.cnpj,
           ativo: dados.ativo,
+          agente_ia_ativo: dados.agente_ia_ativo,
+          tipo_atendimento: dados.tipo_atendimento,
         })
         .eq('id', empresaId)
-        .select('id, razao_social, nome_fantasia, cnpj, ativo, created_at')
+        .select('id, razao_social, nome_fantasia, cnpj, ativo, agente_ia_ativo, tipo_atendimento, created_at')
         .single();
 
       if (error) throw error;

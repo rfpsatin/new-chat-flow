@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Usuario } from '@/types/atendimento';
@@ -15,23 +15,39 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const SESSION_HEARTBEAT_MS = 4 * 60 * 1000; // 4 min
+
+function isAuthError(error: unknown): boolean {
+  if (!error) return false;
+  const e = error as { status?: number; message?: string; name?: string };
+  if (e.status === 401 || e.status === 403) return true;
+  const msg = (e.message || '').toLowerCase();
+  return msg.includes('session_not_found')
+    || msg.includes('jwt expired')
+    || msg.includes('invalid jwt')
+    || e.name === 'AuthSessionMissingError';
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<Usuario | null>(null);
   const [selectedConversa, setSelectedConversa] = useState<import('@/types/atendimento').Conversa | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    let initialSessionHandled = false;
+  const currentUserRef = useRef<Usuario | null>(null);
+  useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
 
+  const clearSessionAndRedirect = useCallback(() => {
+    setCurrentUser(null);
+    setSelectedConversa(null);
+    navigate('/login', { replace: true });
+  }, [navigate]);
+
+  useEffect(() => {
     const setLoadingDone = () => setAuthLoading(false);
 
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       try {
-        // Skip the INITIAL_SESSION event if we already handled it via getSession
-        if (event === 'INITIAL_SESSION' && initialSessionHandled) return;
-
         if (session?.user) {
           const { data: usuario } = await supabase
             .from('usuarios')
@@ -43,51 +59,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (usuario) {
             setCurrentUser(usuario as Usuario);
           } else {
-            // Has auth session but no active usuario record - sign out
-            console.warn('Auth session found but no active usuario record, signing out');
+            console.warn('Auth session exists but no active usuario record');
             setCurrentUser(null);
-            await supabase.auth.signOut();
             navigate('/login', { replace: true });
           }
         } else {
           setCurrentUser(null);
           setSelectedConversa(null);
+          if (event !== 'INITIAL_SESSION') {
+            navigate('/login', { replace: true });
+          }
         }
       } finally {
         setLoadingDone();
       }
     });
 
-    // Check existing session on mount (e.g. after F5). Always clear loading on resolve/reject.
-    supabase.auth
-      .getSession()
-      .then(async ({ data: { session } }) => {
-        initialSessionHandled = true;
-        if (session?.user) {
-          const { data: usuario } = await supabase
-            .from('usuarios')
-            .select('*')
-            .eq('auth_user_id', session.user.id)
-            .eq('ativo', true)
-            .maybeSingle();
-
-          if (usuario) {
-            setCurrentUser(usuario as Usuario);
-          } else {
-            // Has auth session but no active usuario - sign out and redirect
-            console.warn('Stale auth session detected, signing out');
-            setCurrentUser(null);
-            await supabase.auth.signOut();
-            navigate('/login', { replace: true });
-          }
-        }
-      })
-      .catch((err) => {
-        console.warn('getSession failed on load', err);
-      })
-      .finally(setLoadingDone);
-
-    // Fallback: if auth never settles (e.g. network hung), stop loading after 8s so user sees login
     const timeoutId = window.setTimeout(setLoadingDone, 8000);
 
     return () => {
@@ -96,12 +83,60 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const logout = async () => {
-    await supabase.auth.signOut();
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!currentUserRef.current) return;
+
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error && isAuthError(error)) {
+          console.warn('Session expired (visibility check):', error.message);
+          clearSessionAndRedirect();
+        } else if (!error && !user) {
+          console.warn('Session gone (visibility check)');
+          clearSessionAndRedirect();
+        }
+      } catch {
+        // Network or transient error – keep session alive
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [clearSessionAndRedirect]);
+
+  useEffect(() => {
+    const id = window.setInterval(async () => {
+      if (!currentUserRef.current) return;
+
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error && isAuthError(error)) {
+          console.warn('Session heartbeat: auth error', error.message);
+          clearSessionAndRedirect();
+        } else if (!error && !user) {
+          console.warn('Session heartbeat: no user');
+          clearSessionAndRedirect();
+        }
+      } catch {
+        // Network or transient error – keep session alive
+      }
+    }, SESSION_HEARTBEAT_MS);
+
+    return () => window.clearInterval(id);
+  }, [clearSessionAndRedirect]);
+
+  const logout = useCallback((): Promise<void> => {
     setCurrentUser(null);
     setSelectedConversa(null);
     navigate('/login', { replace: true });
-  };
+    // Não chamamos signOut() aqui para evitar condição de corrida: um signOut()
+    // assíncrono pode terminar depois do próximo login e apagar a sessão nova,
+    // deixando o botão "Entrando..." travado. O próximo signInWithPassword
+    // sobrescreve a sessão no storage; ao sair, o token antigo fica até o próximo login.
+    return Promise.resolve();
+  }, [navigate]);
 
   const empresaId = currentUser?.empresa_id ?? '';
 

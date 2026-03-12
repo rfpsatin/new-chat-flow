@@ -318,3 +318,115 @@ Consolidar a seguranca do `chat-flow-pro` em tres frentes:
 - **Fase C:** reduz regressao e inconsistencias de autorizacao.
 - **Fase D:** melhora maturidade operacional e auditoria.
 
+---
+
+## Apêndice – Estados de conexão no Postgres/Supabase e como investigar
+
+### A.1. O que significam os estados
+
+- **idle**
+  - Conexões que **já executaram a última query** e estão paradas aguardando a próxima.
+  - Em ambientes com pool (como Supabase), é normal existir um número razoável de conexões em `idle`: o pool mantém conexões abertas para reutilização.
+
+- **active**
+  - Conexões que **estão executando uma query neste momento**.
+  - Normal ver flutuações rápidas conforme o tráfego da aplicação.
+
+- **background**
+  - Processos internos do Postgres/Supabase:
+    - `autovacuum`, `logical replication`, `checkpointer`, `bgwriter`, `walwriter`, serviços de Realtime etc.
+  - Não são conexões da aplicação e **não devem ser gerenciadas manualmente**.
+
+- **idle in transaction**
+  - Conexões que **abriram uma transação** e ficaram paradas sem `COMMIT`/`ROLLBACK`.
+  - São as mais perigosas:
+    - mantêm locks por mais tempo que o necessário;
+    - atrapalham autovacuum (xid antigo) e podem impactar desempenho e uso de disco;
+    - geralmente vêm de ferramentas (SQL editor, DBeaver, psql) ou código que inicia transação e não finaliza.
+  - **Meta operacional:** manter `idle in transaction` próximo de **zero**.
+
+Em resumo:
+
+- Um número moderado de `idle` + `background` é esperado.
+- `active` indica carga real.
+- `idle in transaction` é o sinal de alerta a ser investigado.
+
+### A.2. Consultas úteis para diagnosticar conexões
+
+> Todas as queries abaixo são **read-only** e podem ser executadas no SQL editor do Supabase.
+
+- **Visão geral por estado:**
+
+```sql
+select
+  state,
+  count(*) as total
+from pg_stat_activity
+group by state
+order by total desc;
+```
+
+- **Detalhar conexões em `idle in transaction`:**
+
+```sql
+select
+  pid,
+  usename,
+  application_name,
+  client_addr,
+  state,
+  xact_start,
+  query_start,
+  now() - xact_start as tempo_transacao,
+  now() - query_start as tempo_query,
+  query
+from pg_stat_activity
+where state = 'idle in transaction'
+order by xact_start asc;
+```
+
+Uso típico:
+
+- Se `application_name`/`client_addr` indicar uma ferramenta (SQL editor, DBeaver, psql), fechar essa sessão/ferramenta.
+- Se apontar para algum serviço nosso, revisar o código para **não manter transações abertas** enquanto espera input do usuário, chama APIs externas, etc.
+
+- **Ver conexões da aplicação em geral (ignorando background):**
+
+```sql
+select
+  datname,
+  usename,
+  application_name,
+  state,
+  count(*) as total
+from pg_stat_activity
+where backend_type = 'client backend'
+group by datname, usename, application_name, state
+order by total desc;
+```
+
+Isso ajuda a identificar:
+
+- quais aplicações/ferramentas mais geram conexões;
+- se há muitos clientes “ruidosos” (várias conexões `idle` do mesmo app, por exemplo).
+
+### A.3. Boas práticas para reduzir conexões problemáticas
+
+- **Eliminar `idle in transaction`:**
+  - evitar transações longas em código; sempre `COMMIT`/`ROLLBACK` o mais rápido possível;
+  - não deixar SQL editor / DBeaver / psql com transações abertas.
+
+- **Reaproveitar pools de conexão:**
+  - criar o client Supabase/PG **uma vez por processo** (ou por função edge, seguindo as recomendações) e reutilizar;
+  - evitar instanciar múltiplos pools desnecessariamente no backend.
+
+- **Fechar conexões de ferramentas que não estão em uso:**
+  - encerrar sessões antigas em SQL editor, IDEs e outros clientes.
+
+O objetivo não é “zerar” conexões, mas garantir que:
+
+- o número total não se aproxime do limite do plano;
+- quase não haja `idle in transaction`;
+- as conexões `idle` sejam apenas as do pool saudável da aplicação/infra.
+
+

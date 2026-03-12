@@ -10,6 +10,8 @@ const corsHeaders = {
 interface N8nCinemktPayload {
   to: string
   body: string
+  /** ID da empresa (UUID) para multitenant; quando enviado, a conversa fica vinculada a essa empresa. */
+  empresa_id?: string
   /** Origem da mensagem: "web-chat" ou "whatsapp" */
   origem?: string
   channel?: string
@@ -70,25 +72,6 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    // Auto-detect empresa (first active)
-    const { data: empresa, error: empresaError } = await supabase
-      .from('empresas')
-      .select('id, nome_fantasia')
-      .eq('ativo', true)
-      .limit(1)
-      .single()
-
-    if (empresaError || !empresa) {
-      console.error(`[${requestId}] No active empresa found:`, empresaError)
-      return new Response(JSON.stringify({ error: 'No active empresa found' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    const empresaId = empresa.id
-    console.log(`[${requestId}] Empresa: ${empresa.nome_fantasia || empresaId}`)
-
     const body: N8nCinemktPayload = await req.json()
     console.log(`[${requestId}] Payload:`, JSON.stringify(body, null, 2))
 
@@ -97,6 +80,45 @@ Deno.serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
+    }
+
+    // Resolver empresa: usar empresa_id do body quando enviado; senão fallback para primeira ativa
+    let empresaId: string
+    const bodyEmpresaId = typeof body.empresa_id === 'string' ? body.empresa_id.trim() : null
+    if (bodyEmpresaId) {
+      const { data: empresa, error: empresaError } = await supabase
+        .from('empresas')
+        .select('id, nome_fantasia')
+        .eq('id', bodyEmpresaId)
+        .eq('ativo', true)
+        .maybeSingle()
+
+      if (empresaError || !empresa) {
+        console.error(`[${requestId}] Empresa não encontrada ou inativa:`, bodyEmpresaId, empresaError)
+        return new Response(JSON.stringify({ error: 'Empresa não encontrada ou inativa', empresa_id: bodyEmpresaId }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      empresaId = empresa.id
+      console.log(`[${requestId}] Empresa (body): ${empresa.nome_fantasia || empresaId}`)
+    } else {
+      const { data: empresa, error: empresaError } = await supabase
+        .from('empresas')
+        .select('id, nome_fantasia')
+        .eq('ativo', true)
+        .limit(1)
+        .maybeSingle()
+
+      if (empresaError || !empresa) {
+        console.error(`[${requestId}] No active empresa found:`, empresaError)
+        return new Response(JSON.stringify({ error: 'No active empresa found' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      empresaId = empresa.id
+      console.log(`[${requestId}] Empresa (fallback primeira ativa): ${empresa.nome_fantasia || empresaId}`)
     }
 
     const n8nWebhookId = body.to
@@ -194,6 +216,13 @@ Deno.serve(async (req) => {
   }
 })
 
+/** Nome exibido para contato web: webchat-{id}. Se id já tiver prefixo, mantém. */
+function webchatDisplayName(webhookId: string): string {
+  const id = (webhookId || '').trim()
+  if (!id) return 'webchat'
+  return id.toLowerCase().startsWith('webchat-') ? id : `webchat-${id}`
+}
+
 async function findOrCreateContato(supabase: any, empresaId: string, n8nWebhookId: string, requestId: string) {
   const { data: existing, error: findError } = await supabase
     .from('contatos')
@@ -204,18 +233,29 @@ async function findOrCreateContato(supabase: any, empresaId: string, n8nWebhookI
 
   if (findError) throw findError
   if (existing) {
+    const displayName = webchatDisplayName(n8nWebhookId)
+    if (!existing.nome || existing.nome.trim() === '') {
+      await supabase.from('contatos').update({ nome: displayName }).eq('id', existing.id)
+      console.log(`[${requestId}] Updated contact name to: ${displayName}`)
+      return { ...existing, nome: displayName }
+    }
     console.log(`[${requestId}] Found contact: ${existing.id}`)
     return existing
   }
 
+  const displayName = webchatDisplayName(n8nWebhookId)
   const { data: newContato, error: createError } = await supabase
     .from('contatos')
-    .insert({ empresa_id: empresaId, whatsapp_numero: n8nWebhookId, nome: null })
+    .insert({
+      empresa_id: empresaId,
+      whatsapp_numero: n8nWebhookId,
+      nome: displayName,
+    })
     .select()
     .single()
 
   if (createError) throw createError
-  console.log(`[${requestId}] Created contact: ${newContato.id}`)
+  console.log(`[${requestId}] Created contact: ${newContato.id} (nome=${displayName})`)
   return newContato
 }
 

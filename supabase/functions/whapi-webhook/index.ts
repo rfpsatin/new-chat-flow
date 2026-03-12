@@ -1,4 +1,4 @@
-// @version 4 — deploy target: hyizldxjiwjeruxqrqbv
+// @version 6 — deploy target: hyizldxjiwjeruxqrqbv
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -64,6 +64,20 @@ interface WhapiMessage {
     label?: string
     sections?: Array<{ title: string; rows: Array<{ id: string; title: string; description?: string }> }>
   }
+  // Campos adicionais que podem existir em replies/contexto (dependendo da versão do Whapi)
+  quotedMsg?: {
+    id?: string
+    message_id?: string
+  } | string
+  quoted?: {
+    id?: string
+    message_id?: string
+  } | string
+  context?: {
+    id?: string
+    message_id?: string
+    quoted_id?: string
+  }
 }
 
 interface WhapiEvent {
@@ -114,7 +128,7 @@ Deno.serve(async (req) => {
 
     const { data: empresa, error: empresaError } = await supabase
       .from('empresas')
-      .select('id, nome_fantasia')
+      .select('id, nome_fantasia, agente_ia_ativo')
       .eq('id', empresaId)
       .maybeSingle()
 
@@ -257,6 +271,7 @@ Deno.serve(async (req) => {
               tipo_remetente: 'bot',
               conteudo: conteudoLimpo,
               payload: message,
+              whatsapp_message_id: message.id,
             })
 
           if (outMsgError) {
@@ -338,6 +353,7 @@ Deno.serve(async (req) => {
           empresaId,
           contato.id,
           conteudo,
+          empresa.agente_ia_ativo === true,
           requestId
         )
 
@@ -369,6 +385,54 @@ Deno.serve(async (req) => {
         }
 
         // Insert message (always in/cliente at this point)
+        // Detect reply / quoted message (cliente respondeu uma mensagem específica)
+        let replyToWhatsappId: string | null = null
+        // Priorizar quotedMsg e quoted (indicam reply real).
+        // context só é reply quando contém .id/.message_id/.quoted_id (ignorar ephemeral etc.)
+        let rawQuotedAny: any =
+          (message as any).quotedMsg ??
+          (message as any).quoted ??
+          null
+
+        if (!rawQuotedAny && (message as any).context) {
+          const ctx = (message as any).context
+          if (typeof ctx === 'object' && (ctx.id || ctx.message_id || ctx.quoted_id)) {
+            rawQuotedAny = ctx
+          }
+        }
+
+        if (typeof rawQuotedAny === 'string') {
+          replyToWhatsappId = rawQuotedAny
+        } else if (rawQuotedAny && typeof rawQuotedAny === 'object') {
+          replyToWhatsappId =
+            rawQuotedAny.id ??
+            rawQuotedAny.message_id ??
+            rawQuotedAny.quoted_id ??
+            null
+        }
+
+        let replyToMessageId: number | null = null
+        if (replyToWhatsappId) {
+          try {
+            const { data: repliedMsg } = await supabase
+              .from('mensagens_ativas')
+              .select('id')
+              .eq('empresa_id', empresaId)
+              .eq('conversa_id', conversa.id)
+              .eq('contato_id', contato.id)
+              .eq('whatsapp_message_id', replyToWhatsappId)
+              .order('criado_em', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+
+            if (repliedMsg) {
+              replyToMessageId = repliedMsg.id as number
+            }
+          } catch (replyLookupError) {
+            console.error(`[${requestId}] ERROR looking up replied message:`, replyLookupError)
+          }
+        }
+
         const doc = extractDocumentFromMessage(message, empresaId, supabaseUrl)
         const { error: msgError } = await supabase
           .from('mensagens_ativas')
@@ -384,6 +448,9 @@ Deno.serve(async (req) => {
             media_kind: doc.mediaKind ?? null,
             media_filename: doc.mediaFilename ?? null,
             media_mime: doc.mediaMime ?? null,
+            whatsapp_message_id: message.id,
+            reply_to_message_id: replyToMessageId,
+            reply_to_whatsapp_id: replyToWhatsappId,
           })
 
         if (msgError) {
@@ -551,6 +618,7 @@ async function findOrCreateConversa(
   empresaId: string,
   contatoId: string,
   conteudo: string,
+  agenteIaAtivo: boolean,
   requestId: string
 ) {
   console.log(`[${requestId}] Finding conversation for contact: ${contatoId}`)
@@ -601,14 +669,14 @@ async function findOrCreateConversa(
       console.log(`[${requestId}] Not a valid satisfaction response (nota: ${conteudo}, isValid: ${isNotaValida}, withinWindow: ${horasPassadas <= 24})`)
     }
 
-    // Conversa encerrada e não é pesquisa válida → nova sessão
-    console.log(`[${requestId}] Found closed conversation ${ultimaConversa.id}, creating new session...`)
+    const initialStatus = agenteIaAtivo ? 'bot' : 'esperando_tria'
+    console.log(`[${requestId}] Found closed conversation ${ultimaConversa.id}, creating new session (status=${initialStatus})...`)
     const { data: newConversa, error: createError } = await supabase
       .from('conversas')
       .insert({
         empresa_id: empresaId,
         contato_id: contatoId,
-        status: 'bot',
+        status: initialStatus,
         canal: 'whatsapp',
         iniciado_por: 'cliente',
       })
@@ -625,13 +693,14 @@ async function findOrCreateConversa(
     return ultimaConversa
   }
 
-  console.log(`[${requestId}] Creating new conversation`)
+  const initialStatus = agenteIaAtivo ? 'bot' : 'esperando_tria'
+  console.log(`[${requestId}] Creating new conversation (status=${initialStatus})`)
   const { data: newConversa, error: createError } = await supabase
     .from('conversas')
     .insert({
       empresa_id: empresaId,
       contato_id: contatoId,
-      status: 'bot',
+      status: initialStatus,
       canal: 'whatsapp',
       iniciado_por: 'cliente',
     })

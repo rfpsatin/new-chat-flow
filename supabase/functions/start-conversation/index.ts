@@ -95,6 +95,7 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     const authHeader = req.headers.get('Authorization') || ''
     const bearer = authHeader.replace(/^Bearer\s+/i, '')
@@ -102,10 +103,12 @@ Deno.serve(async (req) => {
 
     let empresa_id: string
     let remetenteEfetivoId: string | null = null
+    let contato: { id: string; empresa_id: string; whatsapp_numero: string; nome: string | null } | null = null
 
     if (isServiceCaller) {
       // Chamada interna (ex: worker de campanhas) usando service role:
-      // confiar em empresa_id vindo no body e ignorar remetente_id.
+      // Usa SEMPRE a empresa da campanha (bodyEmpresaId) como fonte da verdade
+      // e garante que o contato pertence a essa empresa.
       if (!bodyEmpresaId) {
         return new Response(
           JSON.stringify({
@@ -117,8 +120,32 @@ Deno.serve(async (req) => {
           },
         )
       }
+
       empresa_id = bodyEmpresaId
       remetenteEfetivoId = null
+
+      const { data: contatoRow, error: contatoError } = await supabase
+        .from('contatos')
+        .select('id, empresa_id, whatsapp_numero, nome')
+        .eq('id', contato_id)
+        .eq('empresa_id', empresa_id)
+        .maybeSingle()
+
+      if (contatoError || !contatoRow) {
+        console.error(
+          `[${requestId}] Contato not found for campanha (empresa_id=${empresa_id}):`,
+          contatoError,
+        )
+        return new Response(
+          JSON.stringify({ error: 'Contato não encontrado para a empresa da campanha' }),
+          {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        )
+      }
+
+      contato = contatoRow
     } else {
       // Chamada normal via Hub: autentica usuário e descobre empresa / remetente
       const callerTenant = await getCallerTenant(req, supabaseUrl, supabaseServiceKey)
@@ -134,24 +161,24 @@ Deno.serve(async (req) => {
           },
         )
       }
-    }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+      // Buscar contato limitado à empresa do usuário
+      const { data: contatoRow, error: contatoError } = await supabase
+        .from('contatos')
+        .select('id, empresa_id, whatsapp_numero, nome')
+        .eq('id', contato_id)
+        .eq('empresa_id', empresa_id)
+        .maybeSingle()
 
-    // Buscar contato
-    const { data: contato, error: contatoError } = await supabase
-      .from('contatos')
-      .select('id, empresa_id, whatsapp_numero, nome')
-      .eq('id', contato_id)
-      .eq('empresa_id', empresa_id)
-      .maybeSingle()
+      if (contatoError || !contatoRow) {
+        console.error(`[${requestId}] Contato not found:`, contatoError)
+        return new Response(JSON.stringify({ error: 'Contato não encontrado ou não pertence à empresa' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
 
-    if (contatoError || !contato) {
-      console.error(`[${requestId}] Contato not found:`, contatoError)
-      return new Response(JSON.stringify({ error: 'Contato não encontrado ou não pertence à empresa' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      contato = contatoRow
     }
 
     const whatsappNumero = contato.whatsapp_numero.replace(/@(s\.whatsapp\.net|c\.us)$/, '').trim()
@@ -245,12 +272,13 @@ Deno.serve(async (req) => {
     const isHuman = origem_final === 'atendente'
     const whapiBody = `#\"human_mode=${isHuman ? 'true' : 'false'}\"# ${messageText}`
 
-    // Enviar via Whapi (chamar Edge Function whapi-send-message)
     const sendUrl = `${supabaseUrl}/functions/v1/whapi-send-message`
+    console.log(`[${requestId}] Calling whapi-send-message: empresa_id=${empresa_id}, to=${whatsappNumero}, isServiceCaller=${isServiceCaller}`)
     const sendRes = await fetch(sendUrl, {
       method: 'POST',
       headers: {
         'Authorization': req.headers.get('Authorization') || '',
+        'apikey': Deno.env.get('SUPABASE_ANON_KEY') || supabaseServiceKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -260,12 +288,16 @@ Deno.serve(async (req) => {
       }),
     })
 
-    const sendData = await sendRes.json().catch(() => ({}))
+    let sendRawBody = ''
+    try { sendRawBody = await sendRes.text() } catch { sendRawBody = '' }
+    let sendData: Record<string, unknown> = {}
+    try { sendData = JSON.parse(sendRawBody) } catch { /* not JSON */ }
+
     if (!sendRes.ok) {
-      console.error(`[${requestId}] Whapi send failed:`, sendData)
+      console.error(`[${requestId}] whapi-send-message FAILED status=${sendRes.status} body=${sendRawBody.substring(0, 300)}`)
       return new Response(JSON.stringify({
-        error: sendData.error || 'Falha ao enviar mensagem',
-        details: sendData,
+        error: sendData?.error || `Falha ao enviar mensagem (HTTP ${sendRes.status})`,
+        details: sendData && Object.keys(sendData).length > 0 ? sendData : sendRawBody.substring(0, 200),
       }), {
         status: sendRes.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

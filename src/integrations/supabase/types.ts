@@ -363,12 +363,14 @@ export type Database = {
       }
       empresas: {
         Row: {
+          agente_ia_ativo: boolean
           ativo: boolean
           cnpj: string
           created_at: string
           id: string
           nome_fantasia: string | null
           razao_social: string
+          tipo_atendimento: string
           whapi_channel_name: string | null
           whapi_last_error: string | null
           whapi_last_qr_at: string | null
@@ -381,12 +383,14 @@ export type Database = {
           whapi_work_period: string | null
         }
         Insert: {
+          agente_ia_ativo?: boolean
           ativo?: boolean
           cnpj: string
           created_at?: string
           id?: string
           nome_fantasia?: string | null
           razao_social: string
+          tipo_atendimento?: string
           whapi_channel_name?: string | null
           whapi_last_error?: string | null
           whapi_last_qr_at?: string | null
@@ -399,12 +403,14 @@ export type Database = {
           whapi_work_period?: string | null
         }
         Update: {
+          agente_ia_ativo?: boolean
           ativo?: boolean
           cnpj?: string
           created_at?: string
           id?: string
           nome_fantasia?: string | null
           razao_social?: string
+          tipo_atendimento?: string
           whapi_channel_name?: string | null
           whapi_last_error?: string | null
           whapi_last_qr_at?: string | null
@@ -433,7 +439,10 @@ export type Database = {
           media_url: string | null
           payload: Json | null
           remetente_id: string | null
+          reply_to_message_id: number | null
+          reply_to_whatsapp_id: string | null
           tipo_remetente: string
+          whatsapp_message_id: string | null
         }
         Insert: {
           contato_id: string
@@ -449,7 +458,10 @@ export type Database = {
           media_url?: string | null
           payload?: Json | null
           remetente_id?: string | null
+          reply_to_message_id?: number | null
+          reply_to_whatsapp_id?: string | null
           tipo_remetente: string
+          whatsapp_message_id?: string | null
         }
         Update: {
           contato_id?: string
@@ -465,7 +477,10 @@ export type Database = {
           media_url?: string | null
           payload?: Json | null
           remetente_id?: string | null
+          reply_to_message_id?: number | null
+          reply_to_whatsapp_id?: string | null
           tipo_remetente?: string
+          whatsapp_message_id?: string | null
         }
         Relationships: [
           {
@@ -938,6 +953,50 @@ export type Database = {
       forcar_atendimento_humano: {
         Args: { p_conversa_id: string }
         Returns: undefined
+      }
+      get_acompanhamento_mensagens: {
+        Args: { p_data_fim: string; p_data_inicio: string }
+        Returns: {
+          conversas_fechadas: number
+          em_aberto_atendimento: number
+          em_aberto_bot: number
+          em_aberto_fila: number
+          em_aberto_total: number
+          em_aberto_triagem: number
+          empresa_id: string
+          empresa_nome: string
+          mensagens_recebidas: number
+        }[]
+      }
+      get_db_connection_states: {
+        Args: never
+        Returns: {
+          count: number
+          state: string
+        }[]
+      }
+      get_db_health_overview: {
+        Args: never
+        Returns: {
+          active_connections: number
+          cache_hit_ratio: number
+          db_size_bytes: number
+          db_size_pretty: string
+          max_connections: number
+        }[]
+      }
+      get_db_table_stats: {
+        Args: never
+        Returns: {
+          data_size: string
+          estimated_rows: number
+          idx_scan: number
+          index_size: string
+          n_dead_tup: number
+          seq_scan: number
+          table_name: string
+          total_size: string
+        }[]
       }
       get_next_nr_protocolo: { Args: never; Returns: string }
       is_super_admin: { Args: { p_user_id: string }; Returns: boolean }

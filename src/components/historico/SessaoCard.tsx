@@ -1,12 +1,12 @@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { X, Clock, User } from 'lucide-react';
+import { X, Clock, User, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import React from 'react';
 import { HistoricoConversa } from '@/types/atendimento';
-import { useMensagensHistorico } from '@/hooks/useHistorico';
+import { useMensagensHistoricoInfinite } from '@/hooks/useMensagens';
 import { SatisfacaoStars } from './SatisfacaoStars';
 
 function getHistoricoDisplayContent(msg: { conteudo: string | null; payload?: any }): string {
@@ -136,7 +136,13 @@ interface Props {
 }
 
 export function SessaoCard({ sessao, onClose }: Props) {
-  const { data: mensagens, isLoading } = useMensagensHistorico(sessao.conversa_id);
+  const {
+    mensagens,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useMensagensHistoricoInfinite(sessao.conversa_id);
 
   return (
     <div className="flex-1 min-h-0 border border-border rounded-lg bg-card flex flex-col">
@@ -187,12 +193,29 @@ export function SessaoCard({ sessao, onClose }: Props) {
             <div className="text-center text-sm text-muted-foreground py-4">
               Carregando mensagens...
             </div>
-          ) : mensagens?.length === 0 ? (
+          ) : (mensagens?.length ?? 0) === 0 ? (
             <div className="text-center text-sm text-muted-foreground py-4">
               Nenhuma mensagem
             </div>
           ) : (
-            mensagens?.map((msg) => (
+            <>
+              {hasNextPage && (
+                <div className="py-2 flex justify-center border-b border-border/30">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => fetchNextPage()}
+                    disabled={isFetchingNextPage}
+                  >
+                    {isFetchingNextPage ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      'Carregar mais antigas'
+                    )}
+                  </Button>
+                </div>
+              )}
+              {mensagens?.map((msg) => (
               <div key={msg.id} className="py-2">
                 <div
                   className={cn(
@@ -207,13 +230,14 @@ export function SessaoCard({ sessao, onClose }: Props) {
                       {msg.tipo_remetente === 'bot' ? '🤖 Bot' : '👤 Agente'}
                     </div>
                   )}
-                  <FormattedHistoricoContent content={getHistoricoDisplayContent(msg)} isOutgoing={msg.direcao === 'out'} />
+                  <FormattedHistoricoContent content={getHistoricoDisplayContent({ conteudo: (msg.conteudo as string | null), payload: msg.payload })} isOutgoing={msg.direcao === 'out'} />
                   <div className="text-xs opacity-70 mt-1 text-right">
                     {format(new Date(msg.criado_em), 'HH:mm', { locale: ptBR })}
                   </div>
                 </div>
               </div>
-            ))
+            ))}
+            </>
           )}
         </div>
       </ScrollArea>

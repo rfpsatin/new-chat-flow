@@ -17,9 +17,23 @@ import UsuariosPage from "./pages/admin/UsuariosPage";
 import MotivosPage from "./pages/admin/MotivosPage";
 import EmpresaPage from "./pages/admin/EmpresaPage";
 import SuperAdminEmpresasPage from "./pages/superadmin/EmpresasPage";
+import AcompanhamentoMensagensPage from "./pages/superadmin/AcompanhamentoMensagensPage";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error: unknown) => {
+        const status = (error as { status?: number })?.status;
+        if (status === 401 || status === 403) return false;
+        return failureCount < 3;
+      },
+    },
+    mutations: {
+      retry: false,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -32,8 +46,36 @@ const App = () => (
           <Route path="/login" element={<LoginPage />} />
 
           {/* Super Admin routes */}
-          <Route path="/superadmin" element={<SuperAdminProvider><SuperAdminGuard><SuperAdminEmpresasPage /></SuperAdminGuard></SuperAdminProvider>} />
-          <Route path="/superadmin/empresas" element={<SuperAdminProvider><SuperAdminGuard><SuperAdminEmpresasPage /></SuperAdminGuard></SuperAdminProvider>} />
+          <Route
+            path="/superadmin"
+            element={
+              <SuperAdminProvider>
+                <SuperAdminGuard>
+                  <SuperAdminEmpresasPage />
+                </SuperAdminGuard>
+              </SuperAdminProvider>
+            }
+          />
+          <Route
+            path="/superadmin/empresas"
+            element={
+              <SuperAdminProvider>
+                <SuperAdminGuard>
+                  <SuperAdminEmpresasPage />
+                </SuperAdminGuard>
+              </SuperAdminProvider>
+            }
+          />
+          <Route
+            path="/superadmin/acompanhamento"
+            element={
+              <SuperAdminProvider>
+                <SuperAdminGuard>
+                  <AcompanhamentoMensagensPage />
+                </SuperAdminGuard>
+              </SuperAdminProvider>
+            }
+          />
 
           {/* App routes - single AppProvider persists across all navigations */}
           <Route element={<AppProvider><Outlet /></AppProvider>}>

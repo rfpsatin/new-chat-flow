@@ -1,6 +1,7 @@
-import { MessageSquare, FolderOpen, Clock, User, Phone } from 'lucide-react';
+import { MessageSquare, FolderOpen, Clock, User, Phone, Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -17,6 +18,9 @@ interface Props {
   sessoesAbertas: string[];
   onToggleSessao: (conversaId: string) => void;
   onCloseSessao: (conversaId: string) => void;
+  onCarregarMais?: () => void;
+  hasMore?: boolean;
+  isFetchingMore?: boolean;
 }
 
 export function MensagensMultiplasPanel({
@@ -28,6 +32,9 @@ export function MensagensMultiplasPanel({
   sessoesAbertas,
   onToggleSessao,
   onCloseSessao,
+  onCarregarMais,
+  hasMore,
+  isFetchingMore,
 }: Props) {
   const isAtendentes = modo === 'atendentes';
   const temSelecao = isAtendentes ? !!atendente : !!contato;
@@ -161,6 +168,25 @@ export function MensagensMultiplasPanel({
                 </div>
               );
             })}
+            {hasMore && onCarregarMais && (
+              <div className="p-2 flex justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onCarregarMais()}
+                  disabled={isFetchingMore}
+                >
+                  {isFetchingMore ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Carregando...
+                    </>
+                  ) : (
+                    'Carregar mais sessões'
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </ScrollArea>

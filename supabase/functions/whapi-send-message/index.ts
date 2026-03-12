@@ -1,4 +1,4 @@
-// @version 2 — deploy target: hyizldxjiwjeruxqrqbv
+// @version 3 — deploy target: hyizldxjiwjeruxqrqbv
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -15,11 +15,23 @@ interface SendMessageRequest {
   to: string
   message: string
   human_mode?: boolean
+  reply_to_whatsapp_id?: string
 }
 
 type CallerTenant = {
   empresaId: string
   tipoUsuario: 'adm' | 'sup' | 'opr'
+}
+
+function extractWhapiMessageId(whapiData: any): string | null {
+  return (
+    whapiData?.message?.id ??
+    whapiData?.message?.message_id ??
+    whapiData?.messages?.[0]?.id ??
+    whapiData?.messages?.[0]?.message_id ??
+    whapiData?.id ??
+    null
+  )
 }
 
 async function getCallerTenant(req: Request, supabaseUrl: string, serviceRoleKey: string): Promise<CallerTenant> {
@@ -79,7 +91,7 @@ Deno.serve(async (req) => {
     const body: SendMessageRequest = await req.json()
     console.log(`[${requestId}] Request body:`, JSON.stringify(body, null, 2))
 
-    const { to, message, human_mode, empresa_id: bodyEmpresaId } = body
+    const { to, message, human_mode, empresa_id: bodyEmpresaId, reply_to_whatsapp_id } = body
 
     if (!to || !message) {
       console.error(`[${requestId}] ERROR: Missing required fields`)
@@ -149,8 +161,9 @@ Deno.serve(async (req) => {
       })
     }
 
-    console.log(`[${requestId}] Empresa found: ${empresa.nome_fantasia || empresa.id}`)
-    console.log(`[${requestId}] Sending message to: ${to}, human_mode: ${human_mode}`)
+    const tokenPrefix = empresa.whapi_token.substring(0, 10)
+    console.log(`[${requestId}] Empresa: ${empresa.nome_fantasia || empresa.id} (id=${empresa.id}), isServiceCaller=${isServiceCaller}, token=${tokenPrefix}...`)
+    console.log(`[${requestId}] Sending to: ${to}, human_mode: ${human_mode}`)
 
     // Format phone number for Whapi API
     // Remove any existing @s.whatsapp.net or @c.us suffix
@@ -189,6 +202,9 @@ Deno.serve(async (req) => {
       to: phoneNumber,
       body: cleanMessage,
     }
+    if (reply_to_whatsapp_id && reply_to_whatsapp_id.trim()) {
+      payload.quoted = reply_to_whatsapp_id.trim()
+    }
 
     const whapiResponse = await fetch(whapiUrl, {
       method: 'POST',
@@ -204,9 +220,9 @@ Deno.serve(async (req) => {
     console.log(`[${requestId}] Whapi API response:`, JSON.stringify(whapiData, null, 2))
 
     if (!whapiResponse.ok) {
-      console.error(`[${requestId}] ERROR: Whapi API error:`, whapiData)
+      console.error(`[${requestId}] Whapi API FAILED: status=${whapiResponse.status} empresa=${empresa.id} token=${tokenPrefix}... response=`, JSON.stringify(whapiData))
       return new Response(JSON.stringify({ 
-        error: 'Failed to send message via Whapi',
+        error: `Whapi ${whapiResponse.status}: ${JSON.stringify(whapiData).substring(0, 200)}`,
         details: whapiData
       }), {
         status: whapiResponse.status,
@@ -214,8 +230,9 @@ Deno.serve(async (req) => {
       })
     }
 
+    const whapiMessageId = extractWhapiMessageId(whapiData)
     console.log(`[${requestId}] Message sent successfully`)
-    console.log(`[${requestId}] Message ID: ${whapiData.messages?.[0]?.id || 'unknown'}`)
+    console.log(`[${requestId}] Message ID: ${whapiMessageId || 'unknown'}`)
 
     // If human_mode=true was detected, notify n8n to set Redis
     // (fire-and-forget, don't block the response)
@@ -244,7 +261,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ 
       success: true,
-      message_id: whapiData.messages?.[0]?.id,
+      message_id: whapiMessageId,
       response: whapiData
     }), {
       status: 200,

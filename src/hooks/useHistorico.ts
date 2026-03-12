@@ -1,7 +1,11 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { HistoricoConversa, ContatoComHistorico, AtendenteComHistorico, FiltrosHistorico } from '@/types/atendimento';
 import { startOfDay, endOfDay } from 'date-fns';
+import { useMemo } from 'react';
+import { useOperadores } from '@/hooks/useUsuarios';
+
+const HISTORICO_PAGE_SIZE = 20;
 
 // Lista atendentes que têm sessões finalizadas
 export function useAtendentesComHistorico(empresaId: string) {
@@ -40,21 +44,19 @@ export function useAtendentesComHistorico(empresaId: string) {
   });
 }
 
-// Lista sessões atendidas por um atendente específico
+// Lista sessões atendidas por um atendente específico (paginado; "Carregar mais" via fetchNextPage)
 export function useSessoesAtendente(empresaId: string, agenteId: string | null, filtros: FiltrosHistorico) {
-  return useQuery({
+  const infinite = useInfiniteQuery({
     queryKey: ['sessoes-atendente', empresaId, agenteId, filtros],
-    queryFn: async () => {
+    queryFn: async ({ pageParam }) => {
       if (!agenteId) return [];
 
       let query = supabase
         .from('vw_historico_conversas')
         .select('*')
         .eq('empresa_id', empresaId)
-        .eq('agente_responsavel_id', agenteId)
-        .order('iniciado_em', { ascending: false });
+        .eq('agente_responsavel_id', agenteId);
 
-      // Filtro por período
       if (filtros.dataInicio) {
         query = query.gte('iniciado_em', startOfDay(filtros.dataInicio).toISOString());
       }
@@ -62,13 +64,31 @@ export function useSessoesAtendente(empresaId: string, agenteId: string | null, 
         query = query.lte('iniciado_em', endOfDay(filtros.dataFim).toISOString());
       }
 
-      const { data, error } = await query;
-
+      const { data, error } = await query
+        .order('iniciado_em', { ascending: false })
+        .range(pageParam, pageParam + HISTORICO_PAGE_SIZE - 1);
       if (error) throw error;
-      return data as HistoricoConversa[];
+      return (data ?? []) as HistoricoConversa[];
     },
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length === HISTORICO_PAGE_SIZE ? allPages.length * HISTORICO_PAGE_SIZE : undefined,
+    initialPageParam: 0,
     enabled: !!empresaId && !!agenteId,
   });
+
+  const data = useMemo(
+    () => infinite.data?.pages.flat() ?? [],
+    [infinite.data?.pages],
+  );
+
+  return {
+    ...infinite,
+    data,
+    sessoesAtendente: data,
+    fetchNextPage: infinite.fetchNextPage,
+    hasNextPage: infinite.hasNextPage,
+    isFetchingNextPage: infinite.isFetchingNextPage,
+  };
 }
 
 // Lista contatos com histórico (usado quando há filtro de busca)
@@ -119,26 +139,22 @@ export function useContatosComHistorico(empresaId: string, filtros: FiltrosHisto
   });
 }
 
-// Lista sessões de um contato específico
+// Lista sessões de um contato específico (paginado; "Carregar mais" via fetchNextPage)
 export function useSessoesContato(empresaId: string, contatoId: string | null, filtros: FiltrosHistorico) {
-  return useQuery({
+  const infinite = useInfiniteQuery({
     queryKey: ['sessoes-contato', empresaId, contatoId, filtros],
-    queryFn: async () => {
+    queryFn: async ({ pageParam }) => {
       if (!contatoId) return [];
 
       let query = supabase
         .from('vw_historico_conversas')
         .select('*')
         .eq('empresa_id', empresaId)
-        .eq('contato_id', contatoId)
-        .order('iniciado_em', { ascending: false });
+        .eq('contato_id', contatoId);
 
-      // Filtro por operador
       if (filtros.operadorId) {
         query = query.eq('agente_responsavel_id', filtros.operadorId);
       }
-
-      // Filtro por período
       if (filtros.dataInicio) {
         query = query.gte('iniciado_em', startOfDay(filtros.dataInicio).toISOString());
       }
@@ -146,50 +162,46 @@ export function useSessoesContato(empresaId: string, contatoId: string | null, f
         query = query.lte('iniciado_em', endOfDay(filtros.dataFim).toISOString());
       }
 
-      const { data, error } = await query;
-
+      const { data, error } = await query
+        .order('iniciado_em', { ascending: false })
+        .range(pageParam, pageParam + HISTORICO_PAGE_SIZE - 1);
       if (error) throw error;
-      return data as HistoricoConversa[];
+      return (data ?? []) as HistoricoConversa[];
     },
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length === HISTORICO_PAGE_SIZE ? allPages.length * HISTORICO_PAGE_SIZE : undefined,
+    initialPageParam: 0,
     enabled: !!empresaId && !!contatoId,
   });
+
+  const data = useMemo(
+    () => infinite.data?.pages.flat() ?? [],
+    [infinite.data?.pages],
+  );
+
+  return {
+    ...infinite,
+    data,
+    sessoesContato: data,
+    fetchNextPage: infinite.fetchNextPage,
+    hasNextPage: infinite.hasNextPage,
+    isFetchingNextPage: infinite.isFetchingNextPage,
+  };
 }
 
-export function useMensagensHistorico(conversaId: string | null) {
-  return useQuery({
-    queryKey: ['mensagens-historico', conversaId],
-    queryFn: async () => {
-      if (!conversaId) return [];
+export { useMensagensHistorico } from '@/hooks/useMensagens';
 
-      const { data, error } = await supabase
-        .from('mensagens_historico')
-        .select('*')
-        .eq('conversa_id', conversaId)
-        .order('criado_em', { ascending: true });
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!conversaId,
-  });
-}
-
+// Deriva lista de operadores {id, nome} do cache de useOperadores
+// (sem query adicional ao banco)
 export function useOperadoresHistorico(empresaId: string) {
-  return useQuery({
-    queryKey: ['operadores-historico', empresaId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('usuarios')
-        .select('id, nome')
-        .eq('empresa_id', empresaId)
-        .eq('ativo', true)
-        .order('nome');
+  const { data: operadores, isLoading, error } = useOperadores(empresaId);
 
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!empresaId,
-  });
+  const data = useMemo(
+    () => operadores?.map(({ id, nome }) => ({ id, nome })) ?? [],
+    [operadores],
+  );
+
+  return { data, isLoading, error };
 }
 
 // Histórico de sessões anteriores de um contato (para contexto no chat)

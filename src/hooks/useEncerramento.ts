@@ -42,6 +42,7 @@ export function useEncerrarConversa() {
       resumo,
       empresaId,
       contatoId,
+      whatsapp_numero,
     }: {
       conversaId: string;
       motivoId: string;
@@ -49,23 +50,13 @@ export function useEncerrarConversa() {
       resumo?: string;
       empresaId: string;
       contatoId: string;
+      whatsapp_numero: string;
     }) => {
-      // 1. Buscar número do contato para enviar via WhatsApp
-      const { data: contato, error: contatoError } = await supabase
-        .from('contatos')
-        .select('whatsapp_numero')
-        .eq('id', contatoId)
-        .single();
-
-      if (contatoError || !contato) {
-        throw new Error('Não foi possível obter o número do contato');
-      }
-
-      // 2. Enviar mensagem de pesquisa via WhatsApp
+      // 1. Enviar mensagem de pesquisa via WhatsApp
       const { error: whapiError } = await supabase.functions.invoke('whapi-send-message', {
         body: {
           empresa_id: empresaId,
-          to: contato.whatsapp_numero,
+          to: whatsapp_numero,
           message: MENSAGEM_PESQUISA,
         },
       });
@@ -78,21 +69,15 @@ export function useEncerrarConversa() {
       // A mensagem de pesquisa será registrada em mensagens_ativas quando o webhook
       // do Whapi (whapi-webhook) receber o evento from_me=true.
 
-      // 4. Atualizar timestamp de pesquisa enviada
-      const { error: updateError } = await supabase
+      // 4+5. Atualizar timestamp e buscar dados da conversa em um único roundtrip
+      const { data: conversaData, error: updateError } = await supabase
         .from('conversas')
         .update({ pesquisa_enviada_em: new Date().toISOString() })
-        .eq('id', conversaId);
+        .eq('id', conversaId)
+        .select('origem, channel, n8n_webhook_id, human_mode, origem_final')
+        .single();
       
       if (updateError) throw updateError;
-
-      // 5. Verificar se é conversa do novo webhook n8n (whatsapp_cinemkt) ou do webhook antigo
-      // Buscar dados da conversa para verificar origem/channel
-      const { data: conversaData, error: conversaDataError } = await supabase
-        .from('conversas')
-        .select('origem, channel, n8n_webhook_id, human_mode, origem_final')
-        .eq('id', conversaId)
-        .single();
 
       const isN8nCinemktConversa = conversaData && (
         conversaData.origem || 
@@ -127,7 +112,7 @@ export function useEncerrarConversa() {
             body: {
               conversa_id: conversaId,
               empresa_id: empresaId,
-              chat_id: contato.whatsapp_numero,
+              chat_id: whatsapp_numero,
             },
           });
 

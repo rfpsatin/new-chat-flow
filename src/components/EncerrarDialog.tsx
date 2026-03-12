@@ -41,6 +41,7 @@ export function EncerrarDialog({ conversa, onClose }: EncerrarDialogProps) {
         resumo: resumo.trim() || undefined,
         empresaId: conversa.empresa_id,
         contatoId: conversa.contato_id,
+        whatsapp_numero: conversa.whatsapp_numero,
       });
       
       toast({

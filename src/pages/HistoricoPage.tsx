@@ -41,16 +41,20 @@ export default function HistoricoPage() {
   // Queries
   const { data: atendentes = [], isLoading: loadingAtendentes } = useAtendentesComHistorico(empresaId);
   const { data: contatos = [], isLoading: loadingContatos } = useContatosComHistorico(empresaId, appliedFiltros, hasApplied);
-  const { data: sessoesAtendente = [], isLoading: loadingSessoesAtendente } = useSessoesAtendente(
-    empresaId, 
-    modoAtendentes ? itemSelecionadoId : null, 
-    appliedFiltros
+  const sessoesAtendenteQuery = useSessoesAtendente(
+    empresaId,
+    modoAtendentes ? itemSelecionadoId : null,
+    appliedFiltros,
   );
-  const { data: sessoesContato = [], isLoading: loadingSessoesContato } = useSessoesContato(
-    empresaId, 
-    !modoAtendentes ? itemSelecionadoId : null, 
-    appliedFiltros
+  const sessoesContatoQuery = useSessoesContato(
+    empresaId,
+    !modoAtendentes ? itemSelecionadoId : null,
+    appliedFiltros,
   );
+  const sessoesAtendente = sessoesAtendenteQuery.data ?? [];
+  const sessoesContato = sessoesContatoQuery.data ?? [];
+  const loadingSessoesAtendente = sessoesAtendenteQuery.isLoading;
+  const loadingSessoesContato = sessoesContatoQuery.isLoading;
   const { data: operadores = [] } = useOperadoresHistorico(empresaId);
 
   // Dados baseados no modo
@@ -160,6 +164,9 @@ export default function HistoricoPage() {
               sessoesAbertas={sessoesAbertasIds}
               onToggleSessao={handleToggleSessao}
               onCloseSessao={handleCloseSessao}
+              onCarregarMais={modoAtendentes ? sessoesAtendenteQuery.fetchNextPage : sessoesContatoQuery.fetchNextPage}
+              hasMore={modoAtendentes ? sessoesAtendenteQuery.hasNextPage : sessoesContatoQuery.hasNextPage}
+              isFetchingMore={modoAtendentes ? sessoesAtendenteQuery.isFetchingNextPage : sessoesContatoQuery.isFetchingNextPage}
             />
           </ResizablePanel>
         </ResizablePanelGroup>

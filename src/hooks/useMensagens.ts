@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { MensagemAtiva } from '@/types/atendimento';
 import { useEffect } from 'react';
@@ -62,6 +62,9 @@ export function useEnviarMensagem() {
       conteudo,
       remetenteId,
       humanMode,
+      whatsapp_numero,
+      replyToMessageId,
+      replyToWhatsappId,
     }: {
       empresaId: string;
       conversaId: string;
@@ -69,31 +72,31 @@ export function useEnviarMensagem() {
       conteudo: string;
       remetenteId: string;
       humanMode?: boolean;
+      whatsapp_numero: string;
+      replyToMessageId?: number | null;
+      replyToWhatsappId?: string | null;
     }) => {
-      // 1. Get contact to retrieve WhatsApp number
-      const { data: contato, error: contatoError } = await supabase
-        .from('contatos')
-        .select('whatsapp_numero')
-        .eq('id', contato_id)
-        .single();
-
-      if (contatoError || !contato) {
-        throw new Error('Contato não encontrado');
-      }
-
-      // 2. Send message via Whapi API
       const isHuman = humanMode === true;
       const whapiBody = `#\"human_mode=${isHuman ? 'true' : 'false'}\"# ${conteudo}`;
 
-      const { error: whapiError } = await supabase.functions.invoke('whapi-send-message', {
+      const { data: sendResult, error: whapiError } = await supabase.functions.invoke('whapi-send-message', {
         body: {
           empresa_id: empresaId,
-          to: contato.whatsapp_numero,
+          to: whatsapp_numero,
           message: whapiBody,
+          reply_to_whatsapp_id: replyToWhatsappId ?? undefined,
         },
       });
 
       if (whapiError) throw new Error(whapiError.message || 'Erro ao enviar mensagem via Whapi');
+
+      const whapiMessageId =
+        sendResult?.message_id ??
+        sendResult?.response?.message?.id ??
+        sendResult?.response?.message?.message_id ??
+        sendResult?.response?.messages?.[0]?.id ??
+        sendResult?.response?.messages?.[0]?.message_id ??
+        null;
 
       // Inserir mensagem diretamente no banco (webhook ignora from_me=true)
       await supabase.from('mensagens_ativas').insert({
@@ -104,7 +107,84 @@ export function useEnviarMensagem() {
         tipo_remetente: 'agente',
         remetente_id: remetenteId,
         conteudo: conteudo,
+        whatsapp_message_id: whapiMessageId,
+        reply_to_message_id: replyToMessageId ?? null,
+        reply_to_whatsapp_id: replyToWhatsappId ?? null,
       });
+    },
+    onSuccess: (_, { conversaId }) => {
+      queryClient.invalidateQueries({ queryKey: ['mensagens', conversaId] });
+      queryClient.invalidateQueries({ queryKey: ['fila'] });
+    },
+  });
+}
+
+export function useEnviarArquivo() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      empresaId,
+      conversaId,
+      contato_id,
+      remetenteId,
+      file,
+      whatsapp_numero,
+    }: {
+      empresaId: string;
+      conversaId: string;
+      contato_id: string;
+      remetenteId: string;
+      file: File;
+      whatsapp_numero: string;
+    }) => {
+      // 1. Fazer upload do arquivo para o storage para gerar uma URL pública
+      //    Bucket esperado: "chat-media" (precisa existir no projeto Supabase)
+      const bucket = 'chat-media';
+      const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const path = `${empresaId}/${conversaId}/${uniqueSuffix}-${file.name}`;
+
+      const { error: uploadError } = await supabase.storage.from(bucket).upload(path, file);
+
+      if (uploadError) {
+        throw new Error(uploadError.message || 'Erro ao fazer upload do arquivo');
+      }
+
+      const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(path);
+      const mediaUrl = publicUrlData?.publicUrl;
+
+      if (!mediaUrl) {
+        throw new Error('Não foi possível obter a URL pública do arquivo');
+      }
+
+      // 3. Determinar o tipo de mídia a partir do MIME type
+      const mime = file.type || '';
+      let mediaKind: 'document' | 'image' | 'audio' = 'document';
+
+      if (mime.startsWith('image/')) {
+        mediaKind = 'image';
+      } else if (mime.startsWith('audio/')) {
+        mediaKind = 'audio';
+      }
+
+      // 4. Chamar a edge function para enviar a mídia via Whapi e registrar em mensagens_ativas
+      const { error: whapiError } = await supabase.functions.invoke('whapi-send-media', {
+        body: {
+          empresa_id: empresaId,
+          to: whatsapp_numero,
+          media_url: mediaUrl,
+          media_kind: mediaKind,
+          filename: file.name,
+          mime_type: mime || undefined,
+          conversa_id: conversaId,
+          contato_id,
+          remetente_id: remetenteId,
+        },
+      });
+
+      if (whapiError) {
+        throw new Error(whapiError.message || 'Erro ao enviar arquivo via Whapi');
+      }
     },
     onSuccess: (_, { conversaId }) => {
       queryClient.invalidateQueries({ queryKey: ['mensagens', conversaId] });
@@ -130,4 +210,53 @@ export function useMensagensHistorico(conversaId: string | null) {
     },
     enabled: !!conversaId,
   });
+}
+
+const MENSAGENS_HISTORICO_PAGE_SIZE = 50;
+
+/** Mensagens históricas com "Carregar mais antigas": carrega as mais recentes primeiro e depois páginas mais antigas. */
+export function useMensagensHistoricoInfinite(conversaId: string | null) {
+  const infinite = useInfiniteQuery({
+    queryKey: ['mensagens-historico-infinite', conversaId],
+    queryFn: async ({ pageParam }: { pageParam: string | undefined }) => {
+      if (!conversaId) return [];
+
+      let query = supabase
+        .from('mensagens_historico')
+        .select('*')
+        .eq('conversa_id', conversaId)
+        .order('criado_em', { ascending: false })
+        .limit(MENSAGENS_HISTORICO_PAGE_SIZE);
+
+      if (pageParam) {
+        query = query.lt('criado_em', pageParam);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []) as { id: number; criado_em: string; [key: string]: unknown }[];
+    },
+    getNextPageParam: (lastPage) =>
+      lastPage.length === MENSAGENS_HISTORICO_PAGE_SIZE
+        ? lastPage[lastPage.length - 1].criado_em
+        : undefined,
+    initialPageParam: undefined as string | undefined,
+    enabled: !!conversaId,
+  });
+
+  const mensagensOrdenadas =
+    infinite.data?.pages != null
+      ? [...infinite.data.pages.flat()].sort(
+          (a, b) => new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime()
+        )
+      : [];
+
+  return {
+    ...infinite,
+    data: mensagensOrdenadas,
+    mensagens: mensagensOrdenadas,
+    fetchNextPage: infinite.fetchNextPage,
+    hasNextPage: infinite.hasNextPage,
+    isFetchingNextPage: infinite.isFetchingNextPage,
+  };
 }

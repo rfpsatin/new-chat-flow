@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import { useMensagens, useEnviarMensagem } from '@/hooks/useMensagens';
+import { useMensagens, useEnviarMensagem, useEnviarArquivo } from '@/hooks/useMensagens';
 import { useConversa } from '@/hooks/useFila';
+import { useEmpresa } from '@/hooks/useEmpresa';
 import { MensagemAtiva, FilaAtendimento } from '@/types/atendimento';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
@@ -19,13 +20,23 @@ import {
   Download,
   Play,
   Pause,
+  Plus,
+  Smile,
+  ChevronDown,
 } from 'lucide-react';
-import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { EncerrarDialog } from '@/components/EncerrarDialog';
 import { AtribuirAtendentePopover } from '@/components/AtribuirAtendentePopover';
 import { HistoricoClienteCollapsible } from '@/components/HistoricoClienteCollapsible';
 import { ConversaTags } from '@/components/ConversaTags';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { useToast } from '@/hooks/use-toast';
 
 interface ChatPanelProps {
   conversa: FilaAtendimento | null;
@@ -33,19 +44,113 @@ interface ChatPanelProps {
 
 export function ChatPanel({ conversa }: ChatPanelProps) {
   const { currentUser, empresaId } = useApp();
+  const { empresa } = useEmpresa(empresaId);
   const { data: mensagens, isLoading: mensagensLoading } = useMensagens(conversa?.conversa_id || null);
   const { data: conversaDetalhes } = useConversa(conversa?.conversa_id || null);
   const enviarMensagem = useEnviarMensagem();
+  const enviarArquivo = useEnviarArquivo();
+  const { toast } = useToast();
   
   const [mensagemInput, setMensagemInput] = useState('');
   const [showEncerrar, setShowEncerrar] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<MensagemAtiva | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const documentosInputRef = useRef<HTMLInputElement | null>(null);
+  const midiaInputRef = useRef<HTMLInputElement | null>(null);
+  const messageInputRef = useRef<HTMLInputElement | null>(null);
+  const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
+
+  const emojiCategories = [
+    {
+      id: 'smileys',
+      icon: '😊',
+      emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '😘', '😗', '😙', '😚', '😋', '😜', '🤪', '😝', '🤗', '🤔'],
+    },
+    {
+      id: 'animals',
+      icon: '🐻',
+      emojis: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵'],
+    },
+    {
+      id: 'objects',
+      icon: '⚽',
+      emojis: ['⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🎱', '🏓', '🎯', '🎮', '🎲', '🎵', '🎧'],
+    },
+    {
+      id: 'symbols',
+      icon: '❤️',
+      emojis: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '💖', '✨', '⭐', '🔥', '💯'],
+    },
+  ] as const;
+  const [activeEmojiCategoryId, setActiveEmojiCategoryId] = useState<string>(emojiCategories[0]?.id ?? 'smileys');
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [mensagens]);
+
+  const handleFilesUpload = async (files: FileList | null) => {
+    if (!files || !conversa || !currentUser || !conversaDetalhes || !empresaId || !canRespond) return;
+
+    for (const file of Array.from(files)) {
+      try {
+        await enviarArquivo.mutateAsync({
+          empresaId,
+          conversaId: conversa.conversa_id,
+          contato_id: conversaDetalhes.contato_id,
+          remetenteId: currentUser.id,
+          file,
+          whatsapp_numero: conversa.whatsapp_numero,
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Erro ao enviar arquivo';
+        toast({
+          title: 'Erro ao enviar arquivo',
+          description: `${file.name}: ${message}`,
+          variant: 'destructive',
+        });
+      }
+    }
+  };
+
+  const handleDocumentosChange: React.ChangeEventHandler<HTMLInputElement> = async (event) => {
+    const files = event.target.files;
+    await handleFilesUpload(files);
+    if (event.target) {
+      event.target.value = '';
+    }
+  };
+
+  const handleMidiaChange: React.ChangeEventHandler<HTMLInputElement> = async (event) => {
+    const files = event.target.files;
+    await handleFilesUpload(files);
+    if (event.target) {
+      event.target.value = '';
+    }
+  };
+
+  const handleEmojiInsert = (emoji: string) => {
+    let start = mensagemInput.length;
+    let end = mensagemInput.length;
+    if (selection) {
+      start = selection.start;
+      end = selection.end;
+    }
+    const before = mensagemInput.slice(0, start);
+    const after = mensagemInput.slice(end);
+    const next = `${before}${emoji}${after}`;
+    setMensagemInput(next);
+    if (messageInputRef.current) {
+      const cursorPos = start + emoji.length;
+      requestAnimationFrame(() => {
+        messageInputRef.current?.focus();
+        messageInputRef.current?.setSelectionRange(cursorPos, cursorPos);
+      });
+    }
+  };
 
   const handleEnviar = async () => {
     if (!mensagemInput.trim() || !conversa || !currentUser || !conversaDetalhes) return;
@@ -59,9 +164,13 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
       conteudo: mensagemInput.trim(),
       remetenteId: currentUser.id,
       humanMode,
+      whatsapp_numero: conversa.whatsapp_numero,
+      replyToMessageId: replyingTo?.id ?? null,
+      replyToWhatsappId: (replyingTo as any)?.whatsapp_message_id ?? null,
     });
     
     setMensagemInput('');
+    setReplyingTo(null);
   };
 
   /**
@@ -181,7 +290,7 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
               )}
               {/* Etiquetas origem e channel */}
               <div className="mt-1.5">
-                <ConversaTags origem={conversa.origem} channel={conversa.channel} />
+                <ConversaTags origem={conversa.origem} tipoAtendimentoEmpresa={empresa?.tipo_atendimento ?? null} channel={conversa.channel} />
               </div>
             </div>
           </div>
@@ -248,7 +357,11 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
                     <div className="my-3 border-t border-muted-foreground/20" />
                   )}
                   <div className="py-1.5">
-                    <MessageBubble mensagem={msg} />
+                    <MessageBubble
+                      mensagem={msg}
+                      mensagens={mensagens}
+                      onReply={canRespond ? setReplyingTo : undefined}
+                    />
                   </div>
                 </div>
               );
@@ -259,13 +372,144 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
       
       {/* Input - SEMPRE VISÍVEL */}
       <div className="flex-shrink-0 p-4 border-t bg-card">
+        {replyingTo && (
+          <div className="mb-2 rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-xs flex items-start gap-2">
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold truncate">
+                {replyingTo.tipo_remetente === 'agente'
+                  ? 'Você'
+                  : replyingTo.tipo_remetente === 'bot'
+                  ? 'Bot'
+                  : replyingTo.tipo_remetente === 'sistema'
+                  ? 'Sistema'
+                  : 'Cliente'}
+              </p>
+              <p className="truncate">
+                {replyingTo.media_kind === 'image'
+                  ? '[imagem]'
+                  : replyingTo.media_kind === 'audio'
+                  ? '[áudio]'
+                  : replyingTo.media_kind === 'document'
+                  ? replyingTo.media_filename || '[documento]'
+                  : replyingTo.conteudo || ''}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="ml-2 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => setReplyingTo(null)}
+            >
+              ✕
+            </button>
+          </div>
+        )}
         <form 
           onSubmit={(e) => { e.preventDefault(); handleEnviar(); }}
           className="flex items-center gap-3"
         >
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                className="h-11 w-11"
+                disabled={!canRespond}
+              >
+                <Plus className="w-5 h-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem
+                onSelect={(event) => {
+                  event.preventDefault();
+                  if (!canRespond) return;
+                  documentosInputRef.current?.click();
+                }}
+              >
+                Documentos
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={(event) => {
+                  event.preventDefault();
+                  if (!canRespond) return;
+                  midiaInputRef.current?.click();
+                }}
+              >
+                Fotos e vídeos
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-11 w-11"
+                disabled={!canRespond}
+              >
+                <Smile className="w-5 h-5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              side="top"
+              align="start"
+              className="w-64 p-2"
+            >
+              <div className="flex gap-1 border-b pb-1 mb-2">
+                {emojiCategories.map((category) => (
+                  <button
+                    key={category.id}
+                    type="button"
+                    className={cn(
+                      'flex h-7 w-7 items-center justify-center rounded-md text-base',
+                      activeEmojiCategoryId === category.id
+                        ? 'bg-primary/20'
+                        : 'bg-transparent hover:bg-muted'
+                    )}
+                    onClick={() => setActiveEmojiCategoryId(category.id)}
+                  >
+                    {category.icon}
+                  </button>
+                ))}
+              </div>
+              <div className="max-h-64 overflow-y-auto">
+                <div className="grid grid-cols-8 gap-1 text-lg">
+                  {emojiCategories
+                    .find((c) => c.id === activeEmojiCategoryId)
+                    ?.emojis.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        className="flex h-7 w-7 items-center justify-center rounded-md hover:bg-muted"
+                        onClick={() => handleEmojiInsert(emoji)}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
           <Input
+            ref={messageInputRef}
             value={mensagemInput}
             onChange={(e) => setMensagemInput(e.target.value)}
+            onClick={(e) => {
+              const target = e.target as HTMLInputElement;
+              setSelection({
+                start: target.selectionStart ?? target.value.length,
+                end: target.selectionEnd ?? target.value.length,
+              });
+            }}
+            onKeyUp={(e) => {
+              const target = e.target as HTMLInputElement;
+              setSelection({
+                start: target.selectionStart ?? target.value.length,
+                end: target.selectionEnd ?? target.value.length,
+              });
+            }}
             placeholder={canRespond 
               ? "Digite sua mensagem..." 
               : "Você não é o responsável por esta conversa"}
@@ -286,6 +530,21 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
           </Button>
         </form>
       </div>
+      <input
+        ref={documentosInputRef}
+        type="file"
+        multiple
+        hidden
+        onChange={handleDocumentosChange}
+      />
+      <input
+        ref={midiaInputRef}
+        type="file"
+        multiple
+        accept="image/*,video/*"
+        hidden
+        onChange={handleMidiaChange}
+      />
       
       {showEncerrar && (
         <EncerrarDialog
@@ -415,7 +674,15 @@ function stripHumanModePrefix(text: string): string {
   return text;
 }
 
-function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
+function MessageBubble({
+  mensagem,
+  mensagens,
+  onReply,
+}: {
+  mensagem: MensagemAtiva;
+  mensagens: MensagemAtiva[];
+  onReply?: (mensagem: MensagemAtiva) => void;
+}) {
   const isOutgoing = mensagem.direcao === 'out';
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
@@ -461,6 +728,11 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
 
   const hasMedia = !!mensagem.media_url && !!mensagem.media_kind;
 
+  const repliedMessage =
+    mensagem.reply_to_message_id != null
+      ? mensagens.find((m) => m.id === mensagem.reply_to_message_id)
+      : null;
+
   const getMediaTitle = () => {
     switch (mensagem.media_kind) {
       case 'image':
@@ -485,33 +757,108 @@ function MessageBubble({ mensagem }: { mensagem: MensagemAtiva }) {
     }
   };
 
-  const getMediaLabel = () => {
-    switch (mensagem.media_kind) {
-      case 'image':
-        return 'Baixar imagem';
-      case 'audio':
-        return 'Baixar áudio';
-      case 'document':
-      default:
-        return 'Baixar documento';
+  const handleCopy = async () => {
+    try {
+      let textToCopy = '';
+      if (mensagem.media_kind === 'image') {
+        textToCopy = mensagem.media_url || '[imagem]';
+      } else if (mensagem.media_kind === 'audio') {
+        textToCopy = mensagem.media_url || '[áudio]';
+      } else if (mensagem.media_kind === 'document') {
+        textToCopy = mensagem.media_filename || mensagem.media_url || '[documento]';
+      } else {
+        textToCopy = displayContent || '';
+      }
+      if (!textToCopy) return;
+      await navigator.clipboard.writeText(textToCopy);
+    } catch (error) {
+      console.error('Erro ao copiar mensagem', error);
     }
   };
 
   return (
     <div
       className={cn(
-        'flex animate-fade-in',
+        'flex animate-fade-in group',
         isOutgoing ? 'justify-end' : 'justify-start'
       )}
     >
       <div
         className={cn(
-          'max-w-[75%] rounded-2xl px-4 py-2.5',
+          'relative max-w-[75%] rounded-2xl px-4 py-2.5',
           isOutgoing
             ? 'bg-chat-outgoing text-chat-outgoing-text rounded-br-md'
             : 'bg-chat-incoming text-foreground rounded-bl-md'
         )}
       >
+        {onReply && (
+          <div className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    'h-5 w-5 flex items-center justify-center rounded-full bg-black/5 hover:bg-black/10',
+                    isOutgoing ? 'text-chat-outgoing-text/70' : 'text-muted-foreground'
+                  )}
+                >
+                  <ChevronDown className="h-3 w-3" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align={isOutgoing ? 'end' : 'start'} className="w-32">
+                <DropdownMenuItem
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    onReply(mensagem);
+                  }}
+                >
+                  Responder
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    void handleCopy();
+                  }}
+                >
+                  Copiar
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+        {repliedMessage && (
+          <div className="mb-1 -mx-2 rounded-md bg-black/5 px-2 py-1 text-[11px] border-l-2 border-border/60">
+            <p className="font-semibold truncate">
+              {repliedMessage.tipo_remetente === 'agente'
+                ? 'Você'
+                : repliedMessage.tipo_remetente === 'bot'
+                ? 'Bot'
+                : repliedMessage.tipo_remetente === 'sistema'
+                ? 'Sistema'
+                : 'Cliente'}
+            </p>
+            {repliedMessage.media_kind === 'image' && repliedMessage.media_url ? (
+              <div className="mt-1 flex items-center gap-2">
+                <div className="h-8 w-8 overflow-hidden rounded-sm bg-black/10">
+                  <img
+                    src={repliedMessage.media_url}
+                    alt={repliedMessage.media_filename || 'Imagem'}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <p className="truncate">[imagem]</p>
+              </div>
+            ) : (
+              <p className="truncate">
+                {repliedMessage.media_kind === 'audio'
+                  ? '[áudio]'
+                  : repliedMessage.media_kind === 'document'
+                  ? repliedMessage.media_filename || '[documento]'
+                  : repliedMessage.conteudo || ''}
+              </p>
+            )}
+          </div>
+        )}
         {senderLabel && (
           <p className={cn(
             'text-xs font-medium mb-1',

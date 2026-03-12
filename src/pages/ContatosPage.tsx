@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/contexts/AppContext';
-import { useContatos, useHistoricoContato } from '@/hooks/useContatos';
+import { useContatosInfinite, useHistoricoContato } from '@/hooks/useContatos';
 import { useStartConversation } from '@/hooks/useStartConversation';
 import { MainLayout } from '@/components/MainLayout';
 import { Contato, HistoricoConversa } from '@/types/atendimento';
@@ -18,14 +18,14 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Search, Phone, Calendar, MessageSquare, User, Clock, Send, Loader2, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useMensagensHistorico } from '@/hooks/useHistorico';
+import { useMensagensHistoricoInfinite } from '@/hooks/useMensagens';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 type ImportRow = {
   nome?: string | null;
   whatsapp_numero: string;
-  email?: string | null;
 };
 
 type ParsedCsv = {
@@ -46,10 +46,11 @@ function stripQuotes(value: string): string {
 
 function normalizeNameField(raw: string): string {
   const v = stripQuotes(raw);
-  // Remove acentuação
   return v
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/["'`«»\u201C\u201D\u2018\u2019]/g, '') // aspas restantes
+    .replace(/[\x00-\x1F\x7F]/g, '')                  // controle
+    .replace(/[^a-zA-ZÀ-ÿ\s\-\.]/g, '')               // mantém letras (com acento), espaço, hífen, ponto
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
@@ -167,7 +168,6 @@ function parseCsvLines(text: string): ImportRow[] {
       rows.push({
         nome: nome || null,
         whatsapp_numero: whatsapp,
-        email: null,
       });
     }
     return rows;
@@ -180,7 +180,6 @@ function parseCsvLines(text: string): ImportRow[] {
     const idxMiddle = idxByName('middle name');
     const idxLast = idxByName('last name');
     const idxOrg = idxByName('organization name');
-    const idxEmail = idxByCandidates(['e-mail 1 - value', 'email', 'e-mail']);
 
     for (const cols of dataRows) {
       if (!cols[idxPhone]) continue;
@@ -195,27 +194,24 @@ function parseCsvLines(text: string): ImportRow[] {
       if (!nome && idxOrg >= 0) {
         nome = normalizeNameField(cols[idxOrg] ?? '');
       }
-      const email = idxEmail >= 0 ? (stripQuotes(cols[idxEmail] ?? '') || null) : null;
 
       rows.push({
         nome: nome || null,
         whatsapp_numero: phoneRaw,
-        email,
       });
     }
 
     return rows;
   }
 
-  // Caso 2: formato simples "nome;whatsapp;email" ou "nome,whatsapp,email"
+  // Caso 2: formato simples "nome;whatsapp" ou "nome,whatsapp"
   for (const parts of dataRows) {
     if (parts.length === 0) continue;
-    const [nome, whatsapp, email] = parts.map((p) => stripQuotes(p));
+    const [nome, whatsapp] = parts.map((p) => stripQuotes(p));
     if (!whatsapp || whatsapp === 'whatsapp_numero') continue; // ignora cabeçalho simples
     rows.push({
       nome: normalizeNameField(nome || ''),
       whatsapp_numero: normalizePhoneField(whatsapp),
-      email: email ? stripQuotes(email) : null,
     });
   }
 
@@ -230,18 +226,23 @@ function csvEscapeField(value: string): string {
 }
 
 function buildNormalizedContactsCsv(rows: ImportRow[]): string {
-  const lines = ['nome;whatsapp_numero;email'];
+  const lines = ['nome;whatsapp_numero'];
   rows.forEach((row) => {
     const nome = csvEscapeField((row.nome ?? '').trim());
     const whatsapp = csvEscapeField(row.whatsapp_numero.trim());
-    const email = csvEscapeField((row.email ?? '').trim());
-    lines.push(`${nome};${whatsapp};${email}`);
+    lines.push(`${nome};${whatsapp}`);
   });
   return `${lines.join('\n')}\n`;
 }
 
 function MensagensDialog({ conversa, onClose }: { conversa: HistoricoConversa; onClose: () => void }) {
-  const { data: mensagens, isLoading } = useMensagensHistorico(conversa.conversa_id);
+  const {
+    mensagens,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useMensagensHistoricoInfinite(conversa.conversa_id);
 
   return (
     <Dialog open onOpenChange={onClose}>
@@ -256,10 +257,23 @@ function MensagensDialog({ conversa, onClose }: { conversa: HistoricoConversa; o
           <div className="p-2 space-y-2">
             {isLoading ? (
               <p className="text-center text-muted-foreground py-4">Carregando...</p>
-            ) : mensagens?.length === 0 ? (
+            ) : (mensagens?.length ?? 0) === 0 ? (
               <p className="text-center text-muted-foreground py-4">Nenhuma mensagem</p>
             ) : (
-              mensagens?.map((msg) => (
+              <>
+                {hasNextPage && (
+                  <div className="flex justify-center py-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => fetchNextPage()}
+                      disabled={isFetchingNextPage}
+                    >
+                      {isFetchingNextPage ? 'Carregando...' : 'Carregar mais antigas'}
+                    </Button>
+                  </div>
+                )}
+                {mensagens?.map((msg) => (
                 <div
                   key={msg.id}
                   className={cn(
@@ -274,12 +288,13 @@ function MensagensDialog({ conversa, onClose }: { conversa: HistoricoConversa; o
                       {msg.tipo_remetente === 'bot' ? '🤖 Bot' : '👤 Agente'}
                     </div>
                   )}
-                  <p className="whitespace-pre-wrap break-words">{msg.conteudo}</p>
+                  <p className="whitespace-pre-wrap break-words">{String(msg.conteudo ?? '')}</p>
                   <div className="text-xs opacity-70 mt-1 text-right">
                     {format(new Date(msg.criado_em), 'HH:mm', { locale: ptBR })}
                   </div>
                 </div>
-              ))
+              ))}
+              </>
             )}
           </div>
         </ScrollArea>
@@ -400,6 +415,7 @@ function ImportContatosDialog({
   onClose: () => void;
 }) {
   const { empresaId } = useApp();
+  const queryClient = useQueryClient();
   const [fileName, setFileName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rows, setRows] = useState<
@@ -407,14 +423,13 @@ function ImportContatosDialog({
       id: number;
       nome: string;
       whatsapp_numero: string;
-      email: string;
       status: 'pending' | 'valid' | 'invalid';
       reason?: string;
     }[]
   >([]);
   const [importLog, setImportLog] = useState<{
     imported: number;
-    invalid: { nome: string | null; whatsapp_numero: string; email: string | null; reason?: string }[];
+    invalid: { nome: string | null; whatsapp_numero: string; reason?: string }[];
   } | null>(null);
 
   const normalizePhone = (raw: string) => raw.replace(/\D/g, '');
@@ -444,7 +459,6 @@ function ImportContatosDialog({
         id: idx,
         nome: r.nome ?? '',
         whatsapp_numero: r.whatsapp_numero,
-        email: r.email ?? '',
         status: 'pending' as const,
       }));
       setRows(nextRows);
@@ -472,7 +486,7 @@ function ImportContatosDialog({
     toast.success(`Validação concluída. ${validCount} válido(s), ${invalidCount} com problema.`);
   };
 
-  const handleCellChange = (id: number, field: 'nome' | 'whatsapp_numero' | 'email', value: string) => {
+  const handleCellChange = (id: number, field: 'nome' | 'whatsapp_numero', value: string) => {
     setRows((prev) =>
       prev.map((row) =>
         row.id === id
@@ -509,7 +523,6 @@ function ImportContatosDialog({
       const payloadRows = ready.map((r) => ({
         nome: r.nome || null,
         whatsapp_numero: r.whatsapp_numero,
-        email: r.email || null,
       }));
 
       const { data, error } = await supabase.functions.invoke('import-contacts', {
@@ -521,6 +534,8 @@ function ImportContatosDialog({
       if (!data?.success) {
         toast.error(data?.error || 'Erro ao importar contatos');
       } else {
+        queryClient.invalidateQueries({ queryKey: ['contatos', empresaId] });
+        queryClient.invalidateQueries({ queryKey: ['contatos-infinite', empresaId] });
         const invalidFromServer =
           (data.invalid_rows as { row: ImportRow; reason?: string }[] | undefined) ?? [];
         setImportLog({
@@ -528,7 +543,6 @@ function ImportContatosDialog({
           invalid: invalidFromServer.map((item) => ({
             nome: item.row.nome ?? null,
             whatsapp_numero: item.row.whatsapp_numero,
-            email: item.row.email ?? null,
             reason: item.reason,
           })),
         });
@@ -546,7 +560,7 @@ function ImportContatosDialog({
   };
 
   const handleDownloadTemplate = () => {
-    const content = 'nome;whatsapp_numero;email\nJoão da Silva;5544999999999;joao@exemplo.com\n';
+    const content = 'nome;whatsapp_numero\nJoão da Silva;5544999999999\n';
     const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -598,17 +612,16 @@ function ImportContatosDialog({
               </div>
               <ScrollArea className="h-[260px] rounded-md border">
                 <div className="min-w-full text-xs">
-                  <div className="grid grid-cols-[2fr,2fr,2fr,1fr,2fr] gap-1 px-2 py-1 border-b bg-muted/50 font-medium">
+                  <div className="grid grid-cols-[2fr,2fr,1fr,2fr] gap-1 px-2 py-1 border-b bg-muted/50 font-medium">
                     <span>Nome</span>
                     <span>WhatsApp</span>
-                    <span>Email</span>
                     <span>Status</span>
                     <span>Motivo</span>
                   </div>
                   {rows.map((row) => (
                     <div
                       key={row.id}
-                      className="grid grid-cols-[2fr,2fr,2fr,1fr,2fr] gap-1 px-2 py-1 border-b last:border-b-0 items-center"
+                      className="grid grid-cols-[2fr,2fr,1fr,2fr] gap-1 px-2 py-1 border-b last:border-b-0 items-center"
                     >
                       <Input
                         value={row.nome}
@@ -618,11 +631,6 @@ function ImportContatosDialog({
                       <Input
                         value={row.whatsapp_numero}
                         onChange={(e) => handleCellChange(row.id, 'whatsapp_numero', e.target.value)}
-                        className="h-7 text-xs"
-                      />
-                      <Input
-                        value={row.email}
-                        onChange={(e) => handleCellChange(row.id, 'email', e.target.value)}
                         className="h-7 text-xs"
                       />
                       <span
@@ -757,7 +765,7 @@ function TratarDadosBrutosDialog({
         <div className="space-y-3 text-sm">
           <p className="text-muted-foreground">
             Envie um CSV exportado do Google Contatos (separado por vírgula ou ponto e vírgula). O sistema
-            irá padronizar para o formato de importação: <strong>nome;whatsapp_numero;email</strong>.
+            irá padronizar para o formato de importação: <strong>nome;whatsapp_numero</strong>.
           </p>
           <Input type="file" accept=".csv,text/csv" onChange={handleFileChange} />
           {sourceName && (
@@ -787,19 +795,26 @@ function TratarDadosBrutosDialog({
 export default function ContatosPage() {
   const navigate = useNavigate();
   const { empresaId } = useApp();
-  const { data: contatos, isLoading } = useContatos(empresaId);
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
+  const {
+    data: contatos,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useContatosInfinite(empresaId, searchTerm);
   const [selectedContato, setSelectedContato] = useState<Contato | null>(null);
   const { data: historico } = useHistoricoContato(selectedContato?.id || null);
   const [selectedHistorico, setSelectedHistorico] = useState<HistoricoConversa | null>(null);
   const [contatoParaIniciar, setContatoParaIniciar] = useState<Contato | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [showTratamento, setShowTratamento] = useState(false);
+  const [editNome, setEditNome] = useState('');
+  const [editWhatsapp, setEditWhatsapp] = useState('');
+  const [savingContato, setSavingContato] = useState(false);
 
-  const filteredContatos = contatos?.filter(contato =>
-    contato.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contato.whatsapp_numero.includes(searchTerm)
-  );
+  const filteredContatos = contatos ?? [];
 
   const getInitials = (name: string | null) => {
     if (!name) return '?';
@@ -812,6 +827,53 @@ export default function ContatosPage() {
       return `+${cleaned.slice(0, 2)} (${cleaned.slice(2, 4)}) ${cleaned.slice(4, 9)}-${cleaned.slice(9)}`;
     }
     return phone;
+  };
+
+  useEffect(() => {
+    if (selectedContato) {
+      setEditNome(selectedContato.nome ?? '');
+      setEditWhatsapp(selectedContato.whatsapp_numero ?? '');
+    } else {
+      setEditNome('');
+      setEditWhatsapp('');
+    }
+  }, [selectedContato]);
+
+  const handleSalvarContato = async () => {
+    if (!selectedContato) return;
+    const nome = editNome.trim() || null;
+    const digits = editWhatsapp.replace(/\D/g, '');
+    if (!digits) {
+      toast.error('Informe um número de WhatsApp válido.');
+      return;
+    }
+    setSavingContato(true);
+    try {
+      const { error } = await supabase
+        .from('contatos')
+        .update({
+          nome,
+          whatsapp_numero: digits,
+        })
+        .eq('id', selectedContato.id);
+
+      if (error) throw error;
+
+      // Atualiza seleção local e refaz cache de contatos
+      const updated: Contato = {
+        ...selectedContato,
+        nome,
+        whatsapp_numero: digits,
+      };
+      setSelectedContato(updated);
+      queryClient.invalidateQueries({ queryKey: ['contatos', empresaId] });
+      queryClient.invalidateQueries({ queryKey: ['contatos-infinite', empresaId] });
+      toast.success('Contato atualizado com sucesso.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao salvar contato');
+    } finally {
+      setSavingContato(false);
+    }
   };
 
   return (
@@ -844,34 +906,61 @@ export default function ContatosPage() {
           
           <ScrollArea className="flex-1">
             <div className="p-2 space-y-1">
-              {filteredContatos?.map(contato => (
-                <button
-                  key={contato.id}
-                  onClick={() => setSelectedContato(contato)}
-                  className={cn(
-                    'w-full p-3 text-left rounded-lg transition-colors',
-                    'hover:bg-accent/50',
-                    selectedContato?.id === contato.id && 'bg-accent'
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-primary/10 text-primary font-medium text-sm">
-                        {getInitials(contato.nome)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground truncate">
-                        {contato.nome || 'Sem nome'}
-                      </p>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Phone className="w-3 h-3" />
-                        <span>{formatPhone(contato.whatsapp_numero)}</span>
+              {isLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : filteredContatos.length === 0 ? (
+                <div className="py-8 text-center text-sm text-muted-foreground">
+                  Nenhum contato encontrado.
+                </div>
+              ) : (
+                <>
+                  {filteredContatos.map(contato => (
+                    <button
+                      key={contato.id}
+                      onClick={() => setSelectedContato(contato)}
+                      className={cn(
+                        'w-full p-3 text-left rounded-lg transition-colors',
+                        'hover:bg-accent/50',
+                        selectedContato?.id === contato.id && 'bg-accent'
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10">
+                          <AvatarFallback className="bg-primary/10 text-primary font-medium text-sm">
+                            {getInitials(contato.nome)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-foreground truncate">
+                            {contato.nome || 'Sem nome'}
+                          </p>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Phone className="w-3 h-3" />
+                            <span>{formatPhone(contato.whatsapp_numero)}</span>
+                          </div>
+                        </div>
                       </div>
+                    </button>
+                  ))}
+                  {hasNextPage && (
+                    <div className="py-2 flex justify-center">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fetchNextPage()}
+                        disabled={isFetchingNextPage}
+                      >
+                        {isFetchingNextPage ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        ) : null}
+                        Carregar mais
+                      </Button>
                     </div>
-                  </div>
-                </button>
-              ))}
+                  )}
+                </>
+              )}
             </div>
           </ScrollArea>
         </div>
@@ -890,13 +979,28 @@ export default function ContatosPage() {
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
-                      <h2 className="text-xl font-bold text-foreground">
-                        {selectedContato.nome || 'Sem nome'}
-                      </h2>
+                      <div className="space-y-1">
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground">Nome</label>
+                          <Input
+                            value={editNome}
+                            onChange={(e) => setEditNome(e.target.value)}
+                            className="mt-0.5 h-8 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground">WhatsApp</label>
+                          <Input
+                            value={editWhatsapp}
+                            onChange={(e) => setEditWhatsapp(e.target.value)}
+                            className="mt-0.5 h-8 text-sm"
+                          />
+                        </div>
+                      </div>
                       <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Phone className="w-4 h-4" />
-                          {formatPhone(selectedContato.whatsapp_numero)}
+                          {formatPhone(editWhatsapp)}
                         </span>
                         <span className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
@@ -904,13 +1008,25 @@ export default function ContatosPage() {
                         </span>
                       </div>
                     </div>
-                    <Button
-                      onClick={() => setContatoParaIniciar(selectedContato)}
-                      className="gap-2"
-                    >
-                      <MessageSquare className="w-4 h-4" />
-                      Iniciar conversa
-                    </Button>
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSalvarContato}
+                        disabled={savingContato}
+                      >
+                        {savingContato ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                        Salvar contato
+                      </Button>
+                      <Button
+                        onClick={() => setContatoParaIniciar(selectedContato)}
+                        className="gap-2"
+                        size="sm"
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                        Iniciar conversa
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

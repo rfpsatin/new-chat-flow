@@ -9,7 +9,6 @@ const corsHeaders = {
 interface ImportRow {
   nome?: string | null
   whatsapp_numero: string
-  email?: string | null
 }
 
 interface ImportContactsRequest {
@@ -65,6 +64,15 @@ async function getCallerTenant(req: Request, supabaseUrl: string, serviceRoleKey
   }
 }
 
+function sanitizeName(name: string | null | undefined): string {
+  if (!name) return ''
+  return String(name)
+    .replace(/["'`«»\u201C\u201D\u2018\u2019]/g, '') // Remove all quote types
+    .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
+    .replace(/\s+/g, ' ') // Collapse multiple spaces
+    .trim()
+}
+
 function normalizePhone(raw: string | null | undefined): string | null {
   if (!raw) return null
   const digits = String(raw).replace(/\D/g, '')
@@ -98,7 +106,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           error: 'No rows provided',
-          example_row: { nome: 'Joao da Silva', whatsapp_numero: '5544999999999', email: 'joao@exemplo.com' },
+          example_row: { nome: 'Joao da Silva', whatsapp_numero: '5544999999999' },
         }),
         {
           status: 400,
@@ -119,7 +127,6 @@ Deno.serve(async (req) => {
       empresa_id: string
       nome: string | null
       whatsapp_numero: string
-      email: string | null
       tp_contato: 'I'
       tag_origem: string | null
     }[] = []
@@ -134,9 +141,8 @@ Deno.serve(async (req) => {
 
       validRows.push({
         empresa_id: empresaId,
-        nome: r.nome?.trim() || null,
+        nome: sanitizeName(r.nome) || null,
         whatsapp_numero: normalized,
-        email: r.email?.trim() || null,
         tp_contato: 'I',
         tag_origem: importTag,
       })

@@ -8,9 +8,17 @@ import { ClienteSimulator } from './tabs/ClienteSimulator';
 import { BotSimulator } from './tabs/BotSimulator';
 import { AdminControls } from './tabs/AdminControls';
 import { EventMonitor } from './tabs/EventMonitor';
+import { useApp } from '@/contexts/AppContext';
 
 export function DevPanel() {
   const { isDevPanelOpen, setDevPanelOpen, toggleDevMode } = useDev();
+  const { currentUser } = useApp();
+
+  const isDevAllowed = currentUser?.tipo_usuario === 'adm';
+
+  if (!isDevAllowed) {
+    return null;
+  }
 
   const handleClose = () => {
     setDevPanelOpen(false);
