@@ -223,7 +223,7 @@ Deno.serve(async (req) => {
     // Upsert por (empresa_id, whatsapp_numero) – assume que existe unique index ou que nao ha conflito grave
     const { error: upsertError, count } = await supabase
       .from('contatos')
-      .upsert(validRows, {
+      .upsert(uniqueRows, {
         onConflict: 'empresa_id,whatsapp_numero',
         ignoreDuplicates: false,
         count: 'exact',
@@ -248,7 +248,8 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        imported: count ?? validRows.length,
+        imported: count ?? uniqueRows.length,
+        duplicates_removed: duplicatesRemoved,
         invalid: invalidRows.length,
         invalid_rows: invalidRows,
       }),
