@@ -80,7 +80,85 @@ Esta seção registra otimizações já implementadas, para servirem de modelo.
 
 ---
 
-## 3. Como usar estas boas práticas no dia a dia
+## 3. Paginação, carga incremental e histórico
+
+### 3.1. Padrões adotados no projeto
+
+- **Paginação baseada em servidor (offset / range)**
+  - **Onde usamos**: `useSessoesAtendente`, `useSessoesContato` em `useHistorico.ts`.
+  - **Padrão**:
+    - usamos `useInfiniteQuery` do React Query;
+    - a query aplica todos os filtros (`empresa_id`, `agente_responsavel_id` / `contato_id`, período) e **depois** define ordenação + `.range(offset, offset+pageSize-1)`;
+    - o `getNextPageParam` calcula o próximo offset com base no número de páginas já carregadas.
+  - **Quando preferir**:
+    - listas onde o usuário navega por “Carregar mais” (botão explícito), sem necessidade de scroll infinito;
+    - telas de histórico em que a ordem temporal é importante e não faz sentido carregar “tudo de uma vez”.
+
+- **Paginação por cursor (cursor temporal)**
+  - **Onde usamos**: `useMensagensHistoricoInfinite` em `useMensagens.ts`.
+  - **Padrão**:
+    - carregamos as mensagens mais recentes primeiro (`order('criado_em', { ascending: false })` + `limit`);
+    - o cursor é o `criado_em` da última mensagem retornada;
+    - a próxima página usa `lt('criado_em', cursor)` para buscar blocos **mais antigos**;
+    - no client, reordenamos para `criado_em ASC` antes de renderizar.
+  - **Quando preferir**:
+    - timelines/mensagens onde o tempo é um bom cursor natural;
+    - quando a ordenação é fixa (ex.: sempre por data) e o volume pode crescer muito.
+
+- **Carga incremental “explícita” (Carregar mais)**
+  - **Onde usamos**:
+    - botão “Carregar mais sessões” no painel de histórico (`MensagensMultiplasPanel`);
+    - botão “Carregar mais antigas” em mensagens históricas (`SessaoCard` e dialog de histórico em `ContatosPage`).
+  - **Padrão**:
+    - o componente **não** dispara nova busca sozinho ao rolar a página;
+    - o usuário aciona conscientemente um botão para trazer mais dados;
+    - mantemos o estado acumulado (todas as páginas já carregadas) no próprio hook (`useInfiniteQuery`).
+  - **Vantagens**:
+    - controle de custo (evita múltiplas chamadas em cascata com scroll acelerado);
+    - UX previsível em telas sensíveis (histórico de atendimentos, logs etc.).
+
+- **Seleção explícita de colunas (views “leves”)**
+  - **Onde usamos**: `useFila` passou de `select('*')` para um `select(...)` apenas com colunas usadas pela UI.
+  - **Padrão**:
+    - para listas que fazem polling (fila, dashboards), preferir **view leve** ou `select` explícito;
+    - se for necessário enriquecer os dados, considerar uma segunda query pontual ou um join view-side.
+
+### 3.2. O que *não* estamos fazendo aqui
+
+- **Não é “lazy loading” no sentido de componentes sob demanda**
+  - Lazy loading costuma se referir a:
+    - carregamento on-demand de **componentes** ou **módulos** (ex.: `React.lazy`, `dynamic import`), ou
+    - carregamento de seções da UI só quando entram no viewport (Intersection Observer, virtualização).
+  - O que fizemos é **carga incremental de dados** (data fetching paginado) — às vezes chamado de *lazy data loading* — mas o foco é banco/HTTP, não divisão de bundle.
+
+- **Sem scroll infinito por enquanto**
+  - Nosso padrão atual é botão explícito (“Carregar mais …”) para manter:
+    - menor complexidade de UI;
+    - mais previsibilidade de quantas chamadas serão feitas;
+    - histórico utilizável mesmo em telas menores ou com scroll abrupto.
+  - Se um dia precisarmos de scroll infinito, podemos reaproveitar **os mesmos hooks `useInfiniteQuery`** com outro componente de UI.
+
+### 3.3. Quando considerar componentes/libraries para isso
+
+- **Ganhos potenciais ao usar libs de data loading/virtualização**
+  - **TanStack Query (React Query)**: já é a base que usamos (`useInfiniteQuery`), então o padrão recomendado é:
+    - concentrar o acesso em hooks (`useHistorico`, `useMensagens`),
+    - usar `fetchNextPage` / `hasNextPage` para paginar.
+  - **Virtualização** (ex.: `@tanstack/react-virtual`, `react-virtualized`, `react-window`):
+    - faz sentido em listas **muito grandes** (centenas/milhares de linhas em memória);
+    - pode ser combinada com `useInfiniteQuery` (infinite scroll + renderização só do que está visível).
+
+- **Componentização interna**
+  - Se o padrão “lista + botão Carregar mais” começar a se repetir:
+    - podemos criar um componente genérico tipo `InfiniteList` que receba:
+      - `items`, `renderItem`,
+      - `onLoadMore`, `hasMore`, `isLoadingMore`;
+    - e apenas plugamos os hooks (`useInfiniteQuery`) como fonte de dados.
+  - **Por enquanto** mantivemos a implementação direta em cada tela (Histórico, Contatos) para priorizar clareza em cima de abstração.
+
+---
+
+## 4. Como usar estas boas práticas no dia a dia
 
 - **Antes de criar uma nova query:**
   - Procurar se já existe um hook em `src/hooks/**` que faz algo parecido.

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '@/contexts/AppContext';
-import { useContatos, useHistoricoContato } from '@/hooks/useContatos';
+import { useContatosInfinite, useHistoricoContato } from '@/hooks/useContatos';
 import { useStartConversation } from '@/hooks/useStartConversation';
 import { MainLayout } from '@/components/MainLayout';
 import { Contato, HistoricoConversa } from '@/types/atendimento';
@@ -314,6 +314,7 @@ function ImportContatosDialog({
   onClose: () => void;
 }) {
   const { empresaId } = useApp();
+  const queryClient = useQueryClient();
   const [fileName, setFileName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rows, setRows] = useState<
@@ -432,6 +433,8 @@ function ImportContatosDialog({
       if (!data?.success) {
         toast.error(data?.error || 'Erro ao importar contatos');
       } else {
+        queryClient.invalidateQueries({ queryKey: ['contatos', empresaId] });
+        queryClient.invalidateQueries({ queryKey: ['contatos-infinite', empresaId] });
         const invalidFromServer =
           (data.invalid_rows as { row: ImportRow; reason?: string }[] | undefined) ?? [];
         setImportLog({
@@ -605,7 +608,13 @@ function ImportContatosDialog({
 export default function ContatosPage() {
   const navigate = useNavigate();
   const { empresaId } = useApp();
-  const { data: contatos, isLoading } = useContatos(empresaId);
+  const {
+    data: contatos,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useContatosInfinite(empresaId, searchTerm);
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedContato, setSelectedContato] = useState<Contato | null>(null);
@@ -617,10 +626,7 @@ export default function ContatosPage() {
   const [editWhatsapp, setEditWhatsapp] = useState('');
   const [savingContato, setSavingContato] = useState(false);
 
-  const filteredContatos = contatos?.filter(contato =>
-    contato.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contato.whatsapp_numero.includes(searchTerm)
-  );
+  const filteredContatos = contatos ?? [];
 
   const getInitials = (name: string | null) => {
     if (!name) return '?';
@@ -673,6 +679,7 @@ export default function ContatosPage() {
       };
       setSelectedContato(updated);
       queryClient.invalidateQueries({ queryKey: ['contatos', empresaId] });
+      queryClient.invalidateQueries({ queryKey: ['contatos-infinite', empresaId] });
       toast.success('Contato atualizado com sucesso.');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao salvar contato');
@@ -706,34 +713,61 @@ export default function ContatosPage() {
           
           <ScrollArea className="flex-1">
             <div className="p-2 space-y-1">
-              {filteredContatos?.map(contato => (
-                <button
-                  key={contato.id}
-                  onClick={() => setSelectedContato(contato)}
-                  className={cn(
-                    'w-full p-3 text-left rounded-lg transition-colors',
-                    'hover:bg-accent/50',
-                    selectedContato?.id === contato.id && 'bg-accent'
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-primary/10 text-primary font-medium text-sm">
-                        {getInitials(contato.nome)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground truncate">
-                        {contato.nome || 'Sem nome'}
-                      </p>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Phone className="w-3 h-3" />
-                        <span>{formatPhone(contato.whatsapp_numero)}</span>
+              {isLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : filteredContatos.length === 0 ? (
+                <div className="py-8 text-center text-sm text-muted-foreground">
+                  Nenhum contato encontrado.
+                </div>
+              ) : (
+                <>
+                  {filteredContatos.map(contato => (
+                    <button
+                      key={contato.id}
+                      onClick={() => setSelectedContato(contato)}
+                      className={cn(
+                        'w-full p-3 text-left rounded-lg transition-colors',
+                        'hover:bg-accent/50',
+                        selectedContato?.id === contato.id && 'bg-accent'
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10">
+                          <AvatarFallback className="bg-primary/10 text-primary font-medium text-sm">
+                            {getInitials(contato.nome)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-foreground truncate">
+                            {contato.nome || 'Sem nome'}
+                          </p>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Phone className="w-3 h-3" />
+                            <span>{formatPhone(contato.whatsapp_numero)}</span>
+                          </div>
+                        </div>
                       </div>
+                    </button>
+                  ))}
+                  {hasNextPage && (
+                    <div className="py-2 flex justify-center">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fetchNextPage()}
+                        disabled={isFetchingNextPage}
+                      >
+                        {isFetchingNextPage ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        ) : null}
+                        Carregar mais
+                      </Button>
                     </div>
-                  </div>
-                </button>
-              ))}
+                  )}
+                </>
+              )}
             </div>
           </ScrollArea>
         </div>

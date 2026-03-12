@@ -1,12 +1,15 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Campanha,
   CampanhaDestinatario,
   CampanhaStats,
 } from '@/types/atendimento';
+import { useMemo } from 'react';
 
 const sb = supabase as any;
+
+const CAMPANHAS_PAGE_SIZE = 20;
 
 export function useCampanhas(empresaId: string) {
   return useQuery({
@@ -37,6 +40,41 @@ export function useCampanhasStats(empresaId: string) {
     },
     enabled: !!empresaId,
   });
+}
+
+/** Lista de campanhas (stats) paginada. "Carregar mais" via fetchNextPage. */
+export function useCampanhasStatsInfinite(empresaId: string) {
+  const infinite = useInfiniteQuery({
+    queryKey: ['campanhas-stats-infinite', empresaId],
+    queryFn: async ({ pageParam }) => {
+      const { data, error } = await sb
+        .from('vw_campanha_stats')
+        .select('*')
+        .eq('empresa_id', empresaId)
+        .order('iniciada_em', { ascending: false, nullsFirst: false })
+        .order('agendado_para', { ascending: false, nullsFirst: false })
+        .range(pageParam, pageParam + CAMPANHAS_PAGE_SIZE - 1);
+      if (error) throw error;
+      return (data ?? []) as CampanhaStats[];
+    },
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length === CAMPANHAS_PAGE_SIZE ? allPages.length * CAMPANHAS_PAGE_SIZE : undefined,
+    initialPageParam: 0,
+    enabled: !!empresaId,
+  });
+
+  const data = useMemo(
+    () => infinite.data?.pages.flat() ?? [],
+    [infinite.data?.pages],
+  );
+
+  return {
+    ...infinite,
+    data,
+    fetchNextPage: infinite.fetchNextPage,
+    hasNextPage: infinite.hasNextPage,
+    isFetchingNextPage: infinite.isFetchingNextPage,
+  };
 }
 
 export function useCampanha(campanhaId: string | null) {
@@ -88,6 +126,7 @@ export function useCriarCampanha() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['campanhas'] });
       qc.invalidateQueries({ queryKey: ['campanhas-stats'] });
+      qc.invalidateQueries({ queryKey: ['campanhas-stats-infinite'] });
     },
   });
 }
@@ -109,6 +148,7 @@ export function useAtualizarCampanha() {
       qc.invalidateQueries({ queryKey: ['campanhas'] });
       qc.invalidateQueries({ queryKey: ['campanha', id] });
       qc.invalidateQueries({ queryKey: ['campanhas-stats'] });
+      qc.invalidateQueries({ queryKey: ['campanhas-stats-infinite'] });
     },
   });
 }
@@ -134,6 +174,7 @@ export function useAgendarCampanha() {
       qc.invalidateQueries({ queryKey: ['campanhas'] });
       qc.invalidateQueries({ queryKey: ['campanha', campanhaId] });
       qc.invalidateQueries({ queryKey: ['campanhas-stats'] });
+      qc.invalidateQueries({ queryKey: ['campanhas-stats-infinite'] });
     },
   });
 }
@@ -165,6 +206,7 @@ export function useAdicionarDestinatarios() {
     onSuccess: (_, { campanha_id }) => {
       qc.invalidateQueries({ queryKey: ['campanha-destinatarios', campanha_id] });
       qc.invalidateQueries({ queryKey: ['campanhas-stats'] });
+      qc.invalidateQueries({ queryKey: ['campanhas-stats-infinite'] });
     },
   });
 }
@@ -183,6 +225,7 @@ export function useExcluirCampanha() {
       qc.invalidateQueries({ queryKey: ['campanhas'] });
       qc.invalidateQueries({ queryKey: ['campanha', id] });
       qc.invalidateQueries({ queryKey: ['campanhas-stats'] });
+      qc.invalidateQueries({ queryKey: ['campanhas-stats-infinite'] });
     },
   });
 }
@@ -212,6 +255,7 @@ export function useReagendarErrosCampanha() {
       qc.invalidateQueries({ queryKey: ['campanha', campanhaId] });
       qc.invalidateQueries({ queryKey: ['campanha-destinatarios', campanhaId] });
       qc.invalidateQueries({ queryKey: ['campanhas-stats'] });
+      qc.invalidateQueries({ queryKey: ['campanhas-stats-infinite'] });
     },
   });
 }

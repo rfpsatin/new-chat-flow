@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { MainLayout } from '@/components/MainLayout';
 import {
-  useCampanhasStats,
+  useCampanhasStatsInfinite,
   useCampanha,
   useCampanhaDestinatarios,
   useCriarCampanha,
@@ -11,7 +11,7 @@ import {
   useExcluirCampanha,
   useReagendarErrosCampanha,
 } from '@/hooks/useCampanhas';
-import { useContatos } from '@/hooks/useContatos';
+import { useContatosInfinite } from '@/hooks/useContatos';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -51,16 +51,22 @@ const STATUS_LABEL: Record<StatusCampanha, string> = {
 
 export default function CampanhasPage() {
   const { empresaId } = useApp();
-  const { data: stats, isLoading } = useCampanhasStats(empresaId);
+  const {
+    data: stats,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useCampanhasStatsInfinite(empresaId);
   const [selectedCampanhaId, setSelectedCampanhaId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [sortBy, setSortBy] = useState<'oldest' | 'newest' | 'name-asc' | 'name-desc'>('newest');
 
   const sortedStats = useMemo(() => {
-    if (!stats) return [];
+    if (!stats?.length) return [];
 
     const getDateValue = (c: CampanhaStats) => {
-      const source = c.created_at ?? c.agendado_para ?? c.iniciada_em ?? c.finalizada_em;
+      const source = (c as { created_at?: string }).created_at ?? c.agendado_para ?? c.iniciada_em ?? c.finalizada_em;
       return source ? new Date(source).getTime() : 0;
     };
 
@@ -123,7 +129,7 @@ export default function CampanhasPage() {
           <div className="flex justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
           </div>
-        ) : !stats?.length ? (
+        ) : !sortedStats.length ? (
           <Card>
             <CardContent className="py-12 text-center text-muted-foreground">
               <Megaphone className="w-12 h-12 mx-auto mb-3 opacity-50" />
@@ -168,6 +174,21 @@ export default function CampanhasPage() {
                 </CardContent>
               </Card>
             ))}
+            {hasNextPage && (
+              <div className="flex justify-center py-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                >
+                  {isFetchingNextPage ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : null}
+                  Carregar mais campanhas
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -402,7 +423,12 @@ function NovaCampanhaWizard({
   onSuccess: () => void;
 }) {
   const { empresaId } = useApp();
-  const { data: contatos } = useContatos(empresaId);
+  const {
+    data: contatos,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useContatosInfinite(empresaId);
   const criar = useCriarCampanha();
   const adicionarDest = useAdicionarDestinatarios();
   const agendar = useAgendarCampanha();
@@ -542,7 +568,7 @@ function NovaCampanhaWizard({
               <p className="text-sm text-muted-foreground">Selecione os contatos que receberão a mensagem.</p>
               <ScrollArea className="h-[240px] rounded-md border p-2">
                 <div className="space-y-1">
-                  {contatos?.map((c) => (
+                  {(contatos ?? []).map((c) => (
                     <button
                       key={c.id}
                       type="button"
@@ -556,6 +582,22 @@ function NovaCampanhaWizard({
                       {contatoIds.has(c.id) && <span className="text-xs">✓</span>}
                     </button>
                   ))}
+                  {hasNextPage && (
+                    <div className="pt-2 flex justify-center">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fetchNextPage()}
+                        disabled={isFetchingNextPage}
+                      >
+                        {isFetchingNextPage ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        ) : null}
+                        Carregar mais contatos
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </ScrollArea>
               <div>
