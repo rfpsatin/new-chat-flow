@@ -33,6 +33,7 @@ export function UploadArquivoDialog({
   conversaId,
   contatoId,
   remetenteId,
+  whatsappNumero,
   canRespond,
 }: UploadArquivoDialogProps) {
   const { toast } = useToast();
