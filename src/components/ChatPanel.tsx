@@ -156,6 +156,7 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
     if (!mensagemInput.trim() || !conversa || !currentUser || !conversaDetalhes) return;
     
     const humanMode = conversaDetalhes.human_mode === true;
+    const isN8nWebchat = isN8nCinemktConversa();
     
     await enviarMensagem.mutateAsync({
       empresaId,
@@ -165,6 +166,7 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
       remetenteId: currentUser.id,
       humanMode,
       whatsapp_numero: conversa.whatsapp_numero,
+      isN8nWebchat,
       replyToMessageId: replyingTo?.id ?? null,
       replyToWhatsappId: (replyingTo as any)?.whatsapp_message_id ?? null,
     });

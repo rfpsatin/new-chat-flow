@@ -63,6 +63,7 @@ export function useEnviarMensagem() {
       remetenteId,
       humanMode,
       whatsapp_numero,
+      isN8nWebchat,
       replyToMessageId,
       replyToWhatsappId,
     }: {
@@ -73,30 +74,49 @@ export function useEnviarMensagem() {
       remetenteId: string;
       humanMode?: boolean;
       whatsapp_numero: string;
+      isN8nWebchat?: boolean;
       replyToMessageId?: number | null;
       replyToWhatsappId?: string | null;
     }) => {
       const isHuman = humanMode === true;
       const whapiBody = `#\"human_mode=${isHuman ? 'true' : 'false'}\"# ${conteudo}`;
 
-      const { data: sendResult, error: whapiError } = await supabase.functions.invoke('whapi-send-message', {
-        body: {
-          empresa_id: empresaId,
-          to: whatsapp_numero,
-          message: whapiBody,
-          reply_to_whatsapp_id: replyToWhatsappId ?? undefined,
-        },
-      });
+      let whapiMessageId: string | null = null;
 
-      if (whapiError) throw new Error(whapiError.message || 'Erro ao enviar mensagem via Whapi');
+      if (isN8nWebchat) {
+        const { error: replyError } = await supabase.functions.invoke('webchat-human-reply', {
+          body: {
+            empresa_id: empresaId,
+            conversa_id: conversaId,
+            mensagem: conteudo,
+            remetente_id: remetenteId,
+            reply_to_whatsapp_id: replyToWhatsappId ?? undefined,
+          },
+        });
 
-      const whapiMessageId =
-        sendResult?.message_id ??
-        sendResult?.response?.message?.id ??
-        sendResult?.response?.message?.message_id ??
-        sendResult?.response?.messages?.[0]?.id ??
-        sendResult?.response?.messages?.[0]?.message_id ??
-        null;
+        if (replyError) {
+          throw new Error(replyError.message || 'Erro ao enviar mensagem para o webchat via n8n');
+        }
+      } else {
+        const { data: sendResult, error: whapiError } = await supabase.functions.invoke('whapi-send-message', {
+          body: {
+            empresa_id: empresaId,
+            to: whatsapp_numero,
+            message: whapiBody,
+            reply_to_whatsapp_id: replyToWhatsappId ?? undefined,
+          },
+        });
+
+        if (whapiError) throw new Error(whapiError.message || 'Erro ao enviar mensagem via Whapi');
+
+        whapiMessageId =
+          sendResult?.message_id ??
+          sendResult?.response?.message?.id ??
+          sendResult?.response?.message?.message_id ??
+          sendResult?.response?.messages?.[0]?.id ??
+          sendResult?.response?.messages?.[0]?.message_id ??
+          null;
+      }
 
       // Inserir mensagem diretamente no banco (webhook ignora from_me=true)
       await supabase.from('mensagens_ativas').insert({
