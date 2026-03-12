@@ -216,6 +216,13 @@ Deno.serve(async (req) => {
   }
 })
 
+/** Nome exibido para contato web: webchat-{id}. Se id já tiver prefixo, mantém. */
+function webchatDisplayName(webhookId: string): string {
+  const id = (webhookId || '').trim()
+  if (!id) return 'webchat'
+  return id.toLowerCase().startsWith('webchat-') ? id : `webchat-${id}`
+}
+
 async function findOrCreateContato(supabase: any, empresaId: string, n8nWebhookId: string, requestId: string) {
   const { data: existing, error: findError } = await supabase
     .from('contatos')
@@ -226,18 +233,29 @@ async function findOrCreateContato(supabase: any, empresaId: string, n8nWebhookI
 
   if (findError) throw findError
   if (existing) {
+    const displayName = webchatDisplayName(n8nWebhookId)
+    if (!existing.nome || existing.nome.trim() === '') {
+      await supabase.from('contatos').update({ nome: displayName }).eq('id', existing.id)
+      console.log(`[${requestId}] Updated contact name to: ${displayName}`)
+      return { ...existing, nome: displayName }
+    }
     console.log(`[${requestId}] Found contact: ${existing.id}`)
     return existing
   }
 
+  const displayName = webchatDisplayName(n8nWebhookId)
   const { data: newContato, error: createError } = await supabase
     .from('contatos')
-    .insert({ empresa_id: empresaId, whatsapp_numero: n8nWebhookId, nome: null })
+    .insert({
+      empresa_id: empresaId,
+      whatsapp_numero: n8nWebhookId,
+      nome: displayName,
+    })
     .select()
     .single()
 
   if (createError) throw createError
-  console.log(`[${requestId}] Created contact: ${newContato.id}`)
+  console.log(`[${requestId}] Created contact: ${newContato.id} (nome=${displayName})`)
   return newContato
 }
 
