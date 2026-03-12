@@ -69,21 +69,15 @@ export function useEncerrarConversa() {
       // A mensagem de pesquisa será registrada em mensagens_ativas quando o webhook
       // do Whapi (whapi-webhook) receber o evento from_me=true.
 
-      // 4. Atualizar timestamp de pesquisa enviada
-      const { error: updateError } = await supabase
+      // 4+5. Atualizar timestamp e buscar dados da conversa em um único roundtrip
+      const { data: conversaData, error: updateError } = await supabase
         .from('conversas')
         .update({ pesquisa_enviada_em: new Date().toISOString() })
-        .eq('id', conversaId);
+        .eq('id', conversaId)
+        .select('origem, channel, n8n_webhook_id, human_mode, origem_final')
+        .single();
       
       if (updateError) throw updateError;
-
-      // 5. Verificar se é conversa do novo webhook n8n (whatsapp_cinemkt) ou do webhook antigo
-      // Buscar dados da conversa para verificar origem/channel
-      const { data: conversaData, error: conversaDataError } = await supabase
-        .from('conversas')
-        .select('origem, channel, n8n_webhook_id, human_mode, origem_final')
-        .eq('id', conversaId)
-        .single();
 
       const isN8nCinemktConversa = conversaData && (
         conversaData.origem || 
