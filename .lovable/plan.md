@@ -1,52 +1,14 @@
 
 
-## Plano: Ajustar payload do webchat-human-reply para formato padrao webchat
+## Plano: Deploy de todas as Edge Functions
 
-### Problema
+O projeto possui 22 edge functions. Vou fazer o deploy de todas em paralelo para garantir que o codigo mais recente esteja ativo em producao.
 
-A Edge Function `webchat-human-reply` envia o payload ao n8n com shape `{action, to, mensagem, ...}`, mas o n8n espera o mesmo formato das mensagens normais do webchat: `{to, body, source, channel, channel_id, ...}`.
+### Funcoes a deployar
 
-### Alteracao unica: `supabase/functions/webchat-human-reply/index.ts`
+buscar-empresa, check-attendance-mode, close-service, conversation-attendance-status, create-user-auth, import-contacts, n8n-reset-human-mode, n8n-send-message, n8n-webhook-cinemkt, reschedule-campaign-errors, run-campaigns, setup-super-admin, start-conversation, whapi-config, whapi-connection-webhook, whapi-media, whapi-qr, whapi-reconnect, whapi-send-media, whapi-send-message, whapi-status, whapi-webhook.
 
-Ajustar a construcao do `n8nPayload` (linhas 134-145):
+### Acao
 
-**De:**
-```json
-{
-  "action": "human_reply",
-  "to": "webchat-...",
-  "empresa_id": "...",
-  "conversa_id": "...",
-  "mensagem": "texto",
-  "remetente_id": "..."
-}
-```
-
-**Para:**
-```json
-{
-  "to": "webchat-...",
-  "body": "texto",
-  "source": "web-chat",
-  "channel": "comercial",
-  "channel_id": "PUNISH-U4JJA",
-  "empresa_id": "...",
-  "conversa_id": "...",
-  "remetente_id": "..."
-}
-```
-
-**O que muda no codigo:**
-
-1. Adicionar `whapi_channel_name` ao SELECT da tabela `empresas` (buscar pelo `empresa_id` que ja temos).
-2. No payload:
-   - Remover `action: 'human_reply'` e `mensagem`
-   - Adicionar `body` (= conteudo da mensagem)
-   - Adicionar `source: 'web-chat'` (fixo)
-   - Usar `channel` da conversa (ja disponivel no select, normalizar para lowercase: "Comercial" → "comercial")
-   - Usar `channel_id` = `whapi_channel_name` da empresa
-
-Nenhuma outra alteracao necessaria — o frontend e o hook `useMensagens.ts` continuam enviando os mesmos campos para a edge function. Apenas o payload de saida para o n8n muda.
-
-Apos a alteracao, fazer deploy da edge function.
+Deploy paralelo de todas as 22 funcoes usando a ferramenta de deploy. Nenhuma alteracao de codigo necessaria.
 
