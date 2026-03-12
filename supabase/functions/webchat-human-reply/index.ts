@@ -99,6 +99,19 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Fetch empresa to get whapi_channel_name (channel_id)
+    const { data: empresa, error: empresaError } = await supabase
+      .from('empresas')
+      .select('whapi_channel_name')
+      .eq('id', empresa_id)
+      .maybeSingle()
+
+    if (empresaError) {
+      console.error(`[${requestId}] Error fetching empresa`, empresaError)
+    }
+
+    const channelId = empresa?.whapi_channel_name || null
+
     if (!conversa.n8n_webhook_id) {
       console.error(
         `[${requestId}] Invalid conversa for webchat reply: missing n8n_webhook_id`,
