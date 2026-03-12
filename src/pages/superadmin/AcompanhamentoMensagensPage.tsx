@@ -13,6 +13,8 @@ import {
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DatabaseHealthPanel } from '@/components/superadmin/DatabaseHealthPanel';
 
 export default function AcompanhamentoMensagensPage() {
   const { toast } = useToast();
@@ -69,95 +71,105 @@ export default function AcompanhamentoMensagensPage() {
   return (
     <SuperAdminLayout>
       <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">Acompanhamento de Mensagens</h1>
-            <p className="text-sm text-muted-foreground">
-              Visão consolidada por empresa. As informações só são carregadas quando você clicar em &quot;Atualizar&quot;.
-            </p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold">Acompanhamento</h1>
+          <p className="text-sm text-muted-foreground">
+            Visão consolidada por empresa e saúde do banco. Dados carregados apenas sob demanda.
+          </p>
         </div>
 
-        <div className="flex flex-wrap items-end gap-4">
-          <div>
-            <label className="text-sm font-medium">Data início</label>
-            <Input
-              type="date"
-              value={dataInicio}
-              onChange={(e) => setDataInicio(e.target.value)}
-              className="mt-1 w-[180px]"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium">Data fim</label>
-            <Input
-              type="date"
-              value={dataFim}
-              onChange={(e) => setDataFim(e.target.value)}
-              className="mt-1 w-[180px]"
-            />
-          </div>
-          <div className="flex items-end">
-            <Button
-              type="button"
-              onClick={handleConsultar}
-              disabled={acompanhamentoMutation.isPending}
-              className="min-w-[140px]"
-            >
-              {acompanhamentoMutation.isPending && (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              )}
-              Atualizar
-            </Button>
-          </div>
-        </div>
+        <Tabs defaultValue="mensagens">
+          <TabsList>
+            <TabsTrigger value="mensagens">Mensagens</TabsTrigger>
+            <TabsTrigger value="saude-banco">Saúde do Banco</TabsTrigger>
+          </TabsList>
 
-        <div className="border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Empresa</TableHead>
-                <TableHead className="text-right">Mensagens recebidas</TableHead>
-                <TableHead className="text-right">Conversas fechadas</TableHead>
-                <TableHead className="text-right">Em aberto (total)</TableHead>
-                <TableHead className="text-right">Bot</TableHead>
-                <TableHead className="text-right">Triagem</TableHead>
-                <TableHead className="text-right">Fila</TableHead>
-                <TableHead className="text-right">Em atendimento</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {acompanhamentoMutation.isPending && rows.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    Carregando...
-                  </TableCell>
-                </TableRow>
-              ) : rows.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    Nenhum dado. Informe um período e clique em &quot;Atualizar&quot;.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                rows.map((row) => (
-                  <TableRow key={row.empresa_id}>
-                    <TableCell>{row.empresa_nome ?? row.empresa_id}</TableCell>
-                    <TableCell className="text-right">{row.mensagens_recebidas}</TableCell>
-                    <TableCell className="text-right">{row.conversas_fechadas}</TableCell>
-                    <TableCell className="text-right">{row.em_aberto_total}</TableCell>
-                    <TableCell className="text-right">{row.em_aberto_bot}</TableCell>
-                    <TableCell className="text-right">{row.em_aberto_triagem}</TableCell>
-                    <TableCell className="text-right">{row.em_aberto_fila}</TableCell>
-                    <TableCell className="text-right">{row.em_aberto_atendimento}</TableCell>
+          <TabsContent value="mensagens" className="space-y-6 mt-4">
+            <div className="flex flex-wrap items-end gap-4">
+              <div>
+                <label className="text-sm font-medium">Data início</label>
+                <Input
+                  type="date"
+                  value={dataInicio}
+                  onChange={(e) => setDataInicio(e.target.value)}
+                  className="mt-1 w-[180px]"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Data fim</label>
+                <Input
+                  type="date"
+                  value={dataFim}
+                  onChange={(e) => setDataFim(e.target.value)}
+                  className="mt-1 w-[180px]"
+                />
+              </div>
+              <div className="flex items-end">
+                <Button
+                  type="button"
+                  onClick={handleConsultar}
+                  disabled={acompanhamentoMutation.isPending}
+                  className="min-w-[140px]"
+                >
+                  {acompanhamentoMutation.isPending && (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  )}
+                  Atualizar
+                </Button>
+              </div>
+            </div>
+
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Empresa</TableHead>
+                    <TableHead className="text-right">Mensagens recebidas</TableHead>
+                    <TableHead className="text-right">Conversas fechadas</TableHead>
+                    <TableHead className="text-right">Em aberto (total)</TableHead>
+                    <TableHead className="text-right">Bot</TableHead>
+                    <TableHead className="text-right">Triagem</TableHead>
+                    <TableHead className="text-right">Fila</TableHead>
+                    <TableHead className="text-right">Em atendimento</TableHead>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                </TableHeader>
+                <TableBody>
+                  {acompanhamentoMutation.isPending && rows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        Carregando...
+                      </TableCell>
+                    </TableRow>
+                  ) : rows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        Nenhum dado. Informe um período e clique em &quot;Atualizar&quot;.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    rows.map((row: any) => (
+                      <TableRow key={row.empresa_id}>
+                        <TableCell>{row.empresa_nome ?? row.empresa_id}</TableCell>
+                        <TableCell className="text-right">{row.mensagens_recebidas}</TableCell>
+                        <TableCell className="text-right">{row.conversas_fechadas}</TableCell>
+                        <TableCell className="text-right">{row.em_aberto_total}</TableCell>
+                        <TableCell className="text-right">{row.em_aberto_bot}</TableCell>
+                        <TableCell className="text-right">{row.em_aberto_triagem}</TableCell>
+                        <TableCell className="text-right">{row.em_aberto_fila}</TableCell>
+                        <TableCell className="text-right">{row.em_aberto_atendimento}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="saude-banco" className="mt-4">
+            <DatabaseHealthPanel />
+          </TabsContent>
+        </Tabs>
       </div>
     </SuperAdminLayout>
   );
 }
-
