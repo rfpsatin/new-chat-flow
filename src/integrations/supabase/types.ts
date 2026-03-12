@@ -364,6 +364,7 @@ export type Database = {
           id: string
           nome_fantasia: string | null
           razao_social: string
+          tipo_atendimento: string
           whapi_channel_name: string | null
           whapi_last_error: string | null
           whapi_last_qr_at: string | null
@@ -383,6 +384,7 @@ export type Database = {
           id?: string
           nome_fantasia?: string | null
           razao_social: string
+          tipo_atendimento?: string
           whapi_channel_name?: string | null
           whapi_last_error?: string | null
           whapi_last_qr_at?: string | null
@@ -402,6 +404,7 @@ export type Database = {
           id?: string
           nome_fantasia?: string | null
           razao_social?: string
+          tipo_atendimento?: string
           whapi_channel_name?: string | null
           whapi_last_error?: string | null
           whapi_last_qr_at?: string | null

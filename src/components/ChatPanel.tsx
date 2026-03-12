@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { useMensagens, useEnviarMensagem, useEnviarArquivo } from '@/hooks/useMensagens';
 import { useConversa } from '@/hooks/useFila';
+import { useEmpresa } from '@/hooks/useEmpresa';
 import { MensagemAtiva, FilaAtendimento } from '@/types/atendimento';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
@@ -43,6 +44,7 @@ interface ChatPanelProps {
 
 export function ChatPanel({ conversa }: ChatPanelProps) {
   const { currentUser, empresaId } = useApp();
+  const { empresa } = useEmpresa(empresaId);
   const { data: mensagens, isLoading: mensagensLoading } = useMensagens(conversa?.conversa_id || null);
   const { data: conversaDetalhes } = useConversa(conversa?.conversa_id || null);
   const enviarMensagem = useEnviarMensagem();
@@ -286,7 +288,7 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
               )}
               {/* Etiquetas origem e channel */}
               <div className="mt-1.5">
-                <ConversaTags origem={conversa.origem} channel={conversa.channel} />
+                <ConversaTags origem={conversa.origem} tipoAtendimentoEmpresa={empresa?.tipo_atendimento ?? null} channel={conversa.channel} />
               </div>
             </div>
           </div>

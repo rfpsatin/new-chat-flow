@@ -16,9 +16,11 @@ interface FilaPanelProps {
   onSelectConversa: (conversa: FilaAtendimento | null) => void;
   selectedConversaId: string | null;
   openConversaId?: string | null;
+  /** Tipo de atendimento da empresa (Marketing/Comercial) para rótulo nas tags */
+  tipoAtendimentoEmpresa?: string | null;
 }
 
-export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId }: FilaPanelProps) {
+export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId, tipoAtendimentoEmpresa }: FilaPanelProps) {
   const { empresaId, currentUser } = useApp();
   const { data: fila, isLoading } = useFila(empresaId);
   const assumirConversa = useAssumirConversa();
@@ -269,6 +271,7 @@ export function FilaPanel({ onSelectConversa, selectedConversaId, openConversaId
                       conversa={conversa}
                       isSelected={selectedConversaId === conversa.conversa_id}
                       onClick={() => onSelectConversa(conversa)}
+                      tipoAtendimentoEmpresa={tipoAtendimentoEmpresa}
                       showBadge={isAdmOrSup || selectedStatus === 'todos'}
                       showAgentName={isAdmOrSup}
                       selectionMode={selectionMode}

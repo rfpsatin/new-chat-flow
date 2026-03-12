@@ -8,6 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function EmpresaPage() {
   const { currentUser } = useApp();
@@ -21,6 +28,7 @@ export default function EmpresaPage() {
     cnpj: '',
     ativo: true,
     agente_ia_ativo: false,
+    tipo_atendimento: 'comercial',
   });
 
   useEffect(() => {
@@ -31,6 +39,7 @@ export default function EmpresaPage() {
         cnpj: empresa.cnpj,
         ativo: empresa.ativo,
         agente_ia_ativo: empresa.agente_ia_ativo ?? false,
+        tipo_atendimento: empresa.tipo_atendimento === 'marketing' ? 'marketing' : 'comercial',
       });
     }
   }, [empresa]);
@@ -144,6 +153,25 @@ export default function EmpresaPage() {
                         checked={form.agente_ia_ativo}
                         onCheckedChange={(checked) => handleChange('agente_ia_ativo', checked)}
                       />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="tipo_atendimento">Tipo de atendimento</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Rótulo exibido na fila (Marketing ou Comercial). A cor azul/verde indica a origem: chat web ou WhatsApp.
+                      </p>
+                      <Select
+                        value={form.tipo_atendimento}
+                        onValueChange={(value: 'marketing' | 'comercial') => handleChange('tipo_atendimento', value)}
+                      >
+                        <SelectTrigger id="tipo_atendimento">
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="comercial">Comercial</SelectItem>
+                          <SelectItem value="marketing">Marketing</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div className="flex justify-end gap-2">

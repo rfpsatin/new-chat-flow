@@ -11,6 +11,8 @@ export type DirecaoMensagem = 'in' | 'out';
 
 export type TipoRemetente = 'cliente' | 'bot' | 'agente' | 'sistema';
 
+export type TipoAtendimentoEmpresa = 'marketing' | 'comercial';
+
 export interface Empresa {
   id: string;
   razao_social: string;
@@ -18,6 +20,7 @@ export interface Empresa {
   cnpj: string;
   ativo: boolean;
   agente_ia_ativo?: boolean;
+  tipo_atendimento?: TipoAtendimentoEmpresa;
   created_at: string;
 }
 

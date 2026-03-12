@@ -3,12 +3,16 @@ import { useSearchParams } from 'react-router-dom';
 import { MainLayout } from '@/components/MainLayout';
 import { FilaPanel } from '@/components/FilaPanel';
 import { ChatPanel } from '@/components/ChatPanel';
+import { useApp } from '@/contexts/AppContext';
+import { useEmpresa } from '@/hooks/useEmpresa';
 import { FilaAtendimento } from '@/types/atendimento';
 
 export default function FilaPage() {
   const [searchParams] = useSearchParams();
   const openConversaId = searchParams.get('conversa_id');
   const [selectedConversa, setSelectedConversa] = useState<FilaAtendimento | null>(null);
+  const { empresaId } = useApp();
+  const { empresa } = useEmpresa(empresaId);
 
   return (
     <MainLayout>
@@ -25,6 +29,7 @@ export default function FilaPage() {
               onSelectConversa={setSelectedConversa}
               selectedConversaId={selectedConversa?.conversa_id || null}
               openConversaId={openConversaId}
+              tipoAtendimentoEmpresa={empresa?.tipo_atendimento ?? null}
             />
           </div>
         </div>

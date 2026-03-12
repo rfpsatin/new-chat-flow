@@ -10,6 +10,8 @@ interface ConversaItemProps {
   conversa: FilaAtendimento;
   isSelected: boolean;
   onClick: () => void;
+  /** Tipo de atendimento da empresa (Marketing/Comercial) para o rótulo da tag */
+  tipoAtendimentoEmpresa?: string | null;
   showBadge?: boolean;
   showAgentName?: boolean;
   selectionMode?: boolean;
@@ -17,7 +19,7 @@ interface ConversaItemProps {
   onToggleCheck?: () => void;
 }
 
-export function ConversaItem({ conversa, isSelected, onClick, showBadge = true, showAgentName = true, selectionMode = false, isChecked = false, onToggleCheck }: ConversaItemProps) {
+export function ConversaItem({ conversa, isSelected, onClick, tipoAtendimentoEmpresa, showBadge = true, showAgentName = true, selectionMode = false, isChecked = false, onToggleCheck }: ConversaItemProps) {
   const getInitials = (name: string | null) => {
     if (!name) return '?';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -160,7 +162,7 @@ export function ConversaItem({ conversa, isSelected, onClick, showBadge = true, 
             {timeAgo}
           </span>
           <div className="flex flex-col items-end gap-0.5">
-            <ConversaTags origem={conversa.origem} channel={conversa.channel} />
+            <ConversaTags origem={conversa.origem} tipoAtendimentoEmpresa={tipoAtendimentoEmpresa} channel={conversa.channel} />
             {showBadge && (
               <div className="flex items-center gap-1 text-xs text-muted-foreground flex-wrap justify-end">
                 <span>| {statusLabel[conversa.status]} |</span>
