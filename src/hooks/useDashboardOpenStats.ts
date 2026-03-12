@@ -139,7 +139,7 @@ export function useDashboardOpenStats(
         .select('id, nome')
         .eq('empresa_id', empresaId)
         .eq('ativo', true)
-        .in('tipo_usuario', ['opr', 'sup']);
+        .in('tipo_usuario', ['opr', 'sup', 'adm']);
 
       if (usuariosError) throw usuariosError;
 

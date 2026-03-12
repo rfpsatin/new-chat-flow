@@ -331,13 +331,12 @@ export function useDashboardStats(empresaId: string, periodo: PeriodoFiltro, ena
   const { data: agentesData, isLoading: loadingAgentes } = useQuery({
     queryKey: ['dashboard-agentes', empresaId, periodo],
     queryFn: async () => {
-      // Buscar usuários operadores/supervisores ativos
       const { data: usuarios, error: errorUsuarios } = await supabase
         .from('usuarios')
         .select('id, nome')
         .eq('empresa_id', empresaId)
         .eq('ativo', true)
-        .in('tipo_usuario', ['opr', 'sup']);
+        .in('tipo_usuario', ['opr', 'sup', 'adm']);
 
       if (errorUsuarios) throw errorUsuarios;
 
@@ -440,7 +439,7 @@ export function useDashboardStats(empresaId: string, periodo: PeriodoFiltro, ena
         .select('id')
         .eq('empresa_id', empresaId)
         .eq('ativo', true)
-        .in('tipo_usuario', ['opr', 'sup']);
+        .in('tipo_usuario', ['opr', 'sup', 'adm']);
 
       const { data: conversas } = await supabase
         .from('conversas')
