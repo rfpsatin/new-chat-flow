@@ -114,7 +114,7 @@ export function UploadArquivoDialog({
       setError('Selecione um arquivo para enviar.');
       return;
     }
-    if (!contatoId || !remetenteId) {
+    if (!contatoId || !remetenteId || !whatsappNumero) {
       setError('Não foi possível identificar o contato ou atendente.');
       return;
     }
