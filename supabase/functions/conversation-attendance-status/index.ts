@@ -47,9 +47,11 @@ Deno.serve(async (req) => {
       numero = body.numero ?? body.telefone ?? body.whatsapp_numero ?? null
     }
 
-    const numeroDigits = onlyDigits(numero ?? '')
+    const raw = (numero ?? '').trim()
+    const isWebchat = raw.toLowerCase().startsWith('webchat-')
+    const numeroBusca = isWebchat ? raw : onlyDigits(raw)
 
-    if (!empresaId || !numeroDigits) {
+    if (!empresaId || !numeroBusca) {
       return new Response(
         JSON.stringify({
           error: 'Missing parameters',
@@ -69,12 +71,19 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    // Contato: empresa_id + número (com ou sem sufixo)
-    const { data: contato, error: contatoErr } = await supabase
+    // Contato: empresa_id + número (webchat usa match exato, whatsapp com/sem sufixo)
+    let contatoQuery = supabase
       .from('contatos')
       .select('id')
       .eq('empresa_id', empresaId)
-      .or(`whatsapp_numero.eq.${numeroDigits},whatsapp_numero.eq.${numeroDigits}@s.whatsapp.net`)
+
+    if (isWebchat) {
+      contatoQuery = contatoQuery.eq('whatsapp_numero', numeroBusca)
+    } else {
+      contatoQuery = contatoQuery.or(`whatsapp_numero.eq.${numeroBusca},whatsapp_numero.eq.${numeroBusca}@s.whatsapp.net`)
+    }
+
+    const { data: contato, error: contatoErr } = await contatoQuery
       .limit(1)
       .maybeSingle()
 
