@@ -1089,21 +1089,27 @@ function NovaCampanhaLoteWizard({
                     Buscar contatos
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Contatos encontrados: {contatosFonte.length} (deduplicados por telefone: {totalContatosDeduplicados})
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                  <p className="text-xs text-muted-foreground">
+                    Contatos encontrados: {contatosFonte.length} (deduplicados por telefone:{' '}
+                    {totalContatosDeduplicados})
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleGerarLotes}
+                    disabled={
+                      !contatosFonte.length || !nomeBase.trim() || !mensagemTexto.trim() || !modoResposta
+                    }
+                  >
+                    Gerar lotes
+                  </Button>
+                </div>
               </div>
 
               <div className="flex justify-between items-center pt-2">
                 <Button type="button" variant="outline" onClick={onClose}>
                   Cancelar
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleGerarLotes}
-                  disabled={!contatosFonte.length || !nomeBase.trim() || !mensagemTexto.trim() || !modoResposta}
-                >
-                  Gerar lotes
                 </Button>
               </div>
             </>
