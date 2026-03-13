@@ -1,14 +1,61 @@
 
 
-## Plano: Deploy de todas as Edge Functions
+## Problema
 
-O projeto possui 22 edge functions. Vou fazer o deploy de todas em paralelo para garantir que o codigo mais recente esteja ativo em producao.
+A edge function `conversation-attendance-status` usa `onlyDigits()` para limpar o numero recebido. Para contatos web-chat, o `whatsapp_numero` armazenado e `webchat-XXXX`, mas `onlyDigits()` remove todas as letras e hifens, resultando em apenas digitos que nao batem com nenhum registro na tabela `contatos`. Por isso a funcao sempre retorna `human_mode: false` para conversas webchat.
 
-### Funcoes a deployar
+## Solucao
 
-buscar-empresa, check-attendance-mode, close-service, conversation-attendance-status, create-user-auth, import-contacts, n8n-reset-human-mode, n8n-send-message, n8n-webhook-cinemkt, reschedule-campaign-errors, run-campaigns, setup-super-admin, start-conversation, whapi-config, whapi-connection-webhook, whapi-media, whapi-qr, whapi-reconnect, whapi-send-media, whapi-send-message, whapi-status, whapi-webhook.
+Alterar **um unico arquivo**: `supabase/functions/conversation-attendance-status/index.ts`
 
-### Acao
+1. **Detectar identificador webchat** antes de aplicar `onlyDigits()`:
+   - Se o valor comecar com `webchat-`, preservar o valor original.
+   - Caso contrario, aplicar `onlyDigits()` normalmente.
 
-Deploy paralelo de todas as 22 funcoes usando a ferramenta de deploy. Nenhuma alteracao de codigo necessaria.
+2. **Ajustar a query de busca no banco**:
+   - Se webchat: busca exata por `whatsapp_numero = valor_original`.
+   - Se WhatsApp normal: manter busca atual com/sem sufixo `@s.whatsapp.net`.
+
+3. **Redeploy** da edge function.
+
+## Codigo
+
+```typescript
+// ANTES (sempre remove letras):
+const numeroDigits = onlyDigits(numero ?? '')
+
+// DEPOIS (preserva identificador webchat):
+const raw = (numero ?? '').trim()
+const isWebchat = raw.toLowerCase().startsWith('webchat-')
+const numeroBusca = isWebchat ? raw : onlyDigits(raw)
+```
+
+Query de contatos:
+
+```typescript
+let contatoQuery = supabase
+  .from('contatos')
+  .select('id')
+  .eq('empresa_id', empresaId)
+
+if (isWebchat) {
+  contatoQuery = contatoQuery.eq('whatsapp_numero', numeroBusca)
+} else {
+  contatoQuery = contatoQuery.or(
+    `whatsapp_numero.eq.${numeroBusca},whatsapp_numero.eq.${numeroBusca}@s.whatsapp.net`
+  )
+}
+
+const { data: contato, error: contatoErr } = await contatoQuery
+  .limit(1)
+  .maybeSingle()
+```
+
+Validacao do parametro tambem precisa aceitar webchat:
+
+```typescript
+if (!empresaId || !numeroBusca) {
+  // retorna erro 400
+}
+```
 
