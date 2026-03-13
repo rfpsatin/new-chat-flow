@@ -1239,22 +1239,55 @@ export default function ContatosPage() {
 
     setAjustandoNono(true);
     try {
-      // Carrega todos os contatos da empresa (apenas id e whatsapp_numero)
-      const { data, error } = await supabase
-        .from('contatos')
-        .select('id, whatsapp_numero')
-        .eq('empresa_id', empresaId);
+      // Etapa 1: carregar todos os contatos em blocos paginados para contornar o limite de 1000 registros
+      const pageSize = 1000;
+      let from = 0;
+      const todos: { id: string; whatsapp_numero: string }[] = [];
 
-      if (error) throw error;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { data, error } = await supabase
+          .from('contatos')
+          .select('id, whatsapp_numero')
+          .eq('empresa_id', empresaId)
+          .order('id', { ascending: true })
+          .range(from, from + pageSize - 1);
 
-      const todos = (data ?? []).filter((c: any) => !!c.whatsapp_numero);
+        if (error) {
+          throw error;
+        }
+
+        const page = (data ?? [])
+          .filter((c: any) => !!c.whatsapp_numero)
+          .map((c: any) => ({
+            id: String(c.id),
+            whatsapp_numero: String(c.whatsapp_numero),
+          }));
+
+        if (!page.length) {
+          break;
+        }
+
+        todos.push(...page);
+
+        if (page.length < pageSize) {
+          break;
+        }
+
+        from += pageSize;
+      }
+
+      if (!todos.length) {
+        toast.info('Nenhum contato com whatsapp_numero encontrado para ajuste.');
+        return;
+      }
 
       // Mapeia números de 12 e 13 dígitos
       const numeros12 = new Set<string>();
       const contatos13: { id: string; numero: string }[] = [];
 
       for (const c of todos) {
-        const numero = String(c.whatsapp_numero);
+        const numero = c.whatsapp_numero;
         if (numero.length === 12) {
           numeros12.add(numero);
         } else if (numero.length === 13) {
@@ -1280,12 +1313,16 @@ export default function ContatosPage() {
         );
 
         if (confirmarDelete) {
-          const { error: deleteError } = await supabase
-            .from('contatos')
-            .delete()
-            .in('id', idsParaDeletar);
+          const deleteBatchSize = 1000;
+          for (let i = 0; i < idsParaDeletar.length; i += deleteBatchSize) {
+            const batchIds = idsParaDeletar.slice(i, i + deleteBatchSize);
+            const { error: deleteError } = await supabase
+              .from('contatos')
+              .delete()
+              .in('id', batchIds);
 
-          if (deleteError) throw deleteError;
+            if (deleteError) throw deleteError;
+          }
           toast.success(`Removidos ${idsParaDeletar.length} contato(s) de 13 dígitos em conflito.`);
         } else {
           toast.info('Etapa 1 cancelada pelo usuário. Nenhum contato foi removido.');
@@ -1294,19 +1331,47 @@ export default function ContatosPage() {
         toast.info('Etapa 1: nenhum contato conflitante (13 dígitos vs 12 dígitos) encontrado.');
       }
 
-      // Recarrega os contatos após possíveis deleções
-      const { data: data2, error: error2 } = await supabase
-        .from('contatos')
-        .select('id, whatsapp_numero')
-        .eq('empresa_id', empresaId);
+      // Etapa 2: recarrega contatos restantes (também paginado) e normaliza números com 13 dígitos
+      from = 0;
+      const restantes: { id: string; whatsapp_numero: string }[] = [];
 
-      if (error2) throw error2;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { data, error } = await supabase
+          .from('contatos')
+          .select('id, whatsapp_numero')
+          .eq('empresa_id', empresaId)
+          .order('id', { ascending: true })
+          .range(from, from + pageSize - 1);
 
-      const restantes = (data2 ?? []).filter((c: any) => !!c.whatsapp_numero);
+        if (error) {
+          throw error;
+        }
+
+        const page = (data ?? [])
+          .filter((c: any) => !!c.whatsapp_numero)
+          .map((c: any) => ({
+            id: String(c.id),
+            whatsapp_numero: String(c.whatsapp_numero),
+          }));
+
+        if (!page.length) {
+          break;
+        }
+
+        restantes.push(...page);
+
+        if (page.length < pageSize) {
+          break;
+        }
+
+        from += pageSize;
+      }
+
       const paraAtualizar: { id: string; novoNumero: string }[] = [];
 
       for (const c of restantes) {
-        const numero = String(c.whatsapp_numero);
+        const numero = c.whatsapp_numero;
         if (numero.length === 13) {
           const novoNumero = numero.slice(0, 4) + numero.slice(5);
           paraAtualizar.push({ id: c.id, novoNumero });
