@@ -22,7 +22,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { format } from 'date-fns';
+import { addMinutes, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   Megaphone,
@@ -36,9 +36,10 @@ import {
   Info,
   ArrowUpDown,
 } from 'lucide-react';
-import { Campanha, CampanhaStats, StatusCampanha } from '@/types/atendimento';
+import { Campanha, CampanhaStats, StatusCampanha, Contato } from '@/types/atendimento';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 const STATUS_LABEL: Record<StatusCampanha, string> = {
   draft: 'Rascunho',
@@ -60,6 +61,7 @@ export default function CampanhasPage() {
   } = useCampanhasStatsInfinite(empresaId);
   const [selectedCampanhaId, setSelectedCampanhaId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showCreateBatch, setShowCreateBatch] = useState(false);
   const [sortBy, setSortBy] = useState<'oldest' | 'newest' | 'name-asc' | 'name-desc'>('newest');
 
   const sortedStats = useMemo(() => {
@@ -121,6 +123,10 @@ export default function CampanhasPage() {
             <Button onClick={() => setShowCreate(true)} className="gap-2">
               <Plus className="w-4 h-4" />
               Nova campanha
+            </Button>
+            <Button variant="outline" onClick={() => setShowCreateBatch(true)} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Campanhas em lote
             </Button>
           </div>
         </div>
@@ -206,6 +212,15 @@ export default function CampanhasPage() {
           onSuccess={() => {
             setShowCreate(false);
             toast.success('Campanha criada. Adicione destinatários e agende.');
+          }}
+        />
+      )}
+      {showCreateBatch && (
+        <NovaCampanhaLoteWizard
+          onClose={() => setShowCreateBatch(false)}
+          onSuccess={() => {
+            setShowCreateBatch(false);
+            toast.success('Campanhas em lote criadas.');
           }}
         />
       )}
@@ -617,6 +632,546 @@ function NovaCampanhaWizard({
                 </Button>
               </div>
             </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+type LotePreview = {
+  numero: number;
+  nome: string;
+  dataHora: string; // datetime-local string
+  contatos: Pick<Contato, 'id' | 'nome' | 'whatsapp_numero'>[];
+};
+
+function NovaCampanhaLoteWizard({
+  onClose,
+  onSuccess,
+}: {
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const { empresaId } = useApp();
+  const criar = useCriarCampanha();
+  const adicionarDest = useAdicionarDestinatarios();
+  const agendar = useAgendarCampanha();
+
+  const [step, setStep] = useState<1 | 2>(1);
+
+  // Configuração base
+  const [nomeBase, setNomeBase] = useState('');
+  const [descricao, setDescricao] = useState('');
+  const [tagsStr, setTagsStr] = useState('');
+  const [mensagemTexto, setMensagemTexto] = useState('');
+  const [link, setLink] = useState('');
+  const [modoResposta, setModoResposta] = useState<'agente' | 'atendente' | ''>('');
+  const [dataBase, setDataBase] = useState('');
+  const [tamanhoLote, setTamanhoLote] = useState(300);
+  const [intervaloMinutos, setIntervaloMinutos] = useState(5);
+
+  // Filtros de contatos
+  const [filtroNome, setFiltroNome] = useState('');
+  const [filtroTelefone, setFiltroTelefone] = useState('');
+  const [filtroTag, setFiltroTag] = useState('');
+
+  const [loadingContatos, setLoadingContatos] = useState(false);
+  const [contatosFonte, setContatosFonte] = useState<Pick<Contato, 'id' | 'nome' | 'whatsapp_numero'>[]>([]);
+
+  // Lotes gerados
+  const [lotes, setLotes] = useState<LotePreview[]>([]);
+  const [loteSelecionado, setLoteSelecionado] = useState<LotePreview | null>(null);
+  const [gerandoCampanhas, setGerandoCampanhas] = useState(false);
+
+  const totalContatosDeduplicados = useMemo(() => {
+    const setNums = new Set<string>();
+    contatosFonte.forEach((c) => {
+      if (c.whatsapp_numero) {
+        setNums.add(String(c.whatsapp_numero));
+      }
+    });
+    return setNums.size;
+  }, [contatosFonte]);
+
+  const handleBuscarContatos = async () => {
+    if (!empresaId) {
+      toast.error('Empresa não encontrada na sessão.');
+      return;
+    }
+
+    setLoadingContatos(true);
+    try {
+      let query = supabase
+        .from('contatos')
+        .select('id, nome, whatsapp_numero, tag_origem')
+        .eq('empresa_id', empresaId);
+
+      if (filtroNome.trim()) {
+        query = query.ilike('nome', `%${filtroNome.trim()}%`);
+      }
+
+      if (filtroTelefone.trim()) {
+        const digits = filtroTelefone.replace(/\D/g, '');
+        if (digits) {
+          query = query.ilike('whatsapp_numero', `%${digits}%`);
+        }
+      }
+
+      if (filtroTag.trim()) {
+        query = query.ilike('tag_origem', `%${filtroTag.trim()}%`);
+      }
+
+      const { data, error } = await query.order('nome', { ascending: true });
+
+      if (error) {
+        toast.error(error.message || 'Erro ao buscar contatos.');
+        return;
+      }
+
+      const contatos = (data ?? []).filter(
+        (c) => c.whatsapp_numero && String(c.whatsapp_numero).trim(),
+      );
+
+      if (!contatos.length) {
+        toast.error('Nenhum contato encontrado com os filtros informados.');
+        setContatosFonte([]);
+        return;
+      }
+
+      setContatosFonte(
+        contatos.map((c: any) => ({
+          id: c.id as string,
+          nome: c.nome as string | null,
+          whatsapp_numero: String(c.whatsapp_numero),
+        })),
+      );
+      toast.success(`Encontrados ${contatos.length} contato(s) para geração de lotes.`);
+    } finally {
+      setLoadingContatos(false);
+    }
+  };
+
+  const handleGerarLotes = () => {
+    if (!nomeBase.trim() || !mensagemTexto.trim() || !modoResposta) {
+      toast.error('Preencha nome base, mensagem e modo de resposta.');
+      return;
+    }
+    if (!dataBase) {
+      toast.error('Informe a data base para agendamento.');
+      return;
+    }
+    if (!contatosFonte.length) {
+      toast.error('Busque e selecione contatos antes de gerar os lotes.');
+      return;
+    }
+    if (!tamanhoLote || tamanhoLote <= 0) {
+      toast.error('Informe um tamanho de lote válido.');
+      return;
+    }
+
+    // Deduplicar por telefone
+    const mapa = new Map<string, Pick<Contato, 'id' | 'nome' | 'whatsapp_numero'>>();
+    contatosFonte.forEach((c) => {
+      if (!c.whatsapp_numero) return;
+      mapa.set(String(c.whatsapp_numero), c);
+    });
+    const contatosUnicos = Array.from(mapa.values());
+
+    const maxPorDia = 2000;
+    const lotesGerados: LotePreview[] = [];
+    const baseDate = new Date(dataBase);
+    if (Number.isNaN(baseDate.getTime())) {
+      toast.error('Data base inválida.');
+      return;
+    }
+
+    let diaOffset = 0;
+    let contatosNoDia = 0;
+    let indiceGlobal = 1;
+
+    for (let i = 0; i < contatosUnicos.length; i += tamanhoLote) {
+      const contatosLote = contatosUnicos.slice(i, i + tamanhoLote);
+
+      // Se ultrapassar o limite diário, avança um dia
+      if (contatosNoDia + contatosLote.length > maxPorDia) {
+        diaOffset += 1;
+        contatosNoDia = 0;
+      }
+
+      const dia = new Date(baseDate);
+      dia.setDate(baseDate.getDate() + diaOffset);
+
+      const indiceNoDia = Math.floor(contatosNoDia / tamanhoLote);
+      const dataHoraLote = addMinutes(dia, indiceNoDia * intervaloMinutos);
+
+      lotesGerados.push({
+        numero: indiceGlobal,
+        nome: `${nomeBase.trim()} - Lote ${indiceGlobal}`,
+        dataHora: format(dataHoraLote, "yyyy-MM-dd'T'HH:mm"),
+        contatos: contatosLote,
+      });
+
+      contatosNoDia += contatosLote.length;
+      indiceGlobal += 1;
+    }
+
+    setLotes(lotesGerados);
+    setStep(2);
+  };
+
+  const handleAtualizarLote = (index: number, campo: 'nome' | 'dataHora', valor: string) => {
+    setLotes((prev) =>
+      prev.map((lote) =>
+        lote.numero === index
+          ? {
+              ...lote,
+              [campo]: valor,
+            }
+          : lote,
+      ),
+    );
+  };
+
+  const handleGerarCampanhas = async () => {
+    if (!empresaId) {
+      toast.error('Empresa não encontrada na sessão.');
+      return;
+    }
+    if (!lotes.length) {
+      toast.error('Nenhum lote gerado.');
+      return;
+    }
+
+    setGerandoCampanhas(true);
+    try {
+      const tags = tagsStr.split(/[\s,]+/).filter(Boolean);
+      for (const lote of lotes) {
+        if (!lote.contatos.length) continue;
+
+        const campanha = await criar.mutateAsync({
+          empresa_id: empresaId,
+          nome: lote.nome.trim(),
+          descricao: descricao.trim() || null,
+          tags,
+          mensagem_texto: mensagemTexto.trim(),
+          link: link.trim() || null,
+          modo_resposta: modoResposta,
+          status: 'draft',
+        });
+
+        const contatoIds = lote.contatos.map((c) => c.id);
+        if (contatoIds.length) {
+          await adicionarDest.mutateAsync({
+            campanha_id: campanha.id,
+            contato_ids: contatoIds,
+            empresa_id: empresaId,
+          });
+        }
+
+        if (lote.dataHora) {
+          await agendar.mutateAsync({
+            campanhaId: campanha.id,
+            agendado_para: new Date(lote.dataHora).toISOString(),
+          });
+        }
+      }
+
+      toast.success(`Criadas ${lotes.length} campanhas em lote.`);
+      onSuccess();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Erro ao criar campanhas em lote');
+    } finally {
+      setGerandoCampanhas(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Campanhas em lote</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 flex-1 flex flex-col overflow-hidden">
+          {step === 1 && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Nome base da campanha *</label>
+                  <Input
+                    value={nomeBase}
+                    onChange={(e) => setNomeBase(e.target.value)}
+                    placeholder="Ex: Campanha Nissan"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Descrição</label>
+                  <Input
+                    value={descricao}
+                    onChange={(e) => setDescricao(e.target.value)}
+                    placeholder="Opcional"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium flex items-center gap-1">
+                    <Tag className="w-3 h-3" /> Tags (separadas por vírgula)
+                  </label>
+                  <Input
+                    value={tagsStr}
+                    onChange={(e) => setTagsStr(e.target.value)}
+                    placeholder="promo, whatsapp"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Link (opcional)</label>
+                  <Input
+                    value={link}
+                    onChange={(e) => setLink(e.target.value)}
+                    placeholder="https://..."
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium">Mensagem da campanha *</label>
+                <textarea
+                  value={mensagemTexto}
+                  onChange={(e) => setMensagemTexto(e.target.value)}
+                  className="mt-1 w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  placeholder="Texto que será enviado..."
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <label className="text-sm font-medium">Quem irá tratar a resposta *</label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-[260px]">
+                        <p>
+                          Define quem continuará a conversa. Ao receber uma resposta do cliente, o atendimento
+                          seguirá com Agente ou Atendente, conforme selecionado.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <RadioGroup
+                  value={modoResposta}
+                  onValueChange={(v) => setModoResposta(v as 'agente' | 'atendente')}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="agente" id="lote-agente" />
+                    <Label htmlFor="lote-agente">Agente</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="atendente" id="lote-atendente" />
+                    <Label htmlFor="lote-atendente">Atendente</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Data base para agendamento *</label>
+                  <Input
+                    type="datetime-local"
+                    value={dataBase}
+                    onChange={(e) => setDataBase(e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Contatos por lote *</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={tamanhoLote}
+                    onChange={(e) => setTamanhoLote(Number(e.target.value) || 0)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Intervalo entre lotes (minutos) *</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={intervaloMinutos}
+                    onChange={(e) => setIntervaloMinutos(Number(e.target.value) || 1)}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-md bg-muted/60 border px-3 py-2 text-xs text-muted-foreground">
+                <p>
+                  Orientação: recomendamos no máximo <strong>2000 disparos por dia</strong>. Os lotes serão
+                  distribuídos automaticamente em dias diferentes para respeitar esse limite, usando o intervalo
+                  de tempo configurado entre os lotes.
+                </p>
+              </div>
+
+              <div className="border rounded-md p-3 space-y-3">
+                <div className="flex flex-wrap gap-3 items-end">
+                  <div className="flex-1 min-w-[160px]">
+                    <label className="text-sm font-medium">Filtrar por nome</label>
+                    <Input
+                      value={filtroNome}
+                      onChange={(e) => setFiltroNome(e.target.value)}
+                      placeholder="Opcional"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[160px]">
+                    <label className="text-sm font-medium">Filtrar por telefone</label>
+                    <Input
+                      value={filtroTelefone}
+                      onChange={(e) => setFiltroTelefone(e.target.value)}
+                      placeholder="Opcional"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[160px]">
+                    <label className="text-sm font-medium">Filtrar por tag do cadastro</label>
+                    <Input
+                      value={filtroTag}
+                      onChange={(e) => setFiltroTag(e.target.value)}
+                      placeholder="Opcional"
+                      className="mt-1"
+                    />
+                  </div>
+                  <Button type="button" onClick={handleBuscarContatos} disabled={loadingContatos}>
+                    {loadingContatos ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                    Buscar contatos
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Contatos encontrados: {contatosFonte.length} (deduplicados por telefone: {totalContatosDeduplicados})
+                </p>
+              </div>
+
+              <div className="flex justify-between items-center pt-2">
+                <Button type="button" variant="outline" onClick={onClose}>
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleGerarLotes}
+                  disabled={!contatosFonte.length || !nomeBase.trim() || !mensagemTexto.trim() || !modoResposta}
+                >
+                  Gerar lotes
+                </Button>
+              </div>
+            </>
+          )}
+
+          {step === 2 && (
+            <>
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-medium">Lotes gerados</p>
+                  <p className="text-xs text-muted-foreground">
+                    Total de lotes: {lotes.length} · Total de contatos (deduplicados): {totalContatosDeduplicados}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" onClick={() => setStep(1)}>
+                    Voltar
+                  </Button>
+                  <Button type="button" onClick={handleGerarCampanhas} disabled={gerandoCampanhas}>
+                    {gerandoCampanhas ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                    Gerar campanhas
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex-1 border rounded-md overflow-hidden">
+                <ScrollArea className="h-[320px]">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="text-left px-3 py-2 w-[40%]">Nome do lote</th>
+                        <th className="text-left px-3 py-2 w-[30%]">Data / hora do disparo</th>
+                        <th className="text-right px-3 py-2 w-[15%]">Contatos</th>
+                        <th className="text-right px-3 py-2 w-[15%]">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lotes.map((lote) => (
+                        <tr key={lote.numero} className="border-b last:border-b-0 hover:bg-muted/40">
+                          <td className="px-3 py-2 align-middle">
+                            <Input
+                              value={lote.nome}
+                              onChange={(e) => handleAtualizarLote(lote.numero, 'nome', e.target.value)}
+                              className="h-8 text-sm"
+                            />
+                          </td>
+                          <td className="px-3 py-2 align-middle">
+                            <Input
+                              type="datetime-local"
+                              value={lote.dataHora}
+                              onChange={(e) => handleAtualizarLote(lote.numero, 'dataHora', e.target.value)}
+                              className="h-8 text-sm"
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-right align-middle">
+                            {lote.contatos.length}
+                          </td>
+                          <td className="px-3 py-2 text-right align-middle">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setLoteSelecionado(lote)}
+                            >
+                              Ver contatos
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </ScrollArea>
+              </div>
+
+              <div className="rounded-md bg-muted/60 border px-3 py-2 text-xs text-muted-foreground">
+                <p>
+                  Você pode ajustar manualmente a data/hora e o nome de cada lote. Procure respeitar o limite de
+                  aproximadamente <strong>2000 disparos por dia</strong> e evitar colisões de horário entre lotes.
+                </p>
+              </div>
+            </>
+          )}
+
+          {loteSelecionado && (
+            <Dialog open onOpenChange={() => setLoteSelecionado(null)}>
+              <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+                <DialogHeader>
+                  <DialogTitle>Contatos do {loteSelecionado.nome}</DialogTitle>
+                </DialogHeader>
+                <ScrollArea className="flex-1">
+                  <div className="space-y-1 p-2 text-sm">
+                    {loteSelecionado.contatos.map((c) => (
+                      <div
+                        key={c.id}
+                        className="flex justify-between items-center border-b last:border-b-0 py-1"
+                      >
+                        <span>{c.nome || c.whatsapp_numero}</span>
+                        <span className="text-xs text-muted-foreground">{c.whatsapp_numero}</span>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </DialogContent>
+            </Dialog>
           )}
         </div>
       </DialogContent>
