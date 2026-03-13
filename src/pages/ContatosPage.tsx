@@ -957,6 +957,7 @@ export default function ContatosPage() {
   const [showTratamento, setShowTratamento] = useState(false);
   const [editNome, setEditNome] = useState('');
   const [editWhatsapp, setEditWhatsapp] = useState('');
+  const [editTag, setEditTag] = useState('');
   const [savingContato, setSavingContato] = useState(false);
   const [exporting, setExporting] = useState(false);
 
@@ -981,15 +982,18 @@ export default function ContatosPage() {
     if (selectedContato) {
       setEditNome(selectedContato.nome ?? '');
       setEditWhatsapp(selectedContato.whatsapp_numero ?? '');
+      setEditTag(selectedContato.tag_origem ?? '');
     } else {
       setEditNome('');
       setEditWhatsapp('');
+      setEditTag('');
     }
   }, [selectedContato]);
 
   const handleSalvarContato = async () => {
     if (!selectedContato) return;
     const nome = editNome.trim() || null;
+    const tag_origem = editTag.trim() || null;
     const validation = validatePhoneWithDdd(editWhatsapp);
     if (!validation.ok || !validation.normalizedDigits) {
       toast.error(validation.reason || 'Informe um numero de WhatsApp valido com DDD.');
@@ -1003,7 +1007,8 @@ export default function ContatosPage() {
         .update({
           nome,
           whatsapp_numero: validation.normalizedDigits,
-            telefone_numero: formattedPhone || null,
+          telefone_numero: formattedPhone || null,
+          tag_origem,
         })
         .eq('id', selectedContato.id);
 
@@ -1015,6 +1020,7 @@ export default function ContatosPage() {
         nome,
         whatsapp_numero: validation.normalizedDigits,
         telefone_numero: formattedPhone || null,
+        tag_origem,
       };
       setSelectedContato(updated);
       queryClient.invalidateQueries({ queryKey: ['contatos', empresaId] });
@@ -1247,6 +1253,15 @@ export default function ContatosPage() {
                           <Input
                             value={editWhatsapp}
                             onChange={(e) => setEditWhatsapp(e.target.value)}
+                            className="mt-0.5 h-8 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground">Tag</label>
+                          <Input
+                            value={editTag}
+                            onChange={(e) => setEditTag(e.target.value)}
+                            placeholder="Ex.: campanha_x, lead_importado, etc."
                             className="mt-0.5 h-8 text-sm"
                           />
                         </div>

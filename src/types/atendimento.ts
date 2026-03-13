@@ -41,6 +41,8 @@ export interface Contato {
   nome: string | null;
   whatsapp_numero: string;
   telefone_numero: string | null;
+  /** Tag de origem do contato (ex.: campanha, importação, etiqueta livre). */
+  tag_origem?: string | null;
   created_at: string;
 }
 

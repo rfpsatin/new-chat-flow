@@ -510,7 +510,7 @@ function NovaCampanhaWizard({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nova campanha</DialogTitle>
         </DialogHeader>
@@ -924,7 +924,7 @@ function NovaCampanhaLoteWizard({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Campanhas em lote</DialogTitle>
         </DialogHeader>
@@ -1198,7 +1198,7 @@ function NovaCampanhaLoteWizard({
 
           {loteSelecionado && (
             <Dialog open onOpenChange={() => setLoteSelecionado(null)}>
-              <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+              <DialogContent className="max-w-lg max-h-[80vh] flex flex-col overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Contatos do {loteSelecionado.nome}</DialogTitle>
                 </DialogHeader>
