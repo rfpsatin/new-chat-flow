@@ -144,6 +144,9 @@ Deno.serve(async (req) => {
       )
     }
 
+    // human_mode é definido quando a conversa passa para triagem/atendimento humano
+    // (encaminhar_para_atendente, assumir_conversa, forçar_atendimento_humano), não ao enviar mensagem.
+
     // Normalize channel to lowercase for n8n compatibility
     const channelNormalized = conversa.channel ? conversa.channel.toLowerCase() : null
 

@@ -189,12 +189,16 @@ Deno.serve(async (req) => {
       .update({ last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })
       .eq('id', conversa.id)
 
-    // Transfer to triage if human_mode
+    // Transfer to triage if human_mode (web-chat: mensagem que passa para atendimento humano)
     if (humanMode && conversa.status === 'bot') {
       console.log(`[${requestId}] human_mode=true, transferring to triage`)
       await supabase
         .from('conversas')
-        .update({ status: 'esperando_tria', updated_at: new Date().toISOString() })
+        .update({
+          status: 'esperando_tria',
+          human_mode: true,
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', conversa.id)
         .eq('status', 'bot')
     }
