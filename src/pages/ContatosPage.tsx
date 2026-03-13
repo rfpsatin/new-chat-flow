@@ -937,6 +937,126 @@ function TratarDadosBrutosDialog({
   );
 }
 
+function NovoContatoDialog({
+  open,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated?: (contato: Contato) => void;
+}) {
+  const { empresaId } = useApp();
+  const queryClient = useQueryClient();
+  const [nome, setNome] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
+  const [tag, setTag] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSalvar = async () => {
+    if (!empresaId) {
+      toast.error('Empresa não encontrada na sessão.');
+      return;
+    }
+
+    const nomeFinal = nome.trim() || null;
+    const validation = validatePhoneWithDdd(whatsapp);
+    if (!validation.ok || !validation.normalizedDigits) {
+      toast.error(validation.reason || 'Informe um numero de WhatsApp valido com DDD.');
+      return;
+    }
+    const formattedPhone = normalizePhoneField(whatsapp);
+    const tagFinal = tag.trim() || null;
+
+    setIsSubmitting(true);
+    try {
+      const { data, error } = await supabase
+        .from('contatos')
+        .insert({
+          empresa_id: empresaId,
+          nome: nomeFinal,
+          whatsapp_numero: validation.normalizedDigits,
+          telefone_numero: formattedPhone || null,
+          tag_origem: tagFinal,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const novoContato: Contato = {
+        id: data.id,
+        empresa_id: data.empresa_id,
+        nome: data.nome,
+        whatsapp_numero: data.whatsapp_numero,
+        telefone_numero: data.telefone_numero,
+        tag_origem: data.tag_origem ?? null,
+        created_at: data.created_at,
+      };
+
+      queryClient.invalidateQueries({ queryKey: ['contatos', empresaId] });
+      queryClient.invalidateQueries({ queryKey: ['contatos-infinite', empresaId] });
+      toast.success('Contato criado com sucesso.');
+      if (onCreated) {
+        onCreated(novoContato);
+      }
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao criar contato');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Novo contato</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 text-sm">
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Nome</label>
+            <Input
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder="Nome do contato"
+              className="mt-0.5 h-8 text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">WhatsApp *</label>
+            <Input
+              value={whatsapp}
+              onChange={(e) => setWhatsapp(e.target.value)}
+              placeholder="DDD + número (apenas dígitos)"
+              className="mt-0.5 h-8 text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Tag</label>
+            <Input
+              value={tag}
+              onChange={(e) => setTag(e.target.value)}
+              placeholder="Ex.: campanha_x, lead_importado, etc."
+              className="mt-0.5 h-8 text-sm"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={handleSalvar} disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+              Salvar
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function ContatosPage() {
   const navigate = useNavigate();
   const { empresaId } = useApp();
@@ -955,11 +1075,13 @@ export default function ContatosPage() {
   const [contatoParaIniciar, setContatoParaIniciar] = useState<Contato | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [showTratamento, setShowTratamento] = useState(false);
+  const [showNovoContato, setShowNovoContato] = useState(false);
   const [editNome, setEditNome] = useState('');
   const [editWhatsapp, setEditWhatsapp] = useState('');
   const [editTag, setEditTag] = useState('');
   const [savingContato, setSavingContato] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [ajustandoNono, setAjustandoNono] = useState(false);
 
   const filteredContatos = contatos ?? [];
 
@@ -1109,6 +1231,131 @@ export default function ContatosPage() {
     }
   };
 
+  const handleAjustarNonoDigito = async () => {
+    if (!empresaId) {
+      toast.error('Empresa não encontrada na sessão.');
+      return;
+    }
+
+    setAjustandoNono(true);
+    try {
+      // Carrega todos os contatos da empresa (apenas id e whatsapp_numero)
+      const { data, error } = await supabase
+        .from('contatos')
+        .select('id, whatsapp_numero')
+        .eq('empresa_id', empresaId);
+
+      if (error) throw error;
+
+      const todos = (data ?? []).filter((c: any) => !!c.whatsapp_numero);
+
+      // Mapeia números de 12 e 13 dígitos
+      const numeros12 = new Set<string>();
+      const contatos13: { id: string; numero: string }[] = [];
+
+      for (const c of todos) {
+        const numero = String(c.whatsapp_numero);
+        if (numero.length === 12) {
+          numeros12.add(numero);
+        } else if (numero.length === 13) {
+          contatos13.push({ id: c.id, numero });
+        }
+      }
+
+      // Etapa 1: encontrar 13 dígitos cujo número sem o 5º caractere já existe como 12 dígitos
+      const idsParaDeletar: string[] = [];
+      for (const c of contatos13) {
+        const ajustado = c.numero.slice(0, 4) + c.numero.slice(5);
+        if (numeros12.has(ajustado)) {
+          idsParaDeletar.push(c.id);
+        }
+      }
+
+      if (idsParaDeletar.length > 0) {
+        const confirmarDelete = window.confirm(
+          `Etapa 1 — Remover duplicados conflitantes:\n\n` +
+            `Foram encontrados ${idsParaDeletar.length} contato(s) com 13 dígitos ` +
+            `que conflitam com registros já existentes de 12 dígitos.\n\n` +
+            `Deseja remover esses registros de 13 dígitos, mantendo os de 12 dígitos?`,
+        );
+
+        if (confirmarDelete) {
+          const { error: deleteError } = await supabase
+            .from('contatos')
+            .delete()
+            .in('id', idsParaDeletar);
+
+          if (deleteError) throw deleteError;
+          toast.success(`Removidos ${idsParaDeletar.length} contato(s) de 13 dígitos em conflito.`);
+        } else {
+          toast.info('Etapa 1 cancelada pelo usuário. Nenhum contato foi removido.');
+        }
+      } else {
+        toast.info('Etapa 1: nenhum contato conflitante (13 dígitos vs 12 dígitos) encontrado.');
+      }
+
+      // Recarrega os contatos após possíveis deleções
+      const { data: data2, error: error2 } = await supabase
+        .from('contatos')
+        .select('id, whatsapp_numero')
+        .eq('empresa_id', empresaId);
+
+      if (error2) throw error2;
+
+      const restantes = (data2 ?? []).filter((c: any) => !!c.whatsapp_numero);
+      const paraAtualizar: { id: string; novoNumero: string }[] = [];
+
+      for (const c of restantes) {
+        const numero = String(c.whatsapp_numero);
+        if (numero.length === 13) {
+          const novoNumero = numero.slice(0, 4) + numero.slice(5);
+          paraAtualizar.push({ id: c.id, novoNumero });
+        }
+      }
+
+      if (paraAtualizar.length > 0) {
+        const confirmarUpdate = window.confirm(
+          `Etapa 2 — Normalizar números restantes:\n\n` +
+            `Foram encontrados ${paraAtualizar.length} contato(s) com 13 dígitos restantes.\n\n` +
+            `Deseja atualizar todos para 12 dígitos removendo o 5º caractere (9 extra)?`,
+        );
+
+        if (confirmarUpdate) {
+          const batchSize = 100;
+          for (let i = 0; i < paraAtualizar.length; i += batchSize) {
+            const batch = paraAtualizar.slice(i, i + batchSize);
+            const results = await Promise.all(
+              batch.map((item) =>
+                supabase
+                  .from('contatos')
+                  .update({ whatsapp_numero: item.novoNumero })
+                  .eq('id', item.id),
+              ),
+            );
+            const erro = results.find((r) => r.error);
+            if (erro?.error) {
+              throw erro.error;
+            }
+          }
+          toast.success(`Atualizados ${paraAtualizar.length} contato(s) para 12 dígitos.`);
+        } else {
+          toast.info('Etapa 2 cancelada pelo usuário. Nenhum contato foi atualizado.');
+        }
+      } else {
+        toast.info('Etapa 2: nenhum contato restante com 13 dígitos para ajustar.');
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['contatos', empresaId] });
+      queryClient.invalidateQueries({ queryKey: ['contatos-infinite', empresaId] });
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Erro ao ajustar o 9º dígito dos contatos. Tente novamente.',
+      );
+    } finally {
+      setAjustandoNono(false);
+    }
+  };
+
   return (
     <MainLayout>
       <div className="flex h-full">
@@ -1117,41 +1364,57 @@ export default function ContatosPage() {
           <div className="p-4 border-b space-y-3">
             <div className="flex items-center justify-between gap-2">
               <h2 className="font-semibold text-lg">Contatos</h2>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-1.5">
-                    Ações
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault();
-                      if (!exporting) {
-                        void handleExportContatos();
-                      }
-                    }}
-                  >
-                    Exportar CSV
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault();
-                      setShowTratamento(true);
-                    }}
-                  >
-                    Tratar dados brutos
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault();
-                      setShowImport(true);
-                    }}
-                  >
-                    Importar
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex items-center gap-2">
+                <Button variant="default" size="sm" onClick={() => setShowNovoContato(true)}>
+                  Novo contato
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-1.5">
+                      Ações
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        if (!exporting) {
+                          void handleExportContatos();
+                        }
+                      }}
+                    >
+                      Exportar CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        setShowTratamento(true);
+                      }}
+                    >
+                      Tratar dados brutos
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        setShowImport(true);
+                      }}
+                    >
+                      Importar
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={ajustandoNono}
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        if (!ajustandoNono) {
+                          void handleAjustarNonoDigito();
+                        }
+                      }}
+                    >
+                      Ajustar 9º dígito
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
