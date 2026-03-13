@@ -702,51 +702,73 @@ function NovaCampanhaLoteWizard({
 
     setLoadingContatos(true);
     try {
-      let query = supabase
-        .from('contatos')
-        .select('id, nome, whatsapp_numero, tag_origem')
-        .eq('empresa_id', empresaId);
+      const pageSize = 1000;
+      let from = 0;
+      const contatosAcumulados: any[] = [];
 
-      if (filtroNome.trim()) {
-        query = query.ilike('nome', `%${filtroNome.trim()}%`);
-      }
+      // Paginação manual em blocos de 1000 até varrer todos os contatos que atendem aos filtros.
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        let query = supabase
+          .from('contatos')
+          .select('id, nome, whatsapp_numero, tag_origem')
+          .eq('empresa_id', empresaId);
 
-      if (filtroTelefone.trim()) {
-        const digits = filtroTelefone.replace(/\D/g, '');
-        if (digits) {
-          query = query.ilike('whatsapp_numero', `%${digits}%`);
+        if (filtroNome.trim()) {
+          query = query.ilike('nome', `%${filtroNome.trim()}%`);
         }
+
+        if (filtroTelefone.trim()) {
+          const digits = filtroTelefone.replace(/\D/g, '');
+          if (digits) {
+            query = query.ilike('whatsapp_numero', `%${digits}%`);
+          }
+        }
+
+        if (filtroTag.trim()) {
+          query = query.ilike('tag_origem', `%${filtroTag.trim()}%`);
+        }
+
+        const { data, error } = await query
+          .order('nome', { ascending: true })
+          .range(from, from + pageSize - 1);
+
+        if (error) {
+          toast.error(error.message || 'Erro ao buscar contatos.');
+          return;
+        }
+
+        const page = (data ?? []).filter(
+          (c) => c.whatsapp_numero && String(c.whatsapp_numero).trim(),
+        );
+
+        if (!page.length) {
+          break;
+        }
+
+        contatosAcumulados.push(...page);
+
+        if (page.length < pageSize) {
+          break;
+        }
+
+        from += pageSize;
       }
 
-      if (filtroTag.trim()) {
-        query = query.ilike('tag_origem', `%${filtroTag.trim()}%`);
-      }
-
-      const { data, error } = await query.order('nome', { ascending: true });
-
-      if (error) {
-        toast.error(error.message || 'Erro ao buscar contatos.');
-        return;
-      }
-
-      const contatos = (data ?? []).filter(
-        (c) => c.whatsapp_numero && String(c.whatsapp_numero).trim(),
-      );
-
-      if (!contatos.length) {
+      if (!contatosAcumulados.length) {
         toast.error('Nenhum contato encontrado com os filtros informados.');
         setContatosFonte([]);
         return;
       }
 
       setContatosFonte(
-        contatos.map((c: any) => ({
+        contatosAcumulados.map((c: any) => ({
           id: c.id as string,
           nome: c.nome as string | null,
           whatsapp_numero: String(c.whatsapp_numero),
         })),
       );
-      toast.success(`Encontrados ${contatos.length} contato(s) para geração de lotes.`);
+      toast.success(`Encontrados ${contatosAcumulados.length} contato(s) para geração de lotes.`);
     } finally {
       setLoadingContatos(false);
     }
@@ -884,6 +906,20 @@ function NovaCampanhaLoteWizard({
     } finally {
       setGerandoCampanhas(false);
     }
+  };
+
+  const handleSimularGeracao = () => {
+    if (!lotes.length) {
+      toast.error('Nenhum lote gerado para simulação.');
+      return;
+    }
+
+    const totalCampanhas = lotes.length;
+    const totalContatos = lotes.reduce((acc, lote) => acc + lote.contatos.length, 0);
+
+    toast.success(
+      `Simulação: seriam criadas ${totalCampanhas} campanhas com ${totalContatos} destinatário(s) no total.`,
+    );
   };
 
   return (
@@ -1085,6 +1121,9 @@ function NovaCampanhaLoteWizard({
                 <div className="flex gap-2">
                   <Button type="button" variant="outline" onClick={() => setStep(1)}>
                     Voltar
+                  </Button>
+                  <Button type="button" variant="outline" onClick={handleSimularGeracao}>
+                    Simular geração
                   </Button>
                   <Button type="button" onClick={handleGerarCampanhas} disabled={gerandoCampanhas}>
                     {gerandoCampanhas ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
