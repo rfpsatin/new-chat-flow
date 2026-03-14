@@ -1721,6 +1721,15 @@ export default function ContatosPage() {
           onClose={() => setShowTratamento(false)}
         />
       )}
+      {showNovoContato && (
+        <NovoContatoDialog
+          open={showNovoContato}
+          onClose={() => setShowNovoContato(false)}
+          onCreated={(contato) => {
+            setSelectedContato(contato);
+          }}
+        />
+      )}
     </MainLayout>
   );
 }
