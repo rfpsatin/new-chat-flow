@@ -982,7 +982,35 @@ function NovoContatoDialog({
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // 23505 = unique_violation: (empresa_id, whatsapp_numero) já existe
+        if (error.code === '23505') {
+          toast.error('Este número já está cadastrado para esta empresa.');
+          queryClient.invalidateQueries({ queryKey: ['contatos', empresaId] });
+          queryClient.invalidateQueries({ queryKey: ['contatos-infinite', empresaId] });
+          const { data: existing } = await supabase
+            .from('contatos')
+            .select('id, empresa_id, nome, whatsapp_numero, telefone_numero, tag_origem, created_at')
+            .eq('empresa_id', empresaId)
+            .eq('whatsapp_numero', validation.normalizedDigits)
+            .maybeSingle();
+          if (existing && onCreated) {
+            const contatoExistente: Contato = {
+              id: existing.id,
+              empresa_id: existing.empresa_id,
+              nome: existing.nome,
+              whatsapp_numero: existing.whatsapp_numero,
+              telefone_numero: existing.telefone_numero,
+              tag_origem: existing.tag_origem ?? null,
+              created_at: existing.created_at,
+            };
+            onCreated(contatoExistente);
+            onClose();
+          }
+          return;
+        }
+        throw error;
+      }
 
       const novoContato: Contato = {
         id: data.id,
