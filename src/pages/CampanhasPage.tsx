@@ -178,12 +178,12 @@ export default function CampanhasPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Status</Label>
-              <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+              <Select value={filtroStatus || 'all'} onValueChange={(v) => setFiltroStatus(v === 'all' ? '' : v)}>
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   {(Object.entries(STATUS_LABEL) as [StatusCampanha, string][]).map(([value, label]) => (
                     <SelectItem key={value} value={value}>
                       {label}
@@ -194,12 +194,12 @@ export default function CampanhasPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Quem trata a resposta</Label>
-              <Select value={filtroModoResposta} onValueChange={setFiltroModoResposta}>
+              <Select value={filtroModoResposta || 'all'} onValueChange={(v) => setFiltroModoResposta(v === 'all' ? '' : v)}>
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="agente">Agente</SelectItem>
                   <SelectItem value="atendente">Atendente</SelectItem>
                 </SelectContent>
