@@ -199,7 +199,7 @@ export default function CampanhasPage() {
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="agente">Agente</SelectItem>
                   <SelectItem value="atendente">Atendente</SelectItem>
                 </SelectContent>
