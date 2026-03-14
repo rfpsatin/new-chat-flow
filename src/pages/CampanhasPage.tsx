@@ -178,7 +178,7 @@ export default function CampanhasPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Status</Label>
-              <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+              <Select value={filtroStatus || 'all'} onValueChange={(v) => setFiltroStatus(v === 'all' ? '' : v)}>
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
