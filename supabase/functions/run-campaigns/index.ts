@@ -14,6 +14,22 @@ const N8N_WEBHOOK_URL = 'https://n8n.maringaai.com.br/webhook/whatsapp_cinemkt'
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+function extractWhapiMessageId(whapiData: unknown): string | null {
+  if (!whapiData || typeof whapiData !== 'object') return null
+  const d = whapiData as Record<string, unknown>
+  const msg = d?.message as Record<string, unknown> | undefined
+  const list = d?.messages as unknown[] | undefined
+  const first = list?.[0] as Record<string, unknown> | undefined
+  return (
+    (msg?.id as string) ??
+    (msg?.message_id as string) ??
+    (first?.id as string) ??
+    (first?.message_id as string) ??
+    (d?.id as string) ??
+    null
+  ) || null
+}
+
 Deno.serve(async (req) => {
   const requestId = crypto.randomUUID().slice(0, 8)
   console.log(`[${requestId}] ========== RUN CAMPAIGNS ==========`)
@@ -297,6 +313,17 @@ Deno.serve(async (req) => {
             )
           }
 
+          let whapiMessageId: string | null = null
+          try {
+            const whapiData = JSON.parse(whapiRaw) as unknown
+            whapiMessageId = extractWhapiMessageId(whapiData)
+            if (whapiMessageId) {
+              console.log(`[${requestId}] dest=${dest.id} whapi message_id=${whapiMessageId}`)
+            }
+          } catch {
+            // Resposta não-JSON ou inesperada: segue sem ID, não falha o envio
+          }
+
           // 5. Inserir mensagem no banco
           await supabase.from('mensagens_ativas').insert({
             empresa_id: campanha.empresa_id,
@@ -306,6 +333,7 @@ Deno.serve(async (req) => {
             tipo_remetente: 'sistema',
             remetente_id: null,
             conteudo: messageText,
+            whatsapp_message_id: whapiMessageId,
           })
 
           // 6. Notificar n8n se human_mode=true (fire-and-forget)
@@ -333,10 +361,14 @@ Deno.serve(async (req) => {
             )
           }
 
-          // 7. Marcar como enviado
+          // 7. Marcar como enviado e guardar ID da mensagem (para depois usar no webhook de status)
           await supabase
             .from('campanha_destinatarios')
-            .update({ status_envio: 'enviado', conversa_id: conversaId })
+            .update({
+              status_envio: 'enviado',
+              conversa_id: conversaId,
+              mensagem_id_whatsapp: whapiMessageId,
+            })
             .eq('id', dest.id)
 
           enviados++
