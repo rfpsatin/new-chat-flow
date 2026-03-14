@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { MainLayout } from '@/components/MainLayout';
 import {
@@ -324,11 +324,29 @@ function CampanhaDetailDialog({
   const enviados = destinatarios?.filter((d) => d.status_envio === 'enviado').length ?? 0;
   const erros = destinatarios?.filter((d) => d.status_envio === 'erro_envio').length ?? 0;
 
+  // Campanhas não enviadas: draft ou agendada e nunca iniciada
+  const podeRemover =
+    campanha && (campanha.status === 'draft' || campanha.status === 'agendada') && !campanha.iniciada_em;
+
+  useEffect(() => {
+    if (!campanha) return;
+    if (campanha.status === 'draft' || campanha.status === 'agendada') {
+      const para = campanha.agendado_para
+        ? format(new Date(campanha.agendado_para), "yyyy-MM-dd'T'HH:mm")
+        : '';
+      setAgendadoPara(para);
+    }
+  }, [campanha?.id, campanha?.status, campanha?.agendado_para]);
+
   const handleAgendar = async () => {
     if (!agendadoPara.trim()) return;
     try {
       await agendar.mutateAsync({ campanhaId, agendado_para: new Date(agendadoPara).toISOString() });
-      toast.success('Campanha agendada. O disparo será feito no horário definido.');
+      toast.success(
+        campanha?.status === 'agendada'
+          ? 'Data/hora programada atualizada.'
+          : 'Campanha agendada. O disparo será feito no horário definido.',
+      );
       onClose();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Erro ao agendar');
@@ -336,12 +354,11 @@ function CampanhaDetailDialog({
   };
 
   const handleExcluir = async () => {
-    const total = destinatarios?.length ?? 0;
-    if (total > 0) {
-      toast.error('Só é possível remover campanhas sem destinatários.');
+    if (!podeRemover) {
+      toast.error('Só é possível remover campanhas que ainda não foram enviadas (rascunho ou agendada, sem disparo iniciado).');
       return;
     }
-    if (!window.confirm('Tem certeza que deseja remover esta campanha?')) {
+    if (!window.confirm('Tem certeza que deseja remover esta campanha? Ela será excluída permanentemente.')) {
       return;
     }
     try {
@@ -382,7 +399,7 @@ function CampanhaDetailDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between gap-4">
             <span>{campanha.nome}</span>
-            {(destinatarios?.length ?? 0) === 0 && (
+            {podeRemover && (
               <Button
                 type="button"
                 variant="outline"
@@ -427,10 +444,12 @@ function CampanhaDetailDialog({
             </Card>
           </div>
           <p className="text-sm text-muted-foreground">{campanha.mensagem_texto}</p>
-          {campanha.status === 'draft' && pendentes > 0 && (
+          {(campanha.status === 'draft' || campanha.status === 'agendada') && (
             <div className="flex gap-2 items-end">
               <div className="flex-1">
-                <label className="text-sm font-medium">Agendar para</label>
+                <label className="text-sm font-medium">
+                  {campanha.status === 'agendada' ? 'Data/hora programada' : 'Agendar para'}
+                </label>
                 <Input
                   type="datetime-local"
                   value={agendadoPara}
@@ -438,9 +457,13 @@ function CampanhaDetailDialog({
                   className="mt-1"
                 />
               </div>
-              <Button onClick={handleAgendar} disabled={!agendadoPara || agendar.isPending}>
-                {agendar.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                Agendar disparo
+              <Button onClick={handleAgendar} disabled={!agendadoPara.trim() || agendar.isPending}>
+                {agendar.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+                {campanha.status === 'agendada' ? 'Atualizar data/hora' : 'Agendar disparo'}
               </Button>
             </div>
           )}
