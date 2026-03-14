@@ -226,4 +226,8 @@ export interface CampanhaStats {
   conversas_abertas: number;
   /** Data de criação da campanha (opcional, depende da view). */
   created_at?: string;
+  /** Tags da campanha (para filtros na listagem). */
+  tags?: string[] | null;
+  /** Quem trata a resposta: agente ou atendente (para filtros na listagem). */
+  modo_resposta?: string | null;
 }

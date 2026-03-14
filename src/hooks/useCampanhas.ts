@@ -42,15 +42,43 @@ export function useCampanhasStats(empresaId: string) {
   });
 }
 
-/** Lista de campanhas (stats) paginada. "Carregar mais" via fetchNextPage. */
-export function useCampanhasStatsInfinite(empresaId: string) {
+export type CampanhasFiltros = {
+  nome?: string;
+  tags?: string;
+  status?: string;
+  modo_resposta?: string;
+};
+
+/** Lista de campanhas (stats) paginada. "Carregar mais" via fetchNextPage. Aceita filtros opcionais. */
+export function useCampanhasStatsInfinite(empresaId: string, filtros?: CampanhasFiltros) {
   const infinite = useInfiniteQuery({
-    queryKey: ['campanhas-stats-infinite', empresaId],
+    queryKey: ['campanhas-stats-infinite', empresaId, filtros ?? {}],
     queryFn: async ({ pageParam }) => {
-      const { data, error } = await sb
+      let query = sb
         .from('vw_campanha_stats')
         .select('*')
-        .eq('empresa_id', empresaId)
+        .eq('empresa_id', empresaId);
+
+      if (filtros?.nome?.trim()) {
+        query = query.ilike('nome', `%${filtros.nome.trim()}%`);
+      }
+      if (filtros?.tags?.trim()) {
+        const tagList = filtros.tags
+          .split(/[\s,]+/)
+          .map((t) => t.trim())
+          .filter(Boolean);
+        if (tagList.length > 0) {
+          query = query.overlaps('tags', tagList);
+        }
+      }
+      if (filtros?.status?.trim()) {
+        query = query.eq('status', filtros.status.trim());
+      }
+      if (filtros?.modo_resposta?.trim()) {
+        query = query.eq('modo_resposta', filtros.modo_resposta.trim());
+      }
+
+      const { data, error } = await query
         .order('iniciada_em', { ascending: false, nullsFirst: false })
         .order('agendado_para', { ascending: false, nullsFirst: false })
         .range(pageParam, pageParam + CAMPANHAS_PAGE_SIZE - 1);

@@ -10,6 +10,7 @@ import {
   useAdicionarDestinatarios,
   useExcluirCampanha,
   useReagendarErrosCampanha,
+  type CampanhasFiltros,
 } from '@/hooks/useCampanhas';
 import { useContatosInfinite } from '@/hooks/useContatos';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,13 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { addMinutes, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -52,13 +60,28 @@ const STATUS_LABEL: Record<StatusCampanha, string> = {
 
 export default function CampanhasPage() {
   const { empresaId } = useApp();
+  const [filtroNome, setFiltroNome] = useState('');
+  const [filtroTags, setFiltroTags] = useState('');
+  const [filtroStatus, setFiltroStatus] = useState<string>('');
+  const [filtroModoResposta, setFiltroModoResposta] = useState<string>('');
+
+  const filtros: CampanhasFiltros = useMemo(() => {
+    const f: CampanhasFiltros = {};
+    if (filtroNome.trim()) f.nome = filtroNome.trim();
+    if (filtroTags.trim()) f.tags = filtroTags.trim();
+    if (filtroStatus) f.status = filtroStatus;
+    if (filtroModoResposta) f.modo_resposta = filtroModoResposta;
+    return f;
+  }, [filtroNome, filtroTags, filtroStatus, filtroModoResposta]);
+
   const {
     data: stats,
     isLoading,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useCampanhasStatsInfinite(empresaId);
+  } = useCampanhasStatsInfinite(empresaId, filtros);
+
   const [selectedCampanhaId, setSelectedCampanhaId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showCreateBatch, setShowCreateBatch] = useState(false);
@@ -130,6 +153,60 @@ export default function CampanhasPage() {
             </Button>
           </div>
         </div>
+
+        <Card className="p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Nome</Label>
+              <Input
+                placeholder="Filtrar por nome..."
+                value={filtroNome}
+                onChange={(e) => setFiltroNome(e.target.value)}
+                className="h-9"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                <Tag className="w-3 h-3" /> Tags
+              </Label>
+              <Input
+                placeholder="Ex: promo, whatsapp"
+                value={filtroTags}
+                onChange={(e) => setFiltroTags(e.target.value)}
+                className="h-9"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Status</Label>
+              <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todos</SelectItem>
+                  {(Object.entries(STATUS_LABEL) as [StatusCampanha, string][]).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Quem trata a resposta</Label>
+              <Select value={filtroModoResposta} onValueChange={setFiltroModoResposta}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="agente">Agente</SelectItem>
+                  <SelectItem value="atendente">Atendente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </Card>
 
         {isLoading ? (
           <div className="flex justify-center py-12">
