@@ -183,7 +183,7 @@ export default function CampanhasPage() {
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   {(Object.entries(STATUS_LABEL) as [StatusCampanha, string][]).map(([value, label]) => (
                     <SelectItem key={value} value={value}>
                       {label}
