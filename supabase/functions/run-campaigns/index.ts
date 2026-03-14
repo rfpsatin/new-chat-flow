@@ -85,7 +85,8 @@ Deno.serve(async (req) => {
       .select(
         'id, empresa_id, nome, mensagem_texto, link, status, envios_por_minuto, iniciada_em, modo_resposta',
       )
-      .eq('status', 'agendada')
+      // Inclui campanhas já iniciadas para garantir continuidade após interrupções
+      .in('status', ['agendada', 'em_execucao'])
       .lte('agendado_para', now)
 
     if (campError) {
