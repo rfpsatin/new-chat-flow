@@ -6,6 +6,7 @@ export type ContatoLote = {
 
 export type ConfigAgendamento = {
   dataInicioIso: string;
+  horaInicioPrimeiroDia: string;
   horaInicioDia: string;
   horaFimDia: string;
   limiteDiario: number;
@@ -77,6 +78,7 @@ export function gerarAgendamentosPorDestinatario(
 ): AgendamentoGerado[] {
   const {
     dataInicioIso,
+    horaInicioPrimeiroDia,
     horaInicioDia,
     horaFimDia,
     limiteDiario,
@@ -128,6 +130,7 @@ export function gerarAgendamentosPorDestinatario(
   }
 
   const baseDate = new Date(dataInicioIso);
+  const { hours: hInicio1, minutes: mInicio1 } = parseHora(horaInicioPrimeiroDia || horaInicioDia);
   const { hours: hInicio, minutes: mInicio } = parseHora(horaInicioDia);
   const { hours: hFim, minutes: mFim } = parseHora(horaFimDia);
 
@@ -145,7 +148,11 @@ export function gerarAgendamentosPorDestinatario(
     dia.setDate(dia.getDate() + diaIndex);
 
     const inicioDiaBase = new Date(dia);
-    inicioDiaBase.setHours(hInicio, mInicio, 0, 0);
+    if (diaIndex === 0) {
+      inicioDiaBase.setHours(hInicio1, mInicio1, 0, 0);
+    } else {
+      inicioDiaBase.setHours(hInicio, mInicio, 0, 0);
+    }
 
     const fimDiaBase = new Date(dia);
     fimDiaBase.setHours(hFim, mFim, 0, 0);

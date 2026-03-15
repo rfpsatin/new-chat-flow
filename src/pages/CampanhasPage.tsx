@@ -787,6 +787,7 @@ function NovaCampanhaLoteWizard({
 
   const [dataInicio, setDataInicio] = useState('');
   const [horaInicioDia, setHoraInicioDia] = useState('08:00');
+  const [horaInicioPrimeiroDia, setHoraInicioPrimeiroDia] = useState('08:00');
   const [horaFimDia, setHoraFimDia] = useState('21:00');
   const [limiteDiario, setLimiteDiario] = useState(300);
   const [variacaoMinutos, setVariacaoMinutos] = useState(10);
@@ -890,6 +891,7 @@ function NovaCampanhaLoteWizard({
 
     const cfg: ConfigAgendamento = {
       dataInicioIso: baseDateObj.toISOString(),
+      horaInicioPrimeiroDia,
       horaInicioDia,
       horaFimDia,
       limiteDiario,
@@ -1089,15 +1091,24 @@ function NovaCampanhaLoteWizard({
                     <Input type="time" value={horaInicioDia} onChange={(e) => setHoraInicioDia(e.target.value)} className="mt-1 h-8 text-sm" />
                   </div>
                   <div>
+                    <label className="text-xs text-muted-foreground">Hora início do 1º dia</label>
+                    <Input
+                      type="time"
+                      value={horaInicioPrimeiroDia}
+                      onChange={(e) => setHoraInicioPrimeiroDia(e.target.value)}
+                      className="mt-1 h-8 text-sm"
+                    />
+                  </div>
+                  <div>
                     <label className="text-xs text-muted-foreground">Hora fim do dia</label>
                     <Input type="time" value={horaFimDia} onChange={(e) => setHoraFimDia(e.target.value)} className="mt-1 h-8 text-sm" />
                   </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div>
                     <label className="text-xs text-muted-foreground">Limite diário (lote)</label>
                     <Input type="number" min={1} value={limiteDiario} onChange={(e) => setLimiteDiario(Number(e.target.value) || 1)} className="mt-1 h-8 text-sm" />
                   </div>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div>
                     <label className="text-xs text-muted-foreground">Qtd 1o dia</label>
                     <Input type="number" min={0} value={qtdLote1} onChange={(e) => setQtdLote1(Number(e.target.value) || 0)} className="mt-1 h-8 text-sm" />
