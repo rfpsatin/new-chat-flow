@@ -138,7 +138,7 @@ Deno.serve(async (req) => {
         .eq('status_envio', 'pendente')
         .or(`agendado_para.is.null,agendado_para.lte.${now}`)
         .order('agendado_para', { ascending: true, nullsFirst: true })
-        .limit(DEFAULT_BATCH)
+        .limit(DEFAULT_BATCH) as any
 
       if (destError || !destinatarios?.length) {
         if (destinatarios?.length === 0) {

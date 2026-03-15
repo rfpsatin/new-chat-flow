@@ -136,6 +136,7 @@ export function useCampanhaDestinatarios(campanhaId: string | null) {
       return data as CampanhaDestinatario[];
     },
     enabled: !!campanhaId,
+    refetchInterval: campanhaId ? 15000 : false,
   });
 }
 

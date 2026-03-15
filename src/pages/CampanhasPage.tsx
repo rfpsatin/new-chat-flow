@@ -943,7 +943,7 @@ function NovaCampanhaLoteWizard({
     try {
       const tags = tagsStr.split(/[\s,]+/).filter(Boolean);
       const msgsValidas = mensagensOpcoes.map((m) => m.trim()).filter(Boolean);
-      const baseDateObj = new Date(dataInicio);
+      const baseDateObj = new Date(`${dataInicio}T${horaInicioPrimeiroDia}`);
 
       const campanha = await criar.mutateAsync({
         empresa_id: empresaId,
