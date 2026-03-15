@@ -183,6 +183,8 @@ export interface Campanha {
   descricao: string | null;
   tags: string[];
   mensagem_texto: string;
+  /** Lista de variações de mensagem de texto (quando configurado em campanhas em lote). */
+  mensagem_opcoes?: string[] | null;
   midia_url: string | null;
   link: string | null;
   status: StatusCampanha;
@@ -191,6 +193,22 @@ export interface Campanha {
   finalizada_em: string | null;
   envios_por_minuto: number | null;
   envios_por_hora: number | null;
+  /** Janela diária de disparo (hora local, opcional). */
+  hora_inicio_dia?: string | null;
+  hora_fim_dia?: string | null;
+  /** Limite máximo de envios por dia (lote diário). */
+  limite_diario?: number | null;
+  /** Oscilação (± minutos) aplicada ao início/fim do dia entre os dias de envio. */
+  variacao_minutos?: number | null;
+  /** Quantidade de mensagens no primeiro lote (primeiro dia). */
+  qtd_lote_1?: number | null;
+  /** Quantidade de mensagens no segundo lote (segundo dia). */
+  qtd_lote_2?: number | null;
+  /** Número máximo de lotes (dias) usados para distribuir o envio. */
+  max_lotes?: number | null;
+  /** Intervalo mínimo e máximo (em segundos) entre envios individuais. */
+  intervalo_min_segundos?: number | null;
+  intervalo_max_segundos?: number | null;
   modo_resposta: string | null;
   created_at: string;
   updated_at: string;
@@ -207,7 +225,11 @@ export interface CampanhaDestinatario {
   mensagem_id_whatsapp: string | null;
   conversa_id: string | null;
   created_at: string;
-   erro_envio_msg?: string | null;
+  /** Data/hora em que este destinatário deve receber a mensagem (novo agendamento fino). */
+  agendado_para?: string | null;
+  /** Texto da mensagem atribuído especificamente a este destinatário. */
+  mensagem_texto?: string | null;
+  erro_envio_msg?: string | null;
 }
 
 export interface CampanhaStats {
