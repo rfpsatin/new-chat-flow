@@ -178,6 +178,9 @@ Deno.serve(async (req) => {
       const origemFinal = campanha.modo_resposta === 'atendente' ? 'atendente' : 'agente'
       const isHuman = origemFinal === 'atendente'
 
+      // Usado para aproximar o intervalo real entre os horários agendados
+      let lastAgendadoMs: number | null = null
+
       for (let i = 0; i < destinatarios.length; i++) {
         const dest = destinatarios[i]
 
@@ -336,11 +339,51 @@ Deno.serve(async (req) => {
           totalSent++
           console.log(`[${requestId}] dest=${dest.id} SENT OK conversa=${conversaId}`)
 
-          // Delay aleatório entre envios
+          // Intervalo entre envios baseado no horário agendado de cada item,
+          // limitado pela faixa configurada para evitar manter a função presa por muito tempo.
           if (i < destinatarios.length - 1) {
-            const delaySeconds = randomInt(minDelayS, maxDelayS)
-            console.log(`[${requestId}] waiting ${delaySeconds}s before next send`)
+            const nowMs = Date.now()
+            const agMs =
+              dest.agendado_para && typeof dest.agendado_para === 'string'
+                ? new Date(dest.agendado_para).getTime()
+                : nowMs
+
+            let gapSeconds = 0
+            if (Number.isFinite(agMs)) {
+              if (lastAgendadoMs == null) {
+                // Primeiro item do batch: usa diferença entre agora e o horário agendado (se ainda estiver no futuro)
+                if (agMs > nowMs) {
+                  gapSeconds = Math.max(0, Math.round((agMs - nowMs) / 1000))
+                }
+              } else {
+                // Próximos itens: usa diferença entre horários agendados
+                gapSeconds = Math.max(0, Math.round((agMs - lastAgendadoMs) / 1000))
+              }
+            }
+
+            // Se o gap for muito pequeno ou muito grande, mantemos dentro do intervalo configurado
+            let delaySeconds: number
+            if (gapSeconds === 0) {
+              delaySeconds = randomInt(minDelayS, maxDelayS)
+            } else {
+              delaySeconds = Math.min(Math.max(gapSeconds, minDelayS), maxDelayS)
+            }
+
+            console.log(
+              `[${requestId}] dest=${dest.id} scheduledGap=${gapSeconds}s -> waiting ${delaySeconds}s before next send`,
+            )
             await delay(delaySeconds * 1000)
+            if (Number.isFinite(agMs)) {
+              lastAgendadoMs = agMs
+            }
+          } else {
+            // Atualiza o último horário conhecido mesmo sem delay posterior
+            if (dest.agendado_para && typeof dest.agendado_para === 'string') {
+              const agMs = new Date(dest.agendado_para).getTime()
+              if (Number.isFinite(agMs)) {
+                lastAgendadoMs = agMs
+              }
+            }
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err)
