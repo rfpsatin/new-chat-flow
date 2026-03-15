@@ -886,11 +886,11 @@ function NovaCampanhaLoteWizard({
     contatosFonte.forEach((c) => { if (c.whatsapp_numero) mapa.set(String(c.whatsapp_numero), c); });
     const contatosUnicos = Array.from(mapa.values());
 
-    const baseDateObj = new Date(dataInicio);
+    const baseDateObj = new Date(`${dataInicio}T${horaInicioPrimeiroDia}`);
     if (Number.isNaN(baseDateObj.getTime())) { toast.error('Data de início inválida.'); return; }
 
     const cfg: ConfigAgendamento = {
-      dataInicioIso: baseDateObj.toISOString(),
+      dataInicioIso: `${dataInicio}T${horaInicioPrimeiroDia}`,
       horaInicioPrimeiroDia,
       horaInicioDia,
       horaFimDia,
