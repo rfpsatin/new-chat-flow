@@ -999,12 +999,12 @@ function NovaCampanhaLoteWizard({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 gap-0">
+        <DialogHeader className="px-6 pt-6 pb-4 shrink-0">
           <DialogTitle>Campanha em lote (disparo seguro)</DialogTitle>
         </DialogHeader>
-        <ScrollArea className="flex-1 pr-2">
-          <div className="space-y-4 flex flex-col">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-6">
+          <div className="space-y-4">
           {step === 1 && (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1230,7 +1230,7 @@ function NovaCampanhaLoteWizard({
             </>
           )}
           </div>
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   );
