@@ -47,10 +47,11 @@ function randomInt(min: number, max: number): number {
 }
 
 function distribuirTotalAleatorio(total: number, n: number): number[] {
+  if (total <= 0) return Array(Math.max(n, 0)).fill(0);
   if (n <= 1) return [total];
   if (total <= n) {
-    const base = Array(n).fill(1);
-    let restante = total - n;
+    const base = Array(n).fill(0);
+    let restante = total;
     while (restante > 0) {
       const idx = randomInt(0, n - 1);
       base[idx] += 1;
