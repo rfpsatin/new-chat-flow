@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
         'intervalo_min_segundos, intervalo_max_segundos',
       )
       .in('status', ['agendada', 'em_execucao'])
-      .lte('agendado_para', now)
+      .lte('agendado_para', now) as any
 
     if (campError) {
       console.error(`[${requestId}] Error listing campaigns:`, campError)
