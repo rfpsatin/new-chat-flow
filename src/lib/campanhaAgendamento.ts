@@ -196,7 +196,7 @@ export function gerarAgendamentosPorDestinatario(
   while (cursorContato < contatos.length && resultados.length < contatos.length) {
     const contato = contatos[cursorContato++];
     const ultimo = resultados[resultados.length - 1];
-    const base = ultimo ? new Date(ultimo.agendadoPara) : baseDate;
+    const base = ultimo ? new Date(ultimo.agendadoPara) : new Date(`${baseDateStr}T${horaInicioPrimeiroDia || horaInicioDia}:00`);
     const agendado = addMinutes(base, randomInt(1, 10));
     const mensagemTexto =
       mensagensValidas[randomInt(0, mensagensValidas.length - 1)];
