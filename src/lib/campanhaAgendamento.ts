@@ -47,10 +47,11 @@ function randomInt(min: number, max: number): number {
 }
 
 function distribuirTotalAleatorio(total: number, n: number): number[] {
+  if (total <= 0) return Array(Math.max(n, 0)).fill(0);
   if (n <= 1) return [total];
   if (total <= n) {
-    const base = Array(n).fill(1);
-    let restante = total - n;
+    const base = Array(n).fill(0);
+    let restante = total;
     while (restante > 0) {
       const idx = randomInt(0, n - 1);
       base[idx] += 1;
@@ -129,10 +130,8 @@ export function gerarAgendamentosPorDestinatario(
     quantPorDia[quantPorDia.length - 1] += total - somaCorrigida;
   }
 
-  const baseDate = new Date(dataInicioIso);
-  const { hours: hInicio1, minutes: mInicio1 } = parseHora(horaInicioPrimeiroDia || horaInicioDia);
-  const { hours: hInicio, minutes: mInicio } = parseHora(horaInicioDia);
-  const { hours: hFim, minutes: mFim } = parseHora(horaFimDia);
+  // Extract base date string (YYYY-MM-DD) to avoid UTC/local confusion
+  const baseDateStr = dataInicioIso.substring(0, 10); // "2026-03-15"
 
   const resultados: AgendamentoGerado[] = [];
   let cursorContato = 0;
@@ -144,18 +143,15 @@ export function gerarAgendamentosPorDestinatario(
     const maxDia = limiteDiario > 0 ? limiteDiario : qtdDia;
     const efetivoDia = Math.min(qtdDia, maxDia);
 
-    const dia = new Date(baseDate);
-    dia.setDate(dia.getDate() + diaIndex);
+    // Calculate day date by adding diaIndex days to base date
+    const baseForDay = new Date(`${baseDateStr}T12:00:00`); // noon to avoid DST issues
+    baseForDay.setDate(baseForDay.getDate() + diaIndex);
+    const dayStr = `${baseForDay.getFullYear()}-${String(baseForDay.getMonth() + 1).padStart(2, '0')}-${String(baseForDay.getDate()).padStart(2, '0')}`;
 
-    const inicioDiaBase = new Date(dia);
-    if (diaIndex === 0) {
-      inicioDiaBase.setHours(hInicio1, mInicio1, 0, 0);
-    } else {
-      inicioDiaBase.setHours(hInicio, mInicio, 0, 0);
-    }
-
-    const fimDiaBase = new Date(dia);
-    fimDiaBase.setHours(hFim, mFim, 0, 0);
+    // Build start/end times using string concatenation (local time, no UTC confusion)
+    const horaInicioStr = diaIndex === 0 ? (horaInicioPrimeiroDia || horaInicioDia) : horaInicioDia;
+    const inicioDiaBase = new Date(`${dayStr}T${horaInicioStr}:00`);
+    const fimDiaBase = new Date(`${dayStr}T${horaFimDia}:00`);
 
     let inicioDiaVar = inicioDiaBase;
     let fimDiaVar = fimDiaBase;
@@ -200,7 +196,7 @@ export function gerarAgendamentosPorDestinatario(
   while (cursorContato < contatos.length && resultados.length < contatos.length) {
     const contato = contatos[cursorContato++];
     const ultimo = resultados[resultados.length - 1];
-    const base = ultimo ? new Date(ultimo.agendadoPara) : baseDate;
+    const base = ultimo ? new Date(ultimo.agendadoPara) : new Date(`${baseDateStr}T${horaInicioPrimeiroDia || horaInicioDia}:00`);
     const agendado = addMinutes(base, randomInt(1, 10));
     const mensagemTexto =
       mensagensValidas[randomInt(0, mensagensValidas.length - 1)];
