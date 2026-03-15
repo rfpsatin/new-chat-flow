@@ -61,6 +61,7 @@ export type Database = {
       }
       campanha_destinatarios: {
         Row: {
+          agendado_para: string | null
           campanha_id: string
           contato_id: string
           conversa_id: string | null
@@ -68,12 +69,14 @@ export type Database = {
           erro_envio_msg: string | null
           id: string
           mensagem_id_whatsapp: string | null
+          mensagem_texto: string | null
           status_envio: string
           tentativas: number
           ultima_tentativa_em: string | null
           whatsapp_numero: string
         }
         Insert: {
+          agendado_para?: string | null
           campanha_id: string
           contato_id: string
           conversa_id?: string | null
@@ -81,12 +84,14 @@ export type Database = {
           erro_envio_msg?: string | null
           id?: string
           mensagem_id_whatsapp?: string | null
+          mensagem_texto?: string | null
           status_envio?: string
           tentativas?: number
           ultima_tentativa_em?: string | null
           whatsapp_numero: string
         }
         Update: {
+          agendado_para?: string | null
           campanha_id?: string
           contato_id?: string
           conversa_id?: string | null
@@ -94,6 +99,7 @@ export type Database = {
           erro_envio_msg?: string | null
           id?: string
           mensagem_id_whatsapp?: string | null
+          mensagem_texto?: string | null
           status_envio?: string
           tentativas?: number
           ultima_tentativa_em?: string | null
@@ -125,16 +131,26 @@ export type Database = {
           envios_por_hora: number | null
           envios_por_minuto: number | null
           finalizada_em: string | null
+          hora_fim_dia: string | null
+          hora_inicio_dia: string | null
           id: string
           iniciada_em: string | null
+          intervalo_max_segundos: number | null
+          intervalo_min_segundos: number | null
+          limite_diario: number | null
           link: string | null
+          max_lotes: number | null
+          mensagem_opcoes: string[] | null
           mensagem_texto: string
           midia_url: string | null
           modo_resposta: string | null
           nome: string
+          qtd_lote_1: number | null
+          qtd_lote_2: number | null
           status: string
           tags: string[] | null
           updated_at: string
+          variacao_minutos: number | null
         }
         Insert: {
           agendado_para?: string | null
@@ -144,16 +160,26 @@ export type Database = {
           envios_por_hora?: number | null
           envios_por_minuto?: number | null
           finalizada_em?: string | null
+          hora_fim_dia?: string | null
+          hora_inicio_dia?: string | null
           id?: string
           iniciada_em?: string | null
+          intervalo_max_segundos?: number | null
+          intervalo_min_segundos?: number | null
+          limite_diario?: number | null
           link?: string | null
+          max_lotes?: number | null
+          mensagem_opcoes?: string[] | null
           mensagem_texto: string
           midia_url?: string | null
           modo_resposta?: string | null
           nome: string
+          qtd_lote_1?: number | null
+          qtd_lote_2?: number | null
           status?: string
           tags?: string[] | null
           updated_at?: string
+          variacao_minutos?: number | null
         }
         Update: {
           agendado_para?: string | null
@@ -163,16 +189,26 @@ export type Database = {
           envios_por_hora?: number | null
           envios_por_minuto?: number | null
           finalizada_em?: string | null
+          hora_fim_dia?: string | null
+          hora_inicio_dia?: string | null
           id?: string
           iniciada_em?: string | null
+          intervalo_max_segundos?: number | null
+          intervalo_min_segundos?: number | null
+          limite_diario?: number | null
           link?: string | null
+          max_lotes?: number | null
+          mensagem_opcoes?: string[] | null
           mensagem_texto?: string
           midia_url?: string | null
           modo_resposta?: string | null
           nome?: string
+          qtd_lote_1?: number | null
+          qtd_lote_2?: number | null
           status?: string
           tags?: string[] | null
           updated_at?: string
+          variacao_minutos?: number | null
         }
         Relationships: []
       }
