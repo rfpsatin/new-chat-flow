@@ -48,6 +48,12 @@ import { Campanha, CampanhaStats, StatusCampanha, Contato } from '@/types/atendi
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  gerarAgendamentosPorDestinatario,
+  type ContatoLote,
+  type ConfigAgendamento,
+  type AgendamentoGerado,
+} from '@/lib/campanhaAgendamento';
 
 const STATUS_LABEL: Record<StatusCampanha, string> = {
   draft: 'Rascunho',
@@ -501,20 +507,32 @@ function CampanhaDetailDialog({
                   key={d.id}
                   className="py-1 border-b border-border/50 last:border-0 text-sm"
                 >
-                  <div className="flex justify-between items-center">
-                    <span>{d.whatsapp_numero}</span>
-                    <Badge
-                      variant={
-                        d.status_envio === 'enviado'
-                          ? 'default'
-                          : d.status_envio === 'erro_envio'
-                          ? 'destructive'
-                          : 'secondary'
-                      }
-                    >
-                      {d.status_envio}
-                    </Badge>
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="truncate">{d.whatsapp_numero}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {d.agendado_para && (
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(d.agendado_para), 'dd/MM HH:mm', { locale: ptBR })}
+                        </span>
+                      )}
+                      <Badge
+                        variant={
+                          d.status_envio === 'enviado'
+                            ? 'default'
+                            : d.status_envio === 'erro_envio'
+                            ? 'destructive'
+                            : 'secondary'
+                        }
+                      >
+                        {d.status_envio}
+                      </Badge>
+                    </div>
                   </div>
+                  {d.mensagem_texto && (
+                    <p className="mt-0.5 text-xs text-muted-foreground truncate" title={d.mensagem_texto}>
+                      {d.mensagem_texto.substring(0, 80)}{d.mensagem_texto.length > 80 ? '...' : ''}
+                    </p>
+                  )}
                   {d.status_envio === 'erro_envio' && d.erro_envio_msg && (
                     <p className="mt-0.5 text-xs text-destructive">
                       Motivo: {d.erro_envio_msg}
@@ -739,11 +757,12 @@ function NovaCampanhaWizard({
   );
 }
 
-type LotePreview = {
-  numero: number;
-  nome: string;
-  dataHora: string; // datetime-local string
-  contatos: Pick<Contato, 'id' | 'nome' | 'whatsapp_numero'>[];
+type DiaPreview = {
+  diaIndex: number;
+  data: string;
+  quantidade: number;
+  janelaInicio: string;
+  janelaFim: string;
 };
 
 function NovaCampanhaLoteWizard({
@@ -755,331 +774,280 @@ function NovaCampanhaLoteWizard({
 }) {
   const { empresaId } = useApp();
   const criar = useCriarCampanha();
-  const adicionarDest = useAdicionarDestinatarios();
-  const agendar = useAgendarCampanha();
 
   const [step, setStep] = useState<1 | 2>(1);
 
-  // Configuração base
   const [nomeBase, setNomeBase] = useState('');
   const [descricao, setDescricao] = useState('');
   const [tagsStr, setTagsStr] = useState('');
-  const [mensagemTexto, setMensagemTexto] = useState('');
-  const [link, setLink] = useState('');
+  const [linkCampanha, setLinkCampanha] = useState('');
   const [modoResposta, setModoResposta] = useState<'agente' | 'atendente' | ''>('');
-  const [dataBase, setDataBase] = useState('');
-  const [tamanhoLote, setTamanhoLote] = useState(300);
-  const [intervaloMinutos, setIntervaloMinutos] = useState(5);
 
-  // Filtros de contatos
+  const [mensagensOpcoes, setMensagensOpcoes] = useState<string[]>(['']);
+
+  const [dataInicio, setDataInicio] = useState('');
+  const [horaInicioDia, setHoraInicioDia] = useState('08:00');
+  const [horaFimDia, setHoraFimDia] = useState('21:00');
+  const [limiteDiario, setLimiteDiario] = useState(300);
+  const [variacaoMinutos, setVariacaoMinutos] = useState(10);
+  const [qtdLote1, setQtdLote1] = useState(100);
+  const [qtdLote2, setQtdLote2] = useState(180);
+  const [maxLotes, setMaxLotes] = useState(7);
+  const [intervaloMinSegundos, setIntervaloMinSegundos] = useState(30);
+  const [intervaloMaxSegundos, setIntervaloMaxSegundos] = useState(300);
+
   const [filtroNome, setFiltroNome] = useState('');
   const [filtroTelefone, setFiltroTelefone] = useState('');
   const [filtroTag, setFiltroTag] = useState('');
 
   const [loadingContatos, setLoadingContatos] = useState(false);
-  const [contatosFonte, setContatosFonte] = useState<Pick<Contato, 'id' | 'nome' | 'whatsapp_numero'>[]>([]);
+  const [contatosFonte, setContatosFonte] = useState<ContatoLote[]>([]);
 
-  // Lotes gerados
-  const [lotes, setLotes] = useState<LotePreview[]>([]);
-  const [loteSelecionado, setLoteSelecionado] = useState<LotePreview | null>(null);
+  const [agendamentos, setAgendamentos] = useState<AgendamentoGerado[]>([]);
+  const [diasPreview, setDiasPreview] = useState<DiaPreview[]>([]);
   const [gerandoCampanhas, setGerandoCampanhas] = useState(false);
 
   const totalContatosDeduplicados = useMemo(() => {
     const setNums = new Set<string>();
     contatosFonte.forEach((c) => {
-      if (c.whatsapp_numero) {
-        setNums.add(String(c.whatsapp_numero));
-      }
+      if (c.whatsapp_numero) setNums.add(String(c.whatsapp_numero));
     });
     return setNums.size;
   }, [contatosFonte]);
+
+  const handleAdicionarMensagem = () => setMensagensOpcoes((prev) => [...prev, '']);
+  const handleRemoverMensagem = (idx: number) => {
+    if (mensagensOpcoes.length <= 1) return;
+    setMensagensOpcoes((prev) => prev.filter((_, i) => i !== idx));
+  };
+  const handleAlterarMensagem = (idx: number, valor: string) => {
+    setMensagensOpcoes((prev) => prev.map((v, i) => (i === idx ? valor : v)));
+  };
 
   const handleBuscarContatos = async () => {
     if (!empresaId) {
       toast.error('Empresa não encontrada na sessão.');
       return;
     }
-
     setLoadingContatos(true);
     try {
       const pageSize = 1000;
       let from = 0;
-      const contatosAcumulados: any[] = [];
+      const acumulados: any[] = [];
 
-      // Paginação manual em blocos de 1000 até varrer todos os contatos que atendem aos filtros.
       // eslint-disable-next-line no-constant-condition
       while (true) {
         let query = supabase
           .from('contatos')
           .select('id, nome, whatsapp_numero, tag_origem')
           .eq('empresa_id', empresaId);
-
-        if (filtroNome.trim()) {
-          query = query.ilike('nome', `%${filtroNome.trim()}%`);
-        }
-
+        if (filtroNome.trim()) query = query.ilike('nome', `%${filtroNome.trim()}%`);
         if (filtroTelefone.trim()) {
           const digits = filtroTelefone.replace(/\D/g, '');
-          if (digits) {
-            query = query.ilike('whatsapp_numero', `%${digits}%`);
-          }
+          if (digits) query = query.ilike('whatsapp_numero', `%${digits}%`);
         }
+        if (filtroTag.trim()) query = query.ilike('tag_origem', `%${filtroTag.trim()}%`);
 
-        if (filtroTag.trim()) {
-          query = query.ilike('tag_origem', `%${filtroTag.trim()}%`);
-        }
-
-        const { data, error } = await query
-          .order('nome', { ascending: true })
-          .range(from, from + pageSize - 1);
-
-        if (error) {
-          toast.error(error.message || 'Erro ao buscar contatos.');
-          return;
-        }
-
-        const page = (data ?? []).filter(
-          (c) => c.whatsapp_numero && String(c.whatsapp_numero).trim(),
-        );
-
-        if (!page.length) {
-          break;
-        }
-
-        contatosAcumulados.push(...page);
-
-        if (page.length < pageSize) {
-          break;
-        }
-
+        const { data, error } = await query.order('nome', { ascending: true }).range(from, from + pageSize - 1);
+        if (error) { toast.error(error.message || 'Erro ao buscar contatos.'); return; }
+        const page = (data ?? []).filter((c) => c.whatsapp_numero && String(c.whatsapp_numero).trim());
+        if (!page.length) break;
+        acumulados.push(...page);
+        if (page.length < pageSize) break;
         from += pageSize;
       }
 
-      if (!contatosAcumulados.length) {
+      if (!acumulados.length) {
         toast.error('Nenhum contato encontrado com os filtros informados.');
         setContatosFonte([]);
         return;
       }
-
       setContatosFonte(
-        contatosAcumulados.map((c: any) => ({
-          id: c.id as string,
-          nome: c.nome as string | null,
-          whatsapp_numero: String(c.whatsapp_numero),
-        })),
+        acumulados.map((c: any) => ({ id: c.id as string, nome: c.nome as string | null, whatsapp_numero: String(c.whatsapp_numero) })),
       );
-      toast.success(`Encontrados ${contatosAcumulados.length} contato(s) para geração de lotes.`);
+      toast.success(`Encontrados ${acumulados.length} contato(s).`);
     } finally {
       setLoadingContatos(false);
     }
   };
 
-  const handleGerarLotes = () => {
-    if (!nomeBase.trim() || !mensagemTexto.trim() || !modoResposta) {
-      toast.error('Preencha nome base, mensagem e modo de resposta.');
+  const handleGerarPreview = () => {
+    const msgsValidas = mensagensOpcoes.map((m) => m.trim()).filter(Boolean);
+    if (!nomeBase.trim() || !msgsValidas.length || !modoResposta) {
+      toast.error('Preencha nome base, pelo menos uma mensagem e modo de resposta.');
       return;
     }
-    if (!dataBase) {
-      toast.error('Informe a data base para agendamento.');
-      return;
-    }
-    if (!contatosFonte.length) {
-      toast.error('Busque e selecione contatos antes de gerar os lotes.');
-      return;
-    }
-    if (!tamanhoLote || tamanhoLote <= 0) {
-      toast.error('Informe um tamanho de lote válido.');
-      return;
-    }
+    if (!dataInicio) { toast.error('Informe a data de início.'); return; }
+    if (!contatosFonte.length) { toast.error('Busque contatos antes de gerar.'); return; }
+    if (limiteDiario <= 0) { toast.error('Informe um limite diário válido.'); return; }
 
-    // Deduplicar por telefone
-    const mapa = new Map<string, Pick<Contato, 'id' | 'nome' | 'whatsapp_numero'>>();
-    contatosFonte.forEach((c) => {
-      if (!c.whatsapp_numero) return;
-      mapa.set(String(c.whatsapp_numero), c);
-    });
+    const mapa = new Map<string, ContatoLote>();
+    contatosFonte.forEach((c) => { if (c.whatsapp_numero) mapa.set(String(c.whatsapp_numero), c); });
     const contatosUnicos = Array.from(mapa.values());
 
-    const maxPorDia = 2000;
-    const lotesGerados: LotePreview[] = [];
-    const baseDate = new Date(dataBase);
-    if (Number.isNaN(baseDate.getTime())) {
-      toast.error('Data base inválida.');
-      return;
-    }
+    const baseDateObj = new Date(dataInicio);
+    if (Number.isNaN(baseDateObj.getTime())) { toast.error('Data de início inválida.'); return; }
 
-    let diaOffset = 0;
-    let contatosNoDia = 0;
-    let indiceGlobal = 1;
+    const cfg: ConfigAgendamento = {
+      dataInicioIso: baseDateObj.toISOString(),
+      horaInicioDia,
+      horaFimDia,
+      limiteDiario,
+      variacaoMinutos,
+      qtdLote1,
+      qtdLote2,
+      maxLotes,
+      intervaloMinSegundos,
+      intervaloMaxSegundos,
+      mensagensOpcoes: msgsValidas,
+    };
 
-    for (let i = 0; i < contatosUnicos.length; i += tamanhoLote) {
-      const contatosLote = contatosUnicos.slice(i, i + tamanhoLote);
+    try {
+      const resultado = gerarAgendamentosPorDestinatario(contatosUnicos, cfg);
+      setAgendamentos(resultado);
 
-      // Se ultrapassar o limite diário, avança um dia
-      if (contatosNoDia + contatosLote.length > maxPorDia) {
-        diaOffset += 1;
-        contatosNoDia = 0;
-      }
-
-      const dia = new Date(baseDate);
-      dia.setDate(baseDate.getDate() + diaOffset);
-
-      const indiceNoDia = Math.floor(contatosNoDia / tamanhoLote);
-      const dataHoraLote = addMinutes(dia, indiceNoDia * intervaloMinutos);
-
-      lotesGerados.push({
-        numero: indiceGlobal,
-        nome: `${nomeBase.trim()} - Lote ${indiceGlobal}`,
-        dataHora: format(dataHoraLote, "yyyy-MM-dd'T'HH:mm"),
-        contatos: contatosLote,
+      const porDia = new Map<number, AgendamentoGerado[]>();
+      resultado.forEach((a) => {
+        const arr = porDia.get(a.diaIndex) ?? [];
+        arr.push(a);
+        porDia.set(a.diaIndex, arr);
       });
 
-      contatosNoDia += contatosLote.length;
-      indiceGlobal += 1;
+      const preview: DiaPreview[] = [];
+      porDia.forEach((items, diaIndex) => {
+        const datas = items.map((i) => new Date(i.agendadoPara));
+        const minDate = new Date(Math.min(...datas.map((d) => d.getTime())));
+        const maxDate = new Date(Math.max(...datas.map((d) => d.getTime())));
+        preview.push({
+          diaIndex,
+          data: format(minDate, 'dd/MM/yyyy', { locale: ptBR }),
+          quantidade: items.length,
+          janelaInicio: format(minDate, 'HH:mm'),
+          janelaFim: format(maxDate, 'HH:mm'),
+        });
+      });
+      preview.sort((a, b) => a.diaIndex - b.diaIndex);
+      setDiasPreview(preview);
+      setStep(2);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Erro ao gerar agendamentos.');
     }
-
-    setLotes(lotesGerados);
-    setStep(2);
   };
 
-  const handleAtualizarLote = (index: number, campo: 'nome' | 'dataHora', valor: string) => {
-    setLotes((prev) =>
-      prev.map((lote) =>
-        lote.numero === index
-          ? {
-              ...lote,
-              [campo]: valor,
-            }
-          : lote,
-      ),
-    );
-  };
-
-  const handleGerarCampanhas = async () => {
-    if (!empresaId) {
-      toast.error('Empresa não encontrada na sessão.');
-      return;
-    }
-    if (!lotes.length) {
-      toast.error('Nenhum lote gerado.');
-      return;
-    }
+  const handleCriarCampanha = async () => {
+    if (!empresaId || !agendamentos.length) return;
 
     setGerandoCampanhas(true);
     try {
       const tags = tagsStr.split(/[\s,]+/).filter(Boolean);
-      for (const lote of lotes) {
-        if (!lote.contatos.length) continue;
+      const msgsValidas = mensagensOpcoes.map((m) => m.trim()).filter(Boolean);
+      const baseDateObj = new Date(dataInicio);
 
-        const campanha = await criar.mutateAsync({
-          empresa_id: empresaId,
-          nome: lote.nome.trim(),
-          descricao: descricao.trim() || null,
-          tags,
-          mensagem_texto: mensagemTexto.trim(),
-          link: link.trim() || null,
-          modo_resposta: modoResposta,
-          status: 'draft',
-        });
+      const campanha = await criar.mutateAsync({
+        empresa_id: empresaId,
+        nome: nomeBase.trim(),
+        descricao: descricao.trim() || null,
+        tags,
+        mensagem_texto: msgsValidas[0],
+        link: linkCampanha.trim() || null,
+        modo_resposta: modoResposta,
+        status: 'agendada',
+        agendado_para: baseDateObj.toISOString(),
+      } as any);
 
-        const contatoIds = lote.contatos.map((c) => c.id);
-        if (contatoIds.length) {
-          await adicionarDest.mutateAsync({
-            campanha_id: campanha.id,
-            contato_ids: contatoIds,
-            empresa_id: empresaId,
-          });
-        }
+      const sb = supabase as any;
+      await sb.from('campanhas').update({
+        hora_inicio_dia: horaInicioDia,
+        hora_fim_dia: horaFimDia,
+        limite_diario: limiteDiario,
+        variacao_minutos: variacaoMinutos,
+        qtd_lote_1: qtdLote1,
+        qtd_lote_2: qtdLote2,
+        max_lotes: maxLotes,
+        intervalo_min_segundos: intervaloMinSegundos,
+        intervalo_max_segundos: intervaloMaxSegundos,
+        mensagem_opcoes: msgsValidas,
+      }).eq('id', campanha.id);
 
-        if (lote.dataHora) {
-          await agendar.mutateAsync({
-            campanhaId: campanha.id,
-            agendado_para: new Date(lote.dataHora).toISOString(),
-          });
-        }
+      const chunkSize = 500;
+      const rows = agendamentos.map((item) => ({
+        campanha_id: campanha.id,
+        contato_id: item.contato.id,
+        whatsapp_numero: item.contato.whatsapp_numero,
+        agendado_para: item.agendadoPara,
+        mensagem_texto: item.mensagemTexto,
+        status_envio: 'pendente',
+      }));
+
+      for (let i = 0; i < rows.length; i += chunkSize) {
+        const slice = rows.slice(i, i + chunkSize);
+        const { error } = await sb.from('campanha_destinatarios').insert(slice);
+        if (error) throw error;
       }
 
-      toast.success(`Criadas ${lotes.length} campanhas em lote.`);
+      toast.success(`Campanha criada com ${rows.length} destinatário(s) distribuídos em ${diasPreview.length} dia(s).`);
       onSuccess();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Erro ao criar campanhas em lote');
+      console.error(e);
+      toast.error(e instanceof Error ? e.message : 'Erro ao criar campanha');
     } finally {
       setGerandoCampanhas(false);
     }
-  };
-
-  const handleSimularGeracao = () => {
-    if (!lotes.length) {
-      toast.error('Nenhum lote gerado para simulação.');
-      return;
-    }
-
-    const totalCampanhas = lotes.length;
-    const totalContatos = lotes.reduce((acc, lote) => acc + lote.contatos.length, 0);
-
-    toast.success(
-      `Simulação: seriam criadas ${totalCampanhas} campanhas com ${totalContatos} destinatário(s) no total.`,
-    );
   };
 
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Campanhas em lote</DialogTitle>
+          <DialogTitle>Campanha em lote (disparo seguro)</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 flex-1 flex flex-col overflow-hidden">
           {step === 1 && (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium">Nome base da campanha *</label>
-                  <Input
-                    value={nomeBase}
-                    onChange={(e) => setNomeBase(e.target.value)}
-                    placeholder="Ex: Campanha Nissan"
-                    className="mt-1"
-                  />
+                  <label className="text-sm font-medium">Nome da campanha *</label>
+                  <Input value={nomeBase} onChange={(e) => setNomeBase(e.target.value)} placeholder="Ex: Campanha Nissan" className="mt-1" />
                 </div>
                 <div>
                   <label className="text-sm font-medium">Descrição</label>
-                  <Input
-                    value={descricao}
-                    onChange={(e) => setDescricao(e.target.value)}
-                    placeholder="Opcional"
-                    className="mt-1"
-                  />
+                  <Input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Opcional" className="mt-1" />
                 </div>
                 <div>
-                  <label className="text-sm font-medium flex items-center gap-1">
-                    <Tag className="w-3 h-3" /> Tags (separadas por vírgula)
-                  </label>
-                  <Input
-                    value={tagsStr}
-                    onChange={(e) => setTagsStr(e.target.value)}
-                    placeholder="promo, whatsapp"
-                    className="mt-1"
-                  />
+                  <label className="text-sm font-medium flex items-center gap-1"><Tag className="w-3 h-3" /> Tags</label>
+                  <Input value={tagsStr} onChange={(e) => setTagsStr(e.target.value)} placeholder="promo, whatsapp" className="mt-1" />
                 </div>
                 <div>
                   <label className="text-sm font-medium">Link (opcional)</label>
-                  <Input
-                    value={link}
-                    onChange={(e) => setLink(e.target.value)}
-                    placeholder="https://..."
-                    className="mt-1"
-                  />
+                  <Input value={linkCampanha} onChange={(e) => setLinkCampanha(e.target.value)} placeholder="https://..." className="mt-1" />
                 </div>
               </div>
 
-              <div>
-                <label className="text-sm font-medium">Mensagem da campanha *</label>
-                <textarea
-                  value={mensagemTexto}
-                  onChange={(e) => setMensagemTexto(e.target.value)}
-                  className="mt-1 w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  placeholder="Texto que será enviado..."
-                />
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Opções de mensagem *</label>
+                  <Button type="button" variant="outline" size="sm" onClick={handleAdicionarMensagem}>
+                    <Plus className="w-3 h-3 mr-1" /> Adicionar variação
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Uma mensagem será escolhida aleatoriamente para cada destinatário. Quanto mais variações, menor o risco de bloqueio.
+                </p>
+                {mensagensOpcoes.map((msg, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    <textarea
+                      value={msg}
+                      onChange={(e) => handleAlterarMensagem(idx, e.target.value)}
+                      className="flex-1 min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      placeholder={`Variação ${idx + 1} da mensagem...`}
+                    />
+                    {mensagensOpcoes.length > 1 && (
+                      <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoverMensagem(idx)} className="self-start mt-1 text-destructive">
+                        X
+                      </Button>
+                    )}
+                  </div>
+                ))}
               </div>
 
               <div>
@@ -1091,19 +1059,12 @@ function NovaCampanhaLoteWizard({
                         <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent className="max-w-[260px]">
-                        <p>
-                          Define quem continuará a conversa. Ao receber uma resposta do cliente, o atendimento
-                          seguirá com Agente ou Atendente, conforme selecionado.
-                        </p>
+                        <p>Define quem continuará a conversa ao receber uma resposta do cliente.</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 </div>
-                <RadioGroup
-                  value={modoResposta}
-                  onValueChange={(v) => setModoResposta(v as 'agente' | 'atendente')}
-                  className="flex gap-4"
-                >
+                <RadioGroup value={modoResposta} onValueChange={(v) => setModoResposta(v as 'agente' | 'atendente')} className="flex gap-4">
                   <div className="flex items-center gap-2">
                     <RadioGroupItem value="agente" id="lote-agente" />
                     <Label htmlFor="lote-agente">Agente</Label>
@@ -1115,74 +1076,69 @@ function NovaCampanhaLoteWizard({
                 </RadioGroup>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="text-sm font-medium">Data base para agendamento *</label>
-                  <Input
-                    type="datetime-local"
-                    value={dataBase}
-                    onChange={(e) => setDataBase(e.target.value)}
-                    className="mt-1"
-                  />
+              <div className="rounded-md bg-muted/60 border px-3 py-3 space-y-3">
+                <p className="text-sm font-medium">Configuração de disparo</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground">Data de início *</label>
+                    <Input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} className="mt-1 h-8 text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Hora início do dia</label>
+                    <Input type="time" value={horaInicioDia} onChange={(e) => setHoraInicioDia(e.target.value)} className="mt-1 h-8 text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Hora fim do dia</label>
+                    <Input type="time" value={horaFimDia} onChange={(e) => setHoraFimDia(e.target.value)} className="mt-1 h-8 text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Limite diário (lote)</label>
+                    <Input type="number" min={1} value={limiteDiario} onChange={(e) => setLimiteDiario(Number(e.target.value) || 1)} className="mt-1 h-8 text-sm" />
+                  </div>
                 </div>
-                <div>
-                  <label className="text-sm font-medium">Contatos por lote *</label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={tamanhoLote}
-                    onChange={(e) => setTamanhoLote(Number(e.target.value) || 0)}
-                    className="mt-1"
-                  />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground">Qtd 1o dia</label>
+                    <Input type="number" min={0} value={qtdLote1} onChange={(e) => setQtdLote1(Number(e.target.value) || 0)} className="mt-1 h-8 text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Qtd 2o dia</label>
+                    <Input type="number" min={0} value={qtdLote2} onChange={(e) => setQtdLote2(Number(e.target.value) || 0)} className="mt-1 h-8 text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Max dias (lotes)</label>
+                    <Input type="number" min={1} value={maxLotes} onChange={(e) => setMaxLotes(Number(e.target.value) || 1)} className="mt-1 h-8 text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Variação (± min)</label>
+                    <Input type="number" min={0} value={variacaoMinutos} onChange={(e) => setVariacaoMinutos(Number(e.target.value) || 0)} className="mt-1 h-8 text-sm" />
+                  </div>
                 </div>
-                <div>
-                  <label className="text-sm font-medium">Intervalo entre lotes (minutos) *</label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={intervaloMinutos}
-                    onChange={(e) => setIntervaloMinutos(Number(e.target.value) || 1)}
-                    className="mt-1"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground">Intervalo mín. entre envios (seg)</label>
+                    <Input type="number" min={1} value={intervaloMinSegundos} onChange={(e) => setIntervaloMinSegundos(Number(e.target.value) || 1)} className="mt-1 h-8 text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Intervalo máx. entre envios (seg)</label>
+                    <Input type="number" min={1} value={intervaloMaxSegundos} onChange={(e) => setIntervaloMaxSegundos(Number(e.target.value) || 1)} className="mt-1 h-8 text-sm" />
+                  </div>
                 </div>
-              </div>
-
-              <div className="rounded-md bg-muted/60 border px-3 py-2 text-xs text-muted-foreground">
-                <p>
-                  Orientação: recomendamos no máximo <strong>2000 disparos por dia</strong>. Os lotes serão
-                  distribuídos automaticamente em dias diferentes para respeitar esse limite, usando o intervalo
-                  de tempo configurado entre os lotes.
-                </p>
               </div>
 
               <div className="border rounded-md p-3 space-y-3">
                 <div className="flex flex-wrap gap-3 items-end">
                   <div className="flex-1 min-w-[160px]">
                     <label className="text-sm font-medium">Filtrar por nome</label>
-                    <Input
-                      value={filtroNome}
-                      onChange={(e) => setFiltroNome(e.target.value)}
-                      placeholder="Opcional"
-                      className="mt-1"
-                    />
+                    <Input value={filtroNome} onChange={(e) => setFiltroNome(e.target.value)} placeholder="Opcional" className="mt-1" />
                   </div>
                   <div className="flex-1 min-w-[160px]">
                     <label className="text-sm font-medium">Filtrar por telefone</label>
-                    <Input
-                      value={filtroTelefone}
-                      onChange={(e) => setFiltroTelefone(e.target.value)}
-                      placeholder="Opcional"
-                      className="mt-1"
-                    />
+                    <Input value={filtroTelefone} onChange={(e) => setFiltroTelefone(e.target.value)} placeholder="Opcional" className="mt-1" />
                   </div>
                   <div className="flex-1 min-w-[160px]">
-                    <label className="text-sm font-medium">Filtrar por tag do cadastro</label>
-                    <Input
-                      value={filtroTag}
-                      onChange={(e) => setFiltroTag(e.target.value)}
-                      placeholder="Opcional"
-                      className="mt-1"
-                    />
+                    <label className="text-sm font-medium">Filtrar por tag</label>
+                    <Input value={filtroTag} onChange={(e) => setFiltroTag(e.target.value)} placeholder="Opcional" className="mt-1" />
                   </div>
                   <Button type="button" onClick={handleBuscarContatos} disabled={loadingContatos}>
                     {loadingContatos ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
@@ -1191,26 +1147,21 @@ function NovaCampanhaLoteWizard({
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                   <p className="text-xs text-muted-foreground">
-                    Contatos encontrados: {contatosFonte.length} (deduplicados por telefone:{' '}
-                    {totalContatosDeduplicados})
+                    Contatos encontrados: {contatosFonte.length} (deduplicados: {totalContatosDeduplicados})
                   </p>
                   <Button
                     type="button"
                     size="sm"
-                    onClick={handleGerarLotes}
-                    disabled={
-                      !contatosFonte.length || !nomeBase.trim() || !mensagemTexto.trim() || !modoResposta
-                    }
+                    onClick={handleGerarPreview}
+                    disabled={!contatosFonte.length || !nomeBase.trim() || !mensagensOpcoes.some((m) => m.trim()) || !modoResposta}
                   >
-                    Gerar lotes
+                    Gerar prévia dos lotes
                   </Button>
                 </div>
               </div>
 
               <div className="flex justify-between items-center pt-2">
-                <Button type="button" variant="outline" onClick={onClose}>
-                  Cancelar
-                </Button>
+                <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
               </div>
             </>
           )}
@@ -1219,21 +1170,16 @@ function NovaCampanhaLoteWizard({
             <>
               <div className="flex justify-between items-center">
                 <div>
-                  <p className="text-sm font-medium">Lotes gerados</p>
+                  <p className="text-sm font-medium">Prévia da distribuição</p>
                   <p className="text-xs text-muted-foreground">
-                    Total de lotes: {lotes.length} · Total de contatos (deduplicados): {totalContatosDeduplicados}
+                    {agendamentos.length} destinatário(s) em {diasPreview.length} dia(s). Horários e mensagens foram distribuídos aleatoriamente.
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" onClick={() => setStep(1)}>
-                    Voltar
-                  </Button>
-                  <Button type="button" variant="outline" onClick={handleSimularGeracao}>
-                    Simular geração
-                  </Button>
-                  <Button type="button" onClick={handleGerarCampanhas} disabled={gerandoCampanhas}>
+                  <Button type="button" variant="outline" onClick={() => setStep(1)}>Voltar</Button>
+                  <Button type="button" onClick={handleCriarCampanha} disabled={gerandoCampanhas}>
                     {gerandoCampanhas ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                    Gerar campanhas
+                    Criar campanha
                   </Button>
                 </div>
               </div>
@@ -1243,43 +1189,19 @@ function NovaCampanhaLoteWizard({
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-muted/50">
-                        <th className="text-left px-3 py-2 w-[40%]">Nome do lote</th>
-                        <th className="text-left px-3 py-2 w-[30%]">Data / hora do disparo</th>
-                        <th className="text-right px-3 py-2 w-[15%]">Contatos</th>
-                        <th className="text-right px-3 py-2 w-[15%]">Ações</th>
+                        <th className="text-left px-3 py-2">Dia</th>
+                        <th className="text-left px-3 py-2">Data</th>
+                        <th className="text-right px-3 py-2">Mensagens</th>
+                        <th className="text-left px-3 py-2">Janela</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {lotes.map((lote) => (
-                        <tr key={lote.numero} className="border-b last:border-b-0 hover:bg-muted/40">
-                          <td className="px-3 py-2 align-middle">
-                            <Input
-                              value={lote.nome}
-                              onChange={(e) => handleAtualizarLote(lote.numero, 'nome', e.target.value)}
-                              className="h-8 text-sm"
-                            />
-                          </td>
-                          <td className="px-3 py-2 align-middle">
-                            <Input
-                              type="datetime-local"
-                              value={lote.dataHora}
-                              onChange={(e) => handleAtualizarLote(lote.numero, 'dataHora', e.target.value)}
-                              className="h-8 text-sm"
-                            />
-                          </td>
-                          <td className="px-3 py-2 text-right align-middle">
-                            {lote.contatos.length}
-                          </td>
-                          <td className="px-3 py-2 text-right align-middle">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setLoteSelecionado(lote)}
-                            >
-                              Ver contatos
-                            </Button>
-                          </td>
+                      {diasPreview.map((dia) => (
+                        <tr key={dia.diaIndex} className="border-b last:border-b-0 hover:bg-muted/40">
+                          <td className="px-3 py-2">Lote {dia.diaIndex + 1}</td>
+                          <td className="px-3 py-2">{dia.data}</td>
+                          <td className="px-3 py-2 text-right font-medium">{dia.quantidade}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{dia.janelaInicio} – {dia.janelaFim}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1289,34 +1211,11 @@ function NovaCampanhaLoteWizard({
 
               <div className="rounded-md bg-muted/60 border px-3 py-2 text-xs text-muted-foreground">
                 <p>
-                  Você pode ajustar manualmente a data/hora e o nome de cada lote. Procure respeitar o limite de
-                  aproximadamente <strong>2000 disparos por dia</strong> e evitar colisões de horário entre lotes.
+                  Será criada <strong>uma única campanha</strong> com todos os destinatários.
+                  Cada um tem um horário de disparo aleatório dentro da janela do seu dia e uma mensagem sorteada entre as opções cadastradas.
                 </p>
               </div>
             </>
-          )}
-
-          {loteSelecionado && (
-            <Dialog open onOpenChange={() => setLoteSelecionado(null)}>
-              <DialogContent className="max-w-lg max-h-[80vh] flex flex-col overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Contatos do {loteSelecionado.nome}</DialogTitle>
-                </DialogHeader>
-                <ScrollArea className="flex-1">
-                  <div className="space-y-1 p-2 text-sm">
-                    {loteSelecionado.contatos.map((c) => (
-                      <div
-                        key={c.id}
-                        className="flex justify-between items-center border-b last:border-b-0 py-1"
-                      >
-                        <span>{c.nome || c.whatsapp_numero}</span>
-                        <span className="text-xs text-muted-foreground">{c.whatsapp_numero}</span>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </DialogContent>
-            </Dialog>
           )}
         </div>
       </DialogContent>
