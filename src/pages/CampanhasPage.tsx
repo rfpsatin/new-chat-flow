@@ -835,6 +835,41 @@ function NovaCampanhaLoteWizard({
     }
     setLoadingContatos(true);
     try {
+      // 1) Se excluir recentes, buscar IDs de contatos em campanhas recentes
+      let idsExcluir = new Set<string>();
+      if (excluirRecentes && diasExclusao > 0) {
+        const dataLimite = new Date();
+        dataLimite.setDate(dataLimite.getDate() - diasExclusao);
+        const dataLimiteIso = dataLimite.toISOString();
+
+        // Buscar campanhas ativas/recentes
+        const { data: campanhasRecentes } = await supabase
+          .from('campanhas')
+          .select('id')
+          .eq('empresa_id', empresaId)
+          .gte('created_at', dataLimiteIso) as any;
+
+        if (campanhasRecentes?.length) {
+          const campanhaIds = campanhasRecentes.map((c: any) => c.id);
+          // Buscar contato_ids vinculados a essas campanhas
+          let fromDest = 0;
+          const pageSizeDest = 1000;
+          // eslint-disable-next-line no-constant-condition
+          while (true) {
+            const { data: dests } = await supabase
+              .from('campanha_destinatarios')
+              .select('contato_id')
+              .in('campanha_id', campanhaIds)
+              .range(fromDest, fromDest + pageSizeDest - 1) as any;
+            if (!dests?.length) break;
+            dests.forEach((d: any) => idsExcluir.add(d.contato_id));
+            if (dests.length < pageSizeDest) break;
+            fromDest += pageSizeDest;
+          }
+        }
+      }
+
+      // 2) Buscar contatos com filtros
       const pageSize = 1000;
       let from = 0;
       const acumulados: any[] = [];
@@ -845,7 +880,13 @@ function NovaCampanhaLoteWizard({
           .from('contatos')
           .select('id, nome, whatsapp_numero, tag_origem')
           .eq('empresa_id', empresaId);
-        if (filtroNome.trim()) query = query.ilike('nome', `%${filtroNome.trim()}%`);
+
+        // Se o filtro contém % ou _, usar como padrão ilike direto; senão, wrap com %
+        if (filtroNome.trim()) {
+          const termo = filtroNome.trim();
+          const isPattern = termo.includes('%') || termo.includes('_');
+          query = query.ilike('nome', isPattern ? termo : `%${termo}%`);
+        }
         if (filtroTelefone.trim()) {
           const digits = filtroTelefone.replace(/\D/g, '');
           if (digits) query = query.ilike('whatsapp_numero', `%${digits}%`);
@@ -861,15 +902,23 @@ function NovaCampanhaLoteWizard({
         from += pageSize;
       }
 
-      if (!acumulados.length) {
-        toast.error('Nenhum contato encontrado com os filtros informados.');
+      // 3) Filtrar exclusões
+      const filtrados = idsExcluir.size > 0
+        ? acumulados.filter((c) => !idsExcluir.has(c.id))
+        : acumulados;
+
+      if (!filtrados.length) {
+        toast.error(idsExcluir.size > 0
+          ? 'Nenhum contato encontrado (todos já foram usados em campanhas recentes).'
+          : 'Nenhum contato encontrado com os filtros informados.');
         setContatosFonte([]);
         return;
       }
       setContatosFonte(
-        acumulados.map((c: any) => ({ id: c.id as string, nome: c.nome as string | null, whatsapp_numero: String(c.whatsapp_numero) })),
+        filtrados.map((c: any) => ({ id: c.id as string, nome: c.nome as string | null, whatsapp_numero: String(c.whatsapp_numero) })),
       );
-      toast.success(`Encontrados ${acumulados.length} contato(s).`);
+      const excluidos = acumulados.length - filtrados.length;
+      toast.success(`Encontrados ${filtrados.length} contato(s).${excluidos > 0 ? ` (${excluidos} excluídos por campanha recente)` : ''}`);
     } finally {
       setLoadingContatos(false);
     }
