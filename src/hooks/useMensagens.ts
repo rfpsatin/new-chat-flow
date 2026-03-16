@@ -83,21 +83,7 @@ export function useEnviarMensagem() {
 
       let whapiMessageId: string | null = null;
 
-      if (isN8nWebchat) {
-        const { error: replyError } = await supabase.functions.invoke('webchat-human-reply', {
-          body: {
-            empresa_id: empresaId,
-            conversa_id: conversaId,
-            mensagem: conteudo,
-            remetente_id: remetenteId,
-            reply_to_whatsapp_id: replyToWhatsappId ?? undefined,
-          },
-        });
-
-        if (replyError) {
-          throw new Error(replyError.message || 'Erro ao enviar mensagem para o webchat via n8n');
-        }
-      } else {
+      if (!isN8nWebchat) {
         const { data: sendResult, error: whapiError } = await supabase.functions.invoke('whapi-send-message', {
           body: {
             empresa_id: empresaId,
