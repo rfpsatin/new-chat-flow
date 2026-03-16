@@ -266,7 +266,6 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
     ['adm', 'sup'].includes(currentUser?.tipo_usuario || '');
 
   const canRemoveCampanhaErro =
-    !!conversaDetalhes &&
     !!conversa.campanha_id &&
     !!conversa.contato_id &&
     !mensagensLoading &&
@@ -274,7 +273,14 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
     ['bot', 'esperando_tria', 'fila_humano'].includes(effectiveStatus);
 
   const handleRemoverConversaCampanhaErro = async () => {
-    if (!conversa || !conversaDetalhes || !conversa.campanha_id || !conversa.contato_id) return;
+    if (!conversa || !conversa.campanha_id || !conversa.contato_id) return;
+    if (!conversaDetalhes) {
+      toast({
+        title: 'Aguarde um instante',
+        description: 'Ainda estamos carregando os detalhes da conversa. Tente novamente em alguns segundos.',
+      });
+      return;
+    }
     if (!(mensagens?.length === 0)) return;
 
     const confirmar = window.confirm(
