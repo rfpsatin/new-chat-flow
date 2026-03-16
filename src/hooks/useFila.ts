@@ -17,7 +17,7 @@ export function useFila(empresaId: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('vw_fila_atendimento')
-        .select('conversa_id, empresa_id, contato_id, contato_nome, whatsapp_numero, status, last_message_at, created_at, agente_responsavel_id, agente_nome, resumo, origem, channel, nr_protocolo')
+        .select('conversa_id, empresa_id, contato_id, contato_nome, whatsapp_numero, status, last_message_at, created_at, agente_responsavel_id, agente_nome, resumo, origem, channel, nr_protocolo, campanha_id')
         .eq('empresa_id', empresaId);
       
       if (error) throw error;

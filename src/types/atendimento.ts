@@ -117,6 +117,8 @@ export interface FilaAtendimento {
   channel?: string | null;
   /** Número de protocolo (ex: 20260218-0000002). Gerado automaticamente; reinicia a cada dia. */
   nr_protocolo?: string | null;
+  /** Se a conversa foi originada por campanha, id da campanha. */
+  campanha_id?: string | null;
 }
 
 export interface HistoricoConversa {
