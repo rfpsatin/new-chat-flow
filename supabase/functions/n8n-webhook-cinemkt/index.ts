@@ -302,7 +302,7 @@ async function findOrCreateConversa(
       empresa_id: empresaId,
       contato_id: contatoId,
       status: 'bot',
-      canal: 'whatsapp',
+      canal: origem === 'web-chat' ? 'web' : 'whatsapp',
       iniciado_por: 'cliente',
       origem, channel, human_mode: humanMode, n8n_webhook_id: n8nWebhookId,
     })
