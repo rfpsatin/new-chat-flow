@@ -267,9 +267,9 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
 
   const canRemoveCampanhaErro =
     !!conversaDetalhes &&
-    conversaDetalhes.origem_inicial === 'campanha' &&
     !!conversa.campanha_id &&
     !!conversa.contato_id &&
+    !mensagensLoading &&
     (mensagens?.length ?? 0) === 0 &&
     ['bot', 'esperando_tria', 'fila_humano'].includes(effectiveStatus);
 
