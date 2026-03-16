@@ -801,6 +801,8 @@ function NovaCampanhaLoteWizard({
   const [filtroNome, setFiltroNome] = useState('');
   const [filtroTelefone, setFiltroTelefone] = useState('');
   const [filtroTag, setFiltroTag] = useState('');
+  const [excluirRecentes, setExcluirRecentes] = useState(false);
+  const [diasExclusao, setDiasExclusao] = useState(30);
 
   const [loadingContatos, setLoadingContatos] = useState(false);
   const [contatosFonte, setContatosFonte] = useState<ContatoLote[]>([]);
