@@ -10,6 +10,7 @@ import {
   useAdicionarDestinatarios,
   useExcluirCampanha,
   useReagendarErrosCampanha,
+  useAtualizarStatusCampanha,
   type CampanhasFiltros,
 } from '@/hooks/useCampanhas';
 import { useContatosInfinite } from '@/hooks/useContatos';
@@ -324,6 +325,7 @@ function CampanhaDetailDialog({
   const agendar = useAgendarCampanha();
   const excluir = useExcluirCampanha();
   const reagendarErros = useReagendarErrosCampanha();
+  const atualizarStatus = useAtualizarStatusCampanha();
   const [agendadoPara, setAgendadoPara] = useState('');
   const [novoAgendamentoErros, setNovoAgendamentoErros] = useState('');
 
@@ -334,6 +336,11 @@ function CampanhaDetailDialog({
   // Campanhas não enviadas: draft ou agendada e nunca iniciada
   const podeRemover =
     campanha && (campanha.status === 'draft' || campanha.status === 'agendada') && !campanha.iniciada_em;
+
+  const podePausar =
+    campanha && (campanha.status === 'agendada' || campanha.status === 'em_execucao');
+
+  const isPausando = atualizarStatus.isPending;
 
   useEffect(() => {
     if (!campanha) return;
@@ -377,6 +384,17 @@ function CampanhaDetailDialog({
     }
   };
 
+  const handlePausar = async () => {
+    if (!campanha) return;
+    try {
+      await atualizarStatus.mutateAsync({ campanhaId, status: 'pausada' });
+      toast.success('Campanha pausada. Novos envios serão interrompidos.');
+      onClose();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Erro ao pausar campanha');
+    }
+  };
+
   const handleReagendarErros = async () => {
     if (!novoAgendamentoErros.trim()) {
       toast.error('Informe a data e hora para o novo agendamento.');
@@ -406,21 +424,38 @@ function CampanhaDetailDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between gap-4">
             <span>{campanha.nome}</span>
-            {podeRemover && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleExcluir}
-                disabled={excluir.isPending}
-              >
-                {excluir.isPending ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  'Remover campanha'
-                )}
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {podePausar && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePausar}
+                  disabled={isPausando}
+                >
+                  {isPausando ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    'Pausar envio'
+                  )}
+                </Button>
+              )}
+              {podeRemover && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExcluir}
+                  disabled={excluir.isPending}
+                >
+                  {excluir.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    'Remover campanha'
+                  )}
+                </Button>
+              )}
+            </div>
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">

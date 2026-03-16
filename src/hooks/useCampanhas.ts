@@ -208,6 +208,36 @@ export function useAgendarCampanha() {
   });
 }
 
+/** Atualiza apenas o status da campanha (ex: pausar, retomar). */
+export function useAtualizarStatusCampanha() {
+  const qc = useQueryClient();
+  return useMutation<
+    Campanha,
+    Error,
+    { campanhaId: string; status: Campanha['status'] }
+  >({
+    mutationFn: async ({ campanhaId, status }) => {
+      const { data, error } = await sb
+        .from('campanhas')
+        .update({
+          status,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', campanhaId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as Campanha;
+    },
+    onSuccess: (_, { campanhaId }) => {
+      qc.invalidateQueries({ queryKey: ['campanhas'] });
+      qc.invalidateQueries({ queryKey: ['campanha', campanhaId] });
+      qc.invalidateQueries({ queryKey: ['campanhas-stats'] });
+      qc.invalidateQueries({ queryKey: ['campanhas-stats-infinite'] });
+    },
+  });
+}
+
 export function useAdicionarDestinatarios() {
   const qc = useQueryClient();
   return useMutation<{ added: number }, Error, { campanha_id: string; contato_ids: string[]; empresa_id: string }>({
