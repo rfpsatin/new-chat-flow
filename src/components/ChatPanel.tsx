@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { useMensagens, useEnviarMensagem, useEnviarArquivo } from '@/hooks/useMensagens';
-import { useConversa } from '@/hooks/useFila';
+import { useConversa, useRemoverConversaCampanhaErro } from '@/hooks/useFila';
 import { useEmpresa } from '@/hooks/useEmpresa';
 import { MensagemAtiva, FilaAtendimento } from '@/types/atendimento';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -264,6 +264,46 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
   const canTransfer = conversa.status === 'em_atendimento_humano' &&
     ['adm', 'sup'].includes(currentUser?.tipo_usuario || '');
 
+  const removerConversaCampanhaErro = useRemoverConversaCampanhaErro();
+
+  const canRemoveCampanhaErro =
+    !!conversaDetalhes &&
+    conversaDetalhes.origem_inicial === 'campanha' &&
+    !!conversa.campanha_id &&
+    !!conversa.contato_id &&
+    (mensagens?.length ?? 0) === 0 &&
+    ['bot', 'esperando_tria', 'fila_humano'].includes(effectiveStatus);
+
+  const handleRemoverConversaCampanhaErro = async () => {
+    if (!conversa || !conversaDetalhes || !conversa.campanha_id || !conversa.contato_id) return;
+    if (!(mensagens?.length === 0)) return;
+
+    const confirmar = window.confirm(
+      'Remover esta conversa da fila? Ela foi criada por uma campanha cujo envio falhou e não possui mensagens.',
+    );
+    if (!confirmar) return;
+
+    try {
+      await removerConversaCampanhaErro.mutateAsync({
+        conversaId: conversa.conversa_id,
+        contatoId: conversa.contato_id,
+        campanhaId: conversa.campanha_id,
+      });
+      toast({
+        title: 'Conversa removida',
+        description: 'A conversa de campanha com erro foi removida da fila de triagem.',
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Erro ao remover conversa de campanha com erro.';
+      toast({
+        title: 'Não foi possível remover',
+        description: message,
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <div className="absolute inset-0 flex flex-col bg-background">
       {/* Header */}
@@ -299,6 +339,21 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
           <div className="flex flex-col items-end gap-1">
             <div className="flex items-center gap-3">
               <StatusBadge status={conversa.status} />
+              {canRemoveCampanhaErro && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRemoverConversaCampanhaErro}
+                  disabled={removerConversaCampanhaErro.isPending}
+                >
+                  {removerConversaCampanhaErro.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                  ) : (
+                    <XCircle className="w-4 h-4 mr-1" />
+                  )}
+                  Remover conversa
+                </Button>
+              )}
               {canRespond && (
                 <Button
                   variant="destructive"

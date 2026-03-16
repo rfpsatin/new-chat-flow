@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { FilaAtendimento, Conversa } from '@/types/atendimento';
+import { FilaAtendimento } from '@/types/atendimento';
 import { useEffect, useMemo } from 'react';
 import { usePageVisibility } from '@/hooks/usePageVisibility';
 
@@ -169,5 +169,82 @@ export function useConversa(conversaId: string | null) {
       return data;
     },
     enabled: !!conversaId,
+  });
+}
+
+/** Remove conversas "fantasmas" criadas por campanha cujo envio falhou e não geraram mensagens. */
+export function useRemoverConversaCampanhaErro() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    void,
+    Error,
+    { conversaId: string; contatoId: string; campanhaId: string }
+  >({
+    mutationFn: async ({ conversaId, contatoId, campanhaId }) => {
+      // 1) Garante que a conversa existe, é de campanha e está em status de fila/bot
+      const { data: conversa, error: convErr } = await supabase
+        .from('conversas')
+        .select('id, origem_inicial, status, empresa_id')
+        .eq('id', conversaId)
+        .maybeSingle();
+      if (convErr) throw convErr;
+      if (!conversa) {
+        throw new Error('Conversa não encontrada.');
+      }
+      if (conversa.origem_inicial !== 'campanha') {
+        throw new Error('Conversa não foi originada por campanha.');
+      }
+      if (!['bot', 'esperando_tria', 'fila_humano'].includes(conversa.status)) {
+        throw new Error('Só é possível remover conversas ainda na triagem/fila.');
+      }
+
+      // 2) Garante que não há mensagens ativas ou de histórico vinculadas
+      const { count: msgsAtivas } = await supabase
+        .from('mensagens_ativas')
+        .select('id', { count: 'exact', head: true })
+        .eq('conversa_id', conversaId);
+
+      const { count: msgsHist } = await supabase
+        .from('mensagens_historico')
+        .select('id', { count: 'exact', head: true })
+        .eq('conversa_id', conversaId);
+
+      if ((msgsAtivas ?? 0) > 0 || (msgsHist ?? 0) > 0) {
+        throw new Error('Conversa já possui mensagens e não pode ser removida por este atalho.');
+      }
+
+      // 3) Garante que o destinatário da campanha está marcado com erro de envio
+      const { count: errosEnvio, error: erroCountErr } = await supabase
+        .from('campanha_destinatarios')
+        .select('id', { count: 'exact', head: true })
+        .eq('campanha_id', campanhaId)
+        .eq('contato_id', contatoId)
+        .eq('status_envio', 'erro_envio');
+      if (erroCountErr) throw erroCountErr;
+
+      const { count: enviosOk, error: okCountErr } = await supabase
+        .from('campanha_destinatarios')
+        .select('id', { count: 'exact', head: true })
+        .eq('campanha_id', campanhaId)
+        .eq('contato_id', contatoId)
+        .in('status_envio', ['enviado', 'entregue', 'lido']);
+      if (okCountErr) throw okCountErr;
+
+      if ((errosEnvio ?? 0) === 0 || (enviosOk ?? 0) > 0) {
+        throw new Error('Destinatário não está marcado apenas como erro de envio.');
+      }
+
+      // 4) Finalmente remove a conversa
+      const { error: delErr } = await supabase
+        .from('conversas')
+        .delete()
+        .eq('id', conversaId);
+      if (delErr) throw delErr;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fila'] });
+      queryClient.invalidateQueries({ queryKey: ['conversa'] });
+    },
   });
 }
