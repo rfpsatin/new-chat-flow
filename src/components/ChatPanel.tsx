@@ -47,6 +47,7 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
   const { empresa } = useEmpresa(empresaId);
   const { data: mensagens, isLoading: mensagensLoading } = useMensagens(conversa?.conversa_id || null);
   const { data: conversaDetalhes } = useConversa(conversa?.conversa_id || null);
+  const removerConversaCampanhaErro = useRemoverConversaCampanhaErro();
   const enviarMensagem = useEnviarMensagem();
   const enviarArquivo = useEnviarArquivo();
   const { toast } = useToast();
@@ -263,8 +264,6 @@ export function ChatPanel({ conversa }: ChatPanelProps) {
 
   const canTransfer = conversa.status === 'em_atendimento_humano' &&
     ['adm', 'sup'].includes(currentUser?.tipo_usuario || '');
-
-  const removerConversaCampanhaErro = useRemoverConversaCampanhaErro();
 
   const canRemoveCampanhaErro =
     !!conversaDetalhes &&
