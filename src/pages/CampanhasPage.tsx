@@ -1194,7 +1194,8 @@ function NovaCampanhaLoteWizard({
                 <div className="flex flex-wrap gap-3 items-end">
                   <div className="flex-1 min-w-[160px]">
                     <label className="text-sm font-medium">Filtrar por nome</label>
-                    <Input value={filtroNome} onChange={(e) => setFiltroNome(e.target.value)} placeholder="Opcional" className="mt-1" />
+                    <Input value={filtroNome} onChange={(e) => setFiltroNome(e.target.value)} placeholder="Ex: João ou A%" className="mt-1" />
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Use % como curinga. Ex: A% = nomes que começam com A</p>
                   </div>
                   <div className="flex-1 min-w-[160px]">
                     <label className="text-sm font-medium">Filtrar por telefone</label>
@@ -1209,6 +1210,30 @@ function NovaCampanhaLoteWizard({
                     Buscar contatos
                   </Button>
                 </div>
+
+                <div className="flex flex-wrap items-center gap-3 pt-1 border-t">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="excluir-recentes"
+                      checked={excluirRecentes}
+                      onCheckedChange={(v) => setExcluirRecentes(!!v)}
+                    />
+                    <label htmlFor="excluir-recentes" className="text-sm cursor-pointer">
+                      Excluir contatos usados em campanhas dos últimos
+                    </label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={diasExclusao}
+                      onChange={(e) => setDiasExclusao(Number(e.target.value) || 30)}
+                      className="w-16 h-8 text-sm"
+                      disabled={!excluirRecentes}
+                    />
+                    <span className="text-sm text-muted-foreground">dias</span>
+                  </div>
+                </div>
+
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                   <p className="text-xs text-muted-foreground">
                     Contatos encontrados: {contatosFonte.length} (deduplicados: {totalContatosDeduplicados})
