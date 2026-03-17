@@ -268,6 +268,8 @@ export interface ListaTransmissao {
   status: StatusListaTransmissao;
   created_at: string;
   updated_at: string;
+  /** Link de convite/assinatura do canal/newsletter (WhatsApp). */
+  invite_url?: string | null;
 }
 
 export interface ListaTransmissaoContato {

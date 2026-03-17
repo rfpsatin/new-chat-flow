@@ -10,7 +10,7 @@ export function useListasTransmissao(empresaId: string | null) {
     queryFn: async () => {
       if (!empresaId) return [] as ListaTransmissao[];
       const { data, error } = await sb
-        .from('listas_transmissao')
+        .from('canais_newsletter')
         .select('*')
         .eq('empresa_id', empresaId)
         .order('created_at', { ascending: false });
@@ -26,7 +26,7 @@ export function useCriarListaTransmissao() {
   return useMutation<ListaTransmissao, Error, { empresa_id: string; nome: string; descricao?: string | null }>({
     mutationFn: async ({ empresa_id, nome, descricao }) => {
       const { data, error } = await sb
-        .from('listas_transmissao')
+        .from('canais_newsletter')
         .insert({
           empresa_id,
           nome,
@@ -51,9 +51,9 @@ export function useListaTransmissaoContatos(listaId: string | null) {
     queryFn: async () => {
       if (!listaId) return [] as ListaTransmissaoContato[];
       const { data, error } = await sb
-        .from('lista_transmissao_contatos')
-        .select('id, lista_id, contato_id, whatsapp_numero, created_at, contato:contatos(id, nome)')
-        .eq('lista_id', listaId)
+        .from('canal_newsletter_contatos')
+        .select('id, canal_id as lista_id, contato_id, whatsapp_numero, created_at, contato:contatos(id, nome)')
+        .eq('canal_id', listaId)
         .order('created_at', { ascending: true });
       if (error) throw error;
       return data as ListaTransmissaoContato[];
@@ -101,16 +101,16 @@ export function useAdicionarContatoListaTransmissao() {
       }
 
       const { data, error: insertErr } = await sb
-        .from('lista_transmissao_contatos')
+        .from('canal_newsletter_contatos')
         .upsert(
           {
-            lista_id: listaId,
+            canal_id: listaId,
             contato_id: contato.id,
             whatsapp_numero: String(contato.whatsapp_numero),
           },
-          { onConflict: 'lista_id,contato_id' },
+          { onConflict: 'canal_id,contato_id' },
         )
-        .select('id, lista_id, contato_id, whatsapp_numero, created_at, contato:contatos(id, nome)')
+        .select('id, canal_id as lista_id, contato_id, whatsapp_numero, created_at, contato:contatos(id, nome)')
         .single();
       if (insertErr) throw insertErr;
       return data as ListaTransmissaoContato;
@@ -120,5 +120,33 @@ export function useAdicionarContatoListaTransmissao() {
     },
   });
 }
+
+export function useAtualizarListaTransmissao() {
+  const qc = useQueryClient();
+  return useMutation<
+    ListaTransmissao,
+    Error,
+    { id: string; payload: Partial<Pick<ListaTransmissao, 'nome' | 'descricao' | 'invite_url' | 'status'>> }
+  >({
+    mutationFn: async ({ id, payload }) => {
+      const { data, error } = await sb
+        .from('canais_newsletter')
+        .update({
+          ...payload,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as ListaTransmissao;
+    },
+    onSuccess: (lista) => {
+      qc.invalidateQueries({ queryKey: ['listas-transmissao', lista.empresa_id] });
+      qc.invalidateQueries({ queryKey: ['listas-transmissao'] });
+    },
+  });
+}
+
 
 

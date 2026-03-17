@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { MainLayout } from '@/components/MainLayout';
 import { useApp } from '@/contexts/AppContext';
 import {
@@ -6,6 +6,7 @@ import {
   useCriarListaTransmissao,
   useListaTransmissaoContatos,
   useAdicionarContatoListaTransmissao,
+  useAtualizarListaTransmissao,
 } from '@/hooks/useListasTransmissao';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -30,6 +31,14 @@ export default function ListasTransmissaoPage() {
     selectedListaId,
   );
   const adicionarContatoLista = useAdicionarContatoListaTransmissao();
+  const atualizarLista = useAtualizarListaTransmissao();
+
+  const selectedLista = useMemo(
+    () => listas?.find((l) => l.id === selectedListaId) ?? null,
+    [listas, selectedListaId],
+  );
+
+  const [inviteUrlDraft, setInviteUrlDraft] = useState('');
 
   const isAdmin = currentUser?.tipo_usuario === 'adm';
 
@@ -63,6 +72,15 @@ export default function ListasTransmissaoPage() {
     );
   }
 
+  // Sincroniza inviteUrlDraft quando troca a lista selecionada
+  useMemo(() => {
+    if (selectedLista) {
+      setInviteUrlDraft(selectedLista.invite_url ?? '');
+    } else {
+      setInviteUrlDraft('');
+    }
+  }, [selectedLista]);
+
   return (
     <MainLayout>
       <div className="p-6 space-y-6">
@@ -80,11 +98,11 @@ export default function ListasTransmissaoPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Criar nova lista</CardTitle>
+            <CardTitle>Criar novo canal / newsletter</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="text-sm font-medium">Nome da lista *</label>
+              <label className="text-sm font-medium">Nome do canal *</label>
               <Input
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
@@ -116,7 +134,7 @@ export default function ListasTransmissaoPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Listas cadastradas</CardTitle>
+            <CardTitle>Canais / newsletters cadastrados</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -126,7 +144,7 @@ export default function ListasTransmissaoPage() {
               </div>
             ) : !listas?.length ? (
               <div className="py-8 text-center text-muted-foreground">
-                Nenhuma lista de transmissão criada ainda.
+                Nenhum canal/newsletter criado ainda.
               </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -169,7 +187,65 @@ export default function ListasTransmissaoPage() {
                   {selectedListaId ? (
                     <div className="space-y-4">
                       <h2 className="text-sm font-semibold">
-                        Contatos vinculados à lista selecionada
+                        Configuração do canal selecionado
+                      </h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Link de convite do canal</label>
+                          <Input
+                            value={inviteUrlDraft}
+                            onChange={(e) => setInviteUrlDraft(e.target.value)}
+                            placeholder="Cole aqui o link de convite do canal do WhatsApp"
+                            className="mt-1"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Use o link de convite gerado pelo seu canal oficial (ex: canal &quot;Ricardo
+                            Isenções&quot;). Este link será usado para gerar QR Codes de assinatura.
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              if (!selectedListaId) return;
+                              void atualizarLista
+                                .mutateAsync({
+                                  id: selectedListaId,
+                                  payload: { invite_url: inviteUrlDraft || null },
+                                })
+                                .catch((err) => console.error(err));
+                            }}
+                            disabled={atualizarLista.isPending || !selectedListaId}
+                          >
+                            {atualizarLista.isPending && (
+                              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                            )}
+                            Salvar link do canal
+                          </Button>
+                        </div>
+                        <div className="space-y-2 flex flex-col items-center justify-center">
+                          <span className="text-sm font-medium mb-1">QR Code para assinatura</span>
+                          {selectedLista?.invite_url ? (
+                            <div className="border rounded-md p-2 bg-white">
+                              <img
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
+                                  selectedLista.invite_url,
+                                )}`}
+                                alt="QR Code do canal"
+                                className="w-[220px] h-[220px]"
+                              />
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground text-center">
+                              Informe e salve o link de convite do canal para gerar o QR Code de
+                              assinatura.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <h2 className="text-sm font-semibold pt-2">
+                        Contatos vinculados a este canal (para futuras campanhas)
                       </h2>
                       <div className="flex flex-wrap items-end gap-3">
                         <div className="flex-1 min-w-[200px]">
