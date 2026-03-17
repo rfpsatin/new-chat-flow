@@ -269,3 +269,15 @@ export interface ListaTransmissao {
   created_at: string;
   updated_at: string;
 }
+
+export interface ListaTransmissaoContato {
+  id: string;
+  lista_id: string;
+  contato_id: string;
+  whatsapp_numero: string;
+  created_at: string;
+  contato?: {
+    id: string;
+    nome: string | null;
+  } | null;
+}

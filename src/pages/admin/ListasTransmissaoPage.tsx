@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { MainLayout } from '@/components/MainLayout';
 import { useApp } from '@/contexts/AppContext';
-import { useListasTransmissao, useCriarListaTransmissao } from '@/hooks/useListasTransmissao';
+import {
+  useListasTransmissao,
+  useCriarListaTransmissao,
+  useListaTransmissaoContatos,
+  useAdicionarContatoListaTransmissao,
+} from '@/hooks/useListasTransmissao';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,6 +23,13 @@ export default function ListasTransmissaoPage() {
 
   const [nome, setNome] = useState('');
   const [descricao, setDescricao] = useState('');
+  const [selectedListaId, setSelectedListaId] = useState<string | null>(null);
+  const [telefoneNovoContato, setTelefoneNovoContato] = useState('');
+
+  const { data: contatosLista, isLoading: contatosLoading } = useListaTransmissaoContatos(
+    selectedListaId,
+  );
+  const adicionarContatoLista = useAdicionarContatoListaTransmissao();
 
   const isAdmin = currentUser?.tipo_usuario === 'adm';
 
@@ -117,32 +129,124 @@ export default function ListasTransmissaoPage() {
                 Nenhuma lista de transmissão criada ainda.
               </div>
             ) : (
-              <div className="space-y-3">
-                {listas.map((lista) => (
-                  <div
-                    key={lista.id}
-                    className="border rounded-md px-3 py-2 flex items-center justify-between gap-3"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{lista.nome}</span>
-                        <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-                          {lista.status}
-                        </Badge>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="space-y-3 lg:col-span-1">
+                  {listas.map((lista) => {
+                    const isSelected = selectedListaId === lista.id;
+                    return (
+                      <button
+                        key={lista.id}
+                        type="button"
+                        onClick={() => setSelectedListaId(lista.id)}
+                        className={`w-full text-left border rounded-md px-3 py-2 flex items-center justify-between gap-3 transition-colors ${
+                          isSelected ? 'bg-accent/60 border-primary' : 'hover:bg-muted/60'
+                        }`}
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{lista.nome}</span>
+                            <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                              {lista.status}
+                            </Badge>
+                          </div>
+                          {lista.descricao && (
+                            <p className="text-xs text-muted-foreground">{lista.descricao}</p>
+                          )}
+                          <p className="text-[11px] text-muted-foreground">
+                            Criada em{' '}
+                            {format(new Date(lista.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                            {lista.provider_list_id
+                              ? ` • ID provedor: ${lista.provider_list_id}`
+                              : ' • Ainda não sincronizada com provedor'}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="lg:col-span-2">
+                  {selectedListaId ? (
+                    <div className="space-y-4">
+                      <h2 className="text-sm font-semibold">
+                        Contatos vinculados à lista selecionada
+                      </h2>
+                      <div className="flex flex-wrap items-end gap-3">
+                        <div className="flex-1 min-w-[200px]">
+                          <label className="text-sm font-medium">
+                            Adicionar contato pelo telefone (somente cadastro existente) *
+                          </label>
+                          <Input
+                            value={telefoneNovoContato}
+                            onChange={(e) => setTelefoneNovoContato(e.target.value)}
+                            placeholder="Ex: 554499356186"
+                            className="mt-1"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            if (!empresaId || !selectedListaId || !telefoneNovoContato.trim()) return;
+                            void adicionarContatoLista.mutateAsync({
+                              listaId: selectedListaId,
+                              empresaId,
+                              telefoneRaw: telefoneNovoContato,
+                            }).then(() => {
+                              setTelefoneNovoContato('');
+                            }).catch((err) => {
+                              console.error(err);
+                              // Erros mais amigáveis serão tratados em melhorias futuras (ex: toasts)
+                            });
+                          }}
+                          disabled={
+                            !empresaId ||
+                            !telefoneNovoContato.trim() ||
+                            adicionarContatoLista.isPending
+                          }
+                        >
+                          {adicionarContatoLista.isPending && (
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          )}
+                          Adicionar contato
+                        </Button>
                       </div>
-                      {lista.descricao && (
-                        <p className="text-xs text-muted-foreground">{lista.descricao}</p>
-                      )}
-                      <p className="text-[11px] text-muted-foreground">
-                        Criada em{' '}
-                        {format(new Date(lista.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                        {lista.provider_list_id
-                          ? ` • ID provedor: ${lista.provider_list_id}`
-                          : ' • Ainda não sincronizada com provedor'}
-                      </p>
+
+                      <div className="border rounded-md p-3 max-h-[260px] overflow-y-auto">
+                        {contatosLoading ? (
+                          <div className="py-4 text-sm text-muted-foreground flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Carregando contatos da lista...
+                          </div>
+                        ) : !contatosLista?.length ? (
+                          <p className="text-sm text-muted-foreground">
+                            Nenhum contato vinculado ainda. Use o campo acima para adicionar, sempre
+                            a partir de contatos já existentes no cadastro.
+                          </p>
+                        ) : (
+                          <ul className="space-y-1 text-sm">
+                            {contatosLista.map((c) => (
+                              <li
+                                key={c.id}
+                                className="flex items-center justify-between gap-2 border-b last:border-b-0 py-1"
+                              >
+                                <span className="truncate">
+                                  {c.contato?.nome || c.whatsapp_numero}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {c.whatsapp_numero}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Selecione uma lista à esquerda para visualizar e vincular contatos.
+                    </p>
+                  )}
+                </div>
               </div>
             )}
           </CardContent>
