@@ -29,6 +29,7 @@ import {
   Wifi,
   Megaphone,
   Building2,
+  ListChecks,
 } from "lucide-react";
 
 const menuItems = [
@@ -45,6 +46,7 @@ const adminMenuItems = [
   { title: "Usuários", url: "/admin/usuarios", icon: UserCog },
   { title: "Motivos Encerramento", url: "/admin/motivos", icon: FileText },
   { title: "Empresa", url: "/admin/empresa", icon: Building2 },
+  { title: "Listas de transmissão", url: "/admin/listas-transmissao", icon: ListChecks },
 ];
 
 export function AppSidebar() {

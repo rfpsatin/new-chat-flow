@@ -255,3 +255,17 @@ export interface CampanhaStats {
   /** Quem trata a resposta: agente ou atendente (para filtros na listagem). */
   modo_resposta?: string | null;
 }
+
+export type StatusListaTransmissao = 'rascunho' | 'sincronizada' | 'erro' | 'inativa';
+
+export interface ListaTransmissao {
+  id: string;
+  empresa_id: string;
+  nome: string;
+  descricao: string | null;
+  provider: string;
+  provider_list_id: string | null;
+  status: StatusListaTransmissao;
+  created_at: string;
+  updated_at: string;
+}

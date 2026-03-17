@@ -16,6 +16,7 @@ import CampanhasPage from "./pages/CampanhasPage";
 import UsuariosPage from "./pages/admin/UsuariosPage";
 import MotivosPage from "./pages/admin/MotivosPage";
 import EmpresaPage from "./pages/admin/EmpresaPage";
+import ListasTransmissaoPage from "./pages/admin/ListasTransmissaoPage";
 import SuperAdminEmpresasPage from "./pages/superadmin/EmpresasPage";
 import AcompanhamentoMensagensPage from "./pages/superadmin/AcompanhamentoMensagensPage";
 import NotFound from "./pages/NotFound";
@@ -89,6 +90,7 @@ const App = () => (
             <Route path="/admin/usuarios" element={<UsuariosPage />} />
             <Route path="/admin/motivos" element={<MotivosPage />} />
             <Route path="/admin/empresa" element={<EmpresaPage />} />
+            <Route path="/admin/listas-transmissao" element={<ListasTransmissaoPage />} />
           </Route>
 
           {/* Redirect old super admin login */}
