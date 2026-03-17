@@ -212,6 +212,99 @@ export type Database = {
         }
         Relationships: []
       }
+      canais_newsletter: {
+        Row: {
+          created_at: string
+          descricao: string | null
+          empresa_id: string
+          id: string
+          invite_url: string | null
+          nome: string
+          provider: string
+          provider_list_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          descricao?: string | null
+          empresa_id: string
+          id?: string
+          invite_url?: string | null
+          nome: string
+          provider?: string
+          provider_list_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          descricao?: string | null
+          empresa_id?: string
+          id?: string
+          invite_url?: string | null
+          nome?: string
+          provider?: string
+          provider_list_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listas_transmissao_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      canal_newsletter_contatos: {
+        Row: {
+          canal_id: string
+          contato_id: string
+          created_at: string
+          id: string
+          whatsapp_numero: string
+        }
+        Insert: {
+          canal_id: string
+          contato_id: string
+          created_at?: string
+          id?: string
+          whatsapp_numero: string
+        }
+        Update: {
+          canal_id?: string
+          contato_id?: string
+          created_at?: string
+          id?: string
+          whatsapp_numero?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lista_transmissao_contatos_contato_id_fkey"
+            columns: ["contato_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lista_transmissao_contatos_contato_id_fkey"
+            columns: ["contato_id"]
+            isOneToOne: false
+            referencedRelation: "vw_fila_atendimento"
+            referencedColumns: ["contato_id"]
+          },
+          {
+            foreignKeyName: "lista_transmissao_contatos_lista_id_fkey"
+            columns: ["canal_id"]
+            isOneToOne: false
+            referencedRelation: "canais_newsletter"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contatos: {
         Row: {
           created_at: string
