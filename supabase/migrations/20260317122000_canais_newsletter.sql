@@ -1,6 +1,6 @@
 -- Converter listas de transmissão em canais/newsletters
-truncate table public.lista_transmissao_contatos;
-truncate table public.listas_transmissao;
+-- É necessário truncar as duas tabelas na mesma instrução por causa da FK.
+truncate table public.lista_transmissao_contatos, public.listas_transmissao;
 
 alter table public.listas_transmissao
   rename to canais_newsletter;
