@@ -75,7 +75,7 @@ export default function LoginPage() {
           <div className="mx-auto w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
             <MessageSquare className="w-8 h-8 text-primary" />
           </div>
-          <CardTitle className="text-2xl font-bold">MaIA-Hub</CardTitle>
+          <CardTitle className="text-2xl font-bold">MaIA-Chat</CardTitle>
           <p className="text-muted-foreground text-sm mt-1">
             Hub de Atendimento
           </p>
