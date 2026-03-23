@@ -1,1 +1,0 @@
-ALTER TABLE public.campanha_destinatarios ADD COLUMN IF NOT EXISTS erro_envio_msg text;
