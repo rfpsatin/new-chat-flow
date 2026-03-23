@@ -1,0 +1,1 @@
+ALTER TABLE public.conversas ADD COLUMN origem_inicial text;

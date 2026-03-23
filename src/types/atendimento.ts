@@ -1,0 +1,285 @@
+export type StatusConversa = 
+  | 'bot' 
+  | 'esperando_tria' 
+  | 'fila_humano' 
+  | 'em_atendimento_humano' 
+  | 'encerrado';
+
+export type TipoUsuario = 'adm' | 'sup' | 'opr';
+
+export type DirecaoMensagem = 'in' | 'out';
+
+export type TipoRemetente = 'cliente' | 'bot' | 'agente' | 'sistema';
+
+export type TipoAtendimentoEmpresa = 'marketing' | 'comercial';
+
+export interface Empresa {
+  id: string;
+  razao_social: string;
+  nome_fantasia: string | null;
+  cnpj: string;
+  ativo: boolean;
+  agente_ia_ativo?: boolean;
+  tipo_atendimento?: TipoAtendimentoEmpresa;
+  created_at: string;
+}
+
+export interface Usuario {
+  id: string;
+  auth_user_id: string | null;
+  empresa_id: string;
+  nome: string;
+  email: string;
+  tipo_usuario: TipoUsuario;
+  ativo: boolean;
+  created_at: string;
+}
+
+export interface Contato {
+  id: string;
+  empresa_id: string;
+  nome: string | null;
+  whatsapp_numero: string;
+  telefone_numero: string | null;
+  /** Tag de origem do contato (ex.: campanha, importação, etiqueta livre). */
+  tag_origem?: string | null;
+  created_at: string;
+}
+
+export interface Conversa {
+  id: string;
+  empresa_id: string;
+  contato_id: string;
+  canal: string;
+  status: StatusConversa;
+  iniciado_por: string;
+  agente_responsavel_id: string | null;
+  motivo_encerramento_id: string | null;
+  encerrado_por_id: string | null;
+  encerrado_em: string | null;
+  resumo: string | null;
+  created_at: string;
+  updated_at: string;
+  last_message_at: string;
+  // Campos específicos do webhook n8n whatsapp_cinemkt (opcionais)
+  origem?: string | null;
+  channel?: string | null;
+  human_mode?: boolean | null;
+  n8n_webhook_id?: string | null;
+  campanha_id?: string | null;
+}
+
+export interface MensagemAtiva {
+  id: number;
+  empresa_id: string;
+  conversa_id: string;
+  contato_id: string;
+  direcao: DirecaoMensagem;
+  tipo_remetente: TipoRemetente;
+  remetente_id: string | null;
+  conteudo: string | null;
+  payload: Record<string, unknown> | null;
+  criado_em: string;
+  /** URL da mídia no Whapi (documento, imagem, áudio, etc.) */
+  media_url?: string | null;
+  media_kind?: string | null;
+  media_filename?: string | null;
+  media_mime?: string | null;
+  /** ID da mensagem no WhatsApp/Whapi (message.id) */
+  whatsapp_message_id?: string | null;
+  /** ID interno da mensagem à qual esta responde (reply) */
+  reply_to_message_id?: number | null;
+  /** ID da mensagem original no WhatsApp à qual esta responde */
+  reply_to_whatsapp_id?: string | null;
+}
+
+export interface MotivoEncerramento {
+  id: string;
+  empresa_id: string;
+  descricao: string;
+  ativo: boolean;
+}
+
+export interface FilaAtendimento {
+  conversa_id: string;
+  empresa_id: string;
+  contato_id: string;
+  contato_nome: string | null;
+  whatsapp_numero: string;
+  status: StatusConversa;
+  last_message_at: string;
+  created_at: string;
+  agente_responsavel_id: string | null;
+  agente_nome: string | null;
+  resumo: string | null;
+  // Campos específicos do webhook n8n whatsapp_cinemkt (opcionais)
+  origem?: string | null;
+  channel?: string | null;
+  /** Número de protocolo (ex: 20260218-0000002). Gerado automaticamente; reinicia a cada dia. */
+  nr_protocolo?: string | null;
+  /** Se a conversa foi originada por campanha, id da campanha. */
+  campanha_id?: string | null;
+}
+
+export interface HistoricoConversa {
+  conversa_id: string;
+  contato_id: string;
+  empresa_id: string;
+  canal: string;
+  status: StatusConversa;
+  iniciado_em: string;
+  encerrado_em: string | null;
+  motivo_encerramento: string | null;
+  resumo: string | null;
+  nota_satisfacao: number | null;
+  contato_nome: string | null;
+  whatsapp_numero: string | null;
+  agente_responsavel_id: string | null;
+  agente_nome: string | null;
+  /** Número de protocolo (ex: 20260218-0000002). */
+  nr_protocolo: string | null;
+  /** Status da conversa no momento do encerramento (ex: bot, esperando_tria, fila_humano, em_atendimento_humano). */
+  status_ao_encerrar: string | null;
+}
+
+export interface ContatoComHistorico {
+  contato_id: string;
+  contato_nome: string | null;
+  whatsapp_numero: string | null;
+  total_sessoes: number;
+}
+
+export interface AtendenteComHistorico {
+  agente_id: string;
+  agente_nome: string | null;
+  total_sessoes: number;
+}
+
+export interface FiltrosHistorico {
+  busca: string;
+  operadorId: string | null;
+  dataInicio: Date | null;
+  dataFim: Date | null;
+}
+
+export type StatusCampanha =
+  | 'draft'
+  | 'agendada'
+  | 'em_execucao'
+  | 'concluida'
+  | 'pausada'
+  | 'erro';
+
+export type StatusEnvioCampanha =
+  | 'pendente'
+  | 'enviando'
+  | 'enviado'
+  | 'erro_envio'
+  | 'entregue'
+  | 'lido';
+
+export interface Campanha {
+  id: string;
+  empresa_id: string;
+  nome: string;
+  descricao: string | null;
+  tags: string[];
+  mensagem_texto: string;
+  /** Lista de variações de mensagem de texto (quando configurado em campanhas em lote). */
+  mensagem_opcoes?: string[] | null;
+  midia_url: string | null;
+  link: string | null;
+  status: StatusCampanha;
+  agendado_para: string | null;
+  iniciada_em: string | null;
+  finalizada_em: string | null;
+  envios_por_minuto: number | null;
+  envios_por_hora: number | null;
+  /** Janela diária de disparo (hora local, opcional). */
+  hora_inicio_dia?: string | null;
+  hora_fim_dia?: string | null;
+  /** Limite máximo de envios por dia (lote diário). */
+  limite_diario?: number | null;
+  /** Oscilação (± minutos) aplicada ao início/fim do dia entre os dias de envio. */
+  variacao_minutos?: number | null;
+  /** Quantidade de mensagens no primeiro lote (primeiro dia). */
+  qtd_lote_1?: number | null;
+  /** Quantidade de mensagens no segundo lote (segundo dia). */
+  qtd_lote_2?: number | null;
+  /** Número máximo de lotes (dias) usados para distribuir o envio. */
+  max_lotes?: number | null;
+  /** Intervalo mínimo e máximo (em segundos) entre envios individuais. */
+  intervalo_min_segundos?: number | null;
+  intervalo_max_segundos?: number | null;
+  modo_resposta: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CampanhaDestinatario {
+  id: string;
+  campanha_id: string;
+  contato_id: string;
+  whatsapp_numero: string;
+  status_envio: StatusEnvioCampanha;
+  tentativas: number;
+  ultima_tentativa_em: string | null;
+  mensagem_id_whatsapp: string | null;
+  conversa_id: string | null;
+  created_at: string;
+  /** Data/hora em que este destinatário deve receber a mensagem (novo agendamento fino). */
+  agendado_para?: string | null;
+  /** Texto da mensagem atribuído especificamente a este destinatário. */
+  mensagem_texto?: string | null;
+  erro_envio_msg?: string | null;
+}
+
+export interface CampanhaStats {
+  campanha_id: string;
+  empresa_id: string;
+  nome: string;
+  status: StatusCampanha;
+  agendado_para: string | null;
+  iniciada_em: string | null;
+  finalizada_em: string | null;
+  total_destinatarios: number;
+  pendentes: number;
+  enviados: number;
+  erros: number;
+  entregues: number;
+  conversas_abertas: number;
+  /** Data de criação da campanha (opcional, depende da view). */
+  created_at?: string;
+  /** Tags da campanha (para filtros na listagem). */
+  tags?: string[] | null;
+  /** Quem trata a resposta: agente ou atendente (para filtros na listagem). */
+  modo_resposta?: string | null;
+}
+
+export type StatusListaTransmissao = 'rascunho' | 'sincronizada' | 'erro' | 'inativa';
+
+export interface ListaTransmissao {
+  id: string;
+  empresa_id: string;
+  nome: string;
+  descricao: string | null;
+  provider: string;
+  provider_list_id: string | null;
+  status: StatusListaTransmissao;
+  created_at: string;
+  updated_at: string;
+  /** Link de convite/assinatura do canal/newsletter (WhatsApp). */
+  invite_url?: string | null;
+}
+
+export interface ListaTransmissaoContato {
+  id: string;
+  lista_id: string;
+  contato_id: string;
+  whatsapp_numero: string;
+  created_at: string;
+  contato?: {
+    id: string;
+    nome: string | null;
+  } | null;
+}
